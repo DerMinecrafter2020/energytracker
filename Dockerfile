@@ -23,6 +23,9 @@ COPY --from=build /app/dist ./dist
 # Kopiere Server
 COPY server.js .
 
+# Declare persistent data directory
+VOLUME ["/app/data"]
+
 EXPOSE 3001
 
 ENV NODE_ENV=production
