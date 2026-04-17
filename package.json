@@ -1,9 +1,11 @@
 {
   "name": "energy-drink-caffeine-tracker",
   "private": true,
-  "version": "1.0.5",
+  "version": "1.0.6",
   "type": "module",
   "scripts": {
+    "version:auto": "node scripts/bump-version.mjs",
+    "prebuild": "npm run version:auto",
     "dev": "vite",
     "server": "node server.js",
     "build": "vite build",
