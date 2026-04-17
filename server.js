@@ -144,65 +144,78 @@ const saveSmtpConfig = async (cfg) => {
 };
 
 const initDb = async () => {
-  console.log(`[DB] 🗄️  Verbinde zu MySQL...`);
-  const dbPool = getPool();
+  const MAX_RETRIES = 10;
+  const RETRY_DELAY_MS = 5000;
 
-  try {
-    const createLogsTableQuery = `
-      CREATE TABLE IF NOT EXISTS caffeine_logs (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        size INT NOT NULL,
-        caffeine INT NOT NULL,
-        caffeinePerMl FLOAT NULL,
-        icon VARCHAR(16) NULL,
-        isPreset BOOLEAN DEFAULT false,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        date DATE NOT NULL
-      )
-    `;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    console.log(`[DB] 🗄️  Verbinde zu MySQL... (Versuch ${attempt}/${MAX_RETRIES})`);
+    const dbPool = getPool();
 
-    const createUsersTableQuery = `
-      CREATE TABLE IF NOT EXISTS users (
-        id CHAR(36) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        role VARCHAR(32) NOT NULL DEFAULT 'user',
-        verified BOOLEAN NOT NULL DEFAULT false,
-        verify_token VARCHAR(255) NULL,
-        verify_token_expiry BIGINT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        last_login TIMESTAMP NULL DEFAULT NULL,
-        INDEX idx_users_email (email),
-        INDEX idx_users_verify_token (verify_token)
-      )
-    `;
+    try {
+      const createLogsTableQuery = `
+        CREATE TABLE IF NOT EXISTS caffeine_logs (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          size INT NOT NULL,
+          caffeine INT NOT NULL,
+          caffeinePerMl FLOAT NULL,
+          icon VARCHAR(16) NULL,
+          isPreset BOOLEAN DEFAULT false,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          date DATE NOT NULL
+        )
+      `;
 
-    const createSmtpTableQuery = `
-      CREATE TABLE IF NOT EXISTS smtp_settings (
-        id TINYINT PRIMARY KEY,
-        host VARCHAR(255) NULL,
-        port INT NOT NULL DEFAULT 587,
-        secure BOOLEAN NOT NULL DEFAULT false,
-        auth_user VARCHAR(255) NULL,
-        auth_pass VARCHAR(512) NULL,
-        from_name VARCHAR(255) NOT NULL DEFAULT 'Koffein-Tracker',
-        from_email VARCHAR(255) NULL,
-        base_url VARCHAR(512) NOT NULL DEFAULT '',
-        registration_enabled BOOLEAN NOT NULL DEFAULT true,
-        demo_enabled BOOLEAN NOT NULL DEFAULT true,
-        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `;
+      const createUsersTableQuery = `
+        CREATE TABLE IF NOT EXISTS users (
+          id CHAR(36) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          password_hash VARCHAR(255) NOT NULL,
+          role VARCHAR(32) NOT NULL DEFAULT 'user',
+          verified BOOLEAN NOT NULL DEFAULT false,
+          verify_token VARCHAR(255) NULL,
+          verify_token_expiry BIGINT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          last_login TIMESTAMP NULL DEFAULT NULL,
+          INDEX idx_users_email (email),
+          INDEX idx_users_verify_token (verify_token)
+        )
+      `;
 
-    await dbPool.execute(createLogsTableQuery);
-    await dbPool.execute(createUsersTableQuery);
-    await dbPool.execute(createSmtpTableQuery);
-    console.log('[DB] ✓ Verbindung erfolgreich');
-  } catch (error) {
-    console.error('[DB] ✗ Verbindung fehlgeschlagen:', error.message);
-    throw error;
+      const createSmtpTableQuery = `
+        CREATE TABLE IF NOT EXISTS smtp_settings (
+          id TINYINT PRIMARY KEY,
+          host VARCHAR(255) NULL,
+          port INT NOT NULL DEFAULT 587,
+          secure BOOLEAN NOT NULL DEFAULT false,
+          auth_user VARCHAR(255) NULL,
+          auth_pass VARCHAR(512) NULL,
+          from_name VARCHAR(255) NOT NULL DEFAULT 'Koffein-Tracker',
+          from_email VARCHAR(255) NULL,
+          base_url VARCHAR(512) NOT NULL DEFAULT '',
+          registration_enabled BOOLEAN NOT NULL DEFAULT true,
+          demo_enabled BOOLEAN NOT NULL DEFAULT true,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+      `;
+
+      await dbPool.execute(createLogsTableQuery);
+      await dbPool.execute(createUsersTableQuery);
+      await dbPool.execute(createSmtpTableQuery);
+      console.log('[DB] ✓ Verbindung erfolgreich');
+      return; // success — exit the retry loop
+    } catch (error) {
+      const isLastAttempt = attempt === MAX_RETRIES;
+      console.error(
+        `[DB] ✗ Verbindung fehlgeschlagen (Versuch ${attempt}/${MAX_RETRIES}): ${error.message}`
+      );
+      if (isLastAttempt) throw error;
+      console.log(`[DB] ⏳ Nächster Versuch in ${RETRY_DELAY_MS / 1000}s...`);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      // Reset pool so next attempt opens a fresh connection
+      pool = null;
+    }
   }
 };
 
