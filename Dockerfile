@@ -1,5 +1,5 @@
 # Build Stage
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ WORKDIR /app
 
 # Installiere nur Production Dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Kopiere gebuildetes Frontend von Build Stage
 COPY --from=build /app/dist ./dist
