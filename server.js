@@ -257,7 +257,7 @@ app.get('/api/admin/smtp', requireAdmin, (req, res) => {
 });
 
 app.post('/api/admin/smtp', requireAdmin, (req, res) => {
-  const { host, port, secure, auth, fromName, fromEmail, baseUrl, registrationEnabled } = req.body || {};
+  const { host, port, secure, auth, fromName, fromEmail, baseUrl, registrationEnabled, demoEnabled } = req.body || {};
   if (!host || !port || !auth?.user)
     return res.status(400).json({ error: 'Host, Port und Benutzername sind erforderlich.' });
 
@@ -275,6 +275,7 @@ app.post('/api/admin/smtp', requireAdmin, (req, res) => {
     fromEmail:           fromEmail           || auth.user,
     baseUrl:             baseUrl             || '',
     registrationEnabled: registrationEnabled !== false,
+    demoEnabled:          demoEnabled !== false,
   });
   res.json({ success: true });
 });
@@ -323,6 +324,27 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
   if (users.length === before) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
   saveUsers(users);
   res.json({ success: true });
+});
+
+app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
+  const { role } = req.body || {};
+  if (!role || !['admin', 'user'].includes(role))
+    return res.status(400).json({ error: 'Rolle muss "admin" oder "user" sein.' });
+  const users = loadUsers();
+  const user  = users.find(u => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+  user.role = role;
+  saveUsers(users);
+  res.json({ success: true });
+});
+
+// ── Public settings (no auth required) ────────────────────────────────────────
+app.get('/api/settings/public', (req, res) => {
+  const cfg = loadSmtpConfig();
+  res.json({
+    demoEnabled:          cfg?.demoEnabled !== false,
+    registrationEnabled:  cfg?.registrationEnabled !== false,
+  });
 });
 
 // ── Public Registration & Login ───────────────────────────────────────────────

@@ -45,3 +45,13 @@ export const deleteAdminUser = (id) =>
     method:  'DELETE',
     headers: adminHeaders(),
   }).then(handle);
+
+export const setUserRole = (id, role) =>
+  fetch(`${API_BASE}/api/admin/users/${id}/role`, {
+    method:  'POST',
+    headers: adminHeaders(),
+    body:    JSON.stringify({ role }),
+  }).then(handle);
+
+export const fetchPublicSettings = () =>
+  fetch(`${API_BASE}/api/settings/public`).then(handle);

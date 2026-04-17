@@ -4,13 +4,13 @@ import {
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
   Settings, Mail, Server, Lock, Eye, EyeOff, Send,
-  CheckCircle, UserCheck, UserX, Clock,
+  CheckCircle, UserCheck, UserX, Clock, Shield,
 } from 'lucide-react';
 import { logout } from '../services/auth';
 import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
-  fetchAdminUsers, verifyAdminUser, deleteAdminUser,
+  fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole,
 } from '../services/adminApi';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ const AdminPanel = ({ session, onLogout }) => {
 
   // ── SMTP state ─────────────────────────────────────────────────────────
   const defaultSmtp = { host: '', port: 587, secure: false, auth: { user: '', pass: '' },
-    fromName: 'Koffein-Tracker', fromEmail: '', baseUrl: '', registrationEnabled: true };
+    fromName: 'Koffein-Tracker', fromEmail: '', baseUrl: '', registrationEnabled: true, demoEnabled: true };
   const [smtp, setSmtp]           = useState(defaultSmtp);
   const [smtpLoaded, setSmtpLoaded] = useState(false);
   const [testEmail, setTestEmail] = useState('');
@@ -152,6 +152,17 @@ const AdminPanel = ({ session, onLogout }) => {
     try {
       await deleteAdminUser(id);
       setRegUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err) {
+      setUsersMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleToggleRole = async (id, currentRole) => {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    try {
+      await setUserRole(id, newRole);
+      setRegUsers((prev) => prev.map((u) => u.id === id ? { ...u, role: newRole } : u));
+      setUsersMsg({ type: 'success', text: `Rolle auf "${newRole === 'admin' ? 'Admin' : 'Benutzer'}" geändert.` });
     } catch (err) {
       setUsersMsg({ type: 'error', text: err.message });
     }
@@ -580,18 +591,28 @@ const AdminPanel = ({ session, onLogout }) => {
               ) : (
                 <>
                   {/* Header */}
-                  <div className="grid grid-cols-[2fr_2fr_1fr_1fr_auto] gap-3 px-5 py-3
+                  <div className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_auto] gap-3 px-5 py-3
                     border-b border-white/10 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <span>Name</span><span>E-Mail</span><span>Status</span><span>Registriert</span>
+                    <span>Name</span><span>E-Mail</span><span>Rolle</span><span>Status</span><span>Registriert</span>
                     <span className="text-right">Aktionen</span>
                   </div>
                   <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto">
                     {regUsers.map((u) => (
                       <div key={u.id}
-                        className="grid grid-cols-[2fr_2fr_1fr_1fr_auto] gap-3 px-5 py-3.5
+                        className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_auto] gap-3 px-5 py-3.5
                           hover:bg-white/5 transition-colors items-center text-sm">
                         <span className="text-white font-medium truncate">{u.name}</span>
                         <span className="text-slate-400 truncate text-xs">{u.email}</span>
+                        <span>
+                          {u.role === 'admin'
+                            ? <span className="flex items-center gap-1 text-xs text-amber-400">
+                                <Shield className="w-3.5 h-3.5" />Admin
+                              </span>
+                            : <span className="flex items-center gap-1 text-xs text-slate-400">
+                                <Zap className="w-3.5 h-3.5" />Benutzer
+                              </span>
+                          }
+                        </span>
                         <span>
                           {u.verified
                             ? <span className="flex items-center gap-1 text-xs text-green-400">
@@ -604,6 +625,15 @@ const AdminPanel = ({ session, onLogout }) => {
                         </span>
                         <span className="text-slate-600 text-xs">{formatDate(u.createdAt)}</span>
                         <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => handleToggleRole(u.id, u.role)}
+                            className={`p-1.5 rounded-lg transition-all ${
+                              u.role === 'admin'
+                                ? 'text-amber-400 hover:text-slate-400 hover:bg-white/5'
+                                : 'text-slate-600 hover:text-amber-400 hover:bg-amber-500/10'
+                            }`}
+                            title={u.role === 'admin' ? 'Zum Benutzer herabstufen' : 'Zum Admin befördern'}>
+                            <Shield className="w-4 h-4" />
+                          </button>
                           {!u.verified && (
                             <button onClick={() => handleVerifyUser(u.id)}
                               className="p-1.5 rounded-lg text-slate-600 hover:text-green-400
@@ -775,6 +805,28 @@ const AdminPanel = ({ session, onLogout }) => {
                     ${smtp.registrationEnabled ? 'bg-green-500' : 'bg-white/10'}`}>
                   <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-300
                     ${smtp.registrationEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Demo access toggle card */}
+            <div className="glass-card rounded-2xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    Demo-Zugang
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Zeigt Demo-Login-Buttons auf der Anmeldeseite (Admin + Benutzer).
+                  </p>
+                </div>
+                <button type="button"
+                  onClick={() => handleSmtpChange('demoEnabled', !smtp.demoEnabled)}
+                  className={`relative w-12 h-6 rounded-full transition-all duration-300
+                    ${smtp.demoEnabled !== false ? 'bg-amber-500' : 'bg-white/10'}`}>
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-300
+                    ${smtp.demoEnabled !== false ? 'left-7' : 'left-1'}`} />
                 </button>
               </div>
             </div>

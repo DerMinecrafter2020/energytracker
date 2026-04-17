@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { login } from '../services/auth';
+import { fetchPublicSettings } from '../services/adminApi';
 
 const LoginPage = ({ onLogin, onShowRegister }) => {
   const [email, setEmail]       = useState('');
@@ -9,6 +10,14 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
   const [error, setError]       = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [verifiedBanner, setVerifiedBanner] = useState(null);
+  const [publicSettings, setPublicSettings] = useState({ demoEnabled: true, registrationEnabled: true });
+
+  // Load public settings (demo toggle, registration toggle)
+  useEffect(() => {
+    fetchPublicSettings()
+      .then((s) => setPublicSettings(s))
+      .catch(() => {});
+  }, []);
 
   // Handle ?verified= query param (from email-verification redirect)
   useEffect(() => {
@@ -127,6 +136,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
           </form>
 
           {/* Register link */}
+          {publicSettings.registrationEnabled && (
           <div className="mt-5 pt-4 border-t border-white/10 text-center">
             <p className="text-sm text-slate-500">
               Noch kein Konto?{' '}
@@ -136,8 +146,10 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
               </button>
             </p>
           </div>
+          )}
 
           {/* Demo fill */}
+          {publicSettings.demoEnabled && (
           <div className="mt-4 pt-4 border-t border-white/10">
             <p className="text-xs text-slate-600 text-center mb-3">Demo-Zugänge</p>
             <div className="flex gap-2">
@@ -155,6 +167,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
               </button>
             </div>
           </div>
+          )}
         </div>
 
         <p className="text-center text-xs text-slate-600 mt-4">

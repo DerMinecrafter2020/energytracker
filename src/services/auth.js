@@ -14,17 +14,30 @@ const BUILTIN_USERS = [
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 /**
- * Attempt login. Checks built-in credentials first, then server-registered users.
+ * Attempt login. Checks built-in credentials first (if demo enabled), then server-registered users.
  * Returns session object on success, throws on failure.
  */
 export const login = async (email, password) => {
   const trimmed = email.trim().toLowerCase();
 
-  // 1. Check built-in admin/user credentials
+  // 1. Check built-in admin/user credentials (only if demo access enabled)
   const builtin = BUILTIN_USERS.find(
     (u) => u.email.toLowerCase() === trimmed && u.password === password
   );
   if (builtin) {
+    // Verify demo is still enabled server-side
+    try {
+      const resp = await fetch(`${API_BASE}/api/settings/public`);
+      if (resp.ok) {
+        const settings = await resp.json();
+        if (settings.demoEnabled === false) {
+          throw new Error('Demo-Zugang ist deaktiviert.');
+        }
+      }
+    } catch (err) {
+      if (err.message === 'Demo-Zugang ist deaktiviert.') throw err;
+      // If server is unreachable, allow built-in login as fallback
+    }
     const session = {
       email:   builtin.email,
       role:    builtin.role,
