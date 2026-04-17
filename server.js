@@ -71,6 +71,7 @@ let dbState = {
   caffeine_logs: [],
   users: [],
   smtp_settings: null,
+  reminders: [],
 };
 
 const ensureDbFile = () => {
@@ -88,6 +89,7 @@ const loadDbState = () => {
     caffeine_logs: Array.isArray(parsed.caffeine_logs) ? parsed.caffeine_logs : [],
     users: Array.isArray(parsed.users) ? parsed.users : [],
     smtp_settings: parsed.smtp_settings || null,
+    reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
   };
 };
 
@@ -349,6 +351,117 @@ const initDb = async () => {
   console.log('[DB] 🗄️  Starte lokale Datei-Datenbank...');
   getPool();
   console.log(`[DB] ✓ Datei-Datenbank bereit: ${dbFile}`);
+};
+
+const getReminderOwnerKey = ({ userId, email }) => {
+  if (userId) return `user:${userId}`;
+  return `email:${String(email || '').toLowerCase().trim()}`;
+};
+
+const isValidReminderTime = (time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(time || ''));
+
+const sanitizeReminder = (reminder) => ({
+  enabled: reminder.enabled !== false,
+  time: isValidReminderTime(reminder.time) ? reminder.time : '18:00',
+  mailEnabled: reminder.mailEnabled !== false,
+  discordEnabled: !!reminder.discordEnabled,
+  discordWebhook: reminder.discordWebhook || '',
+  lastTriggeredDate: reminder.lastTriggeredDate || null,
+});
+
+const getReminderForUser = ({ userId, email }) => {
+  const ownerKey = getReminderOwnerKey({ userId, email });
+  const found = dbState.reminders.find((r) => r.ownerKey === ownerKey);
+  if (!found) {
+    return {
+      ownerKey,
+      userId: userId || null,
+      email: String(email || '').toLowerCase().trim(),
+      ...sanitizeReminder({}),
+    };
+  }
+  return {
+    ...found,
+    ...sanitizeReminder(found),
+  };
+};
+
+const upsertReminderForUser = ({ userId, email, settings }) => {
+  const ownerKey = getReminderOwnerKey({ userId, email });
+  const idx = dbState.reminders.findIndex((r) => r.ownerKey === ownerKey);
+  const base = idx >= 0 ? dbState.reminders[idx] : { ownerKey, userId: userId || null, email: String(email || '').toLowerCase().trim() };
+  const updated = {
+    ...base,
+    userId: userId || null,
+    email: String(email || '').toLowerCase().trim(),
+    ...sanitizeReminder({ ...base, ...settings }),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (idx >= 0) dbState.reminders[idx] = updated;
+  else dbState.reminders.push(updated);
+
+  persistDbState();
+  return updated;
+};
+
+const sendReminderEmail = async ({ to }) => {
+  const cfg = await loadSmtpConfig();
+  if (!cfg?.host || !cfg?.auth?.user) {
+    throw new Error('SMTP ist nicht vollständig konfiguriert.');
+  }
+
+  const transporter = createTransporter(cfg);
+  await transporter.sendMail({
+    from: `"${cfg.fromName}" <${cfg.fromEmail || cfg.auth.user}>`,
+    to,
+    subject: 'Koffein-Tracker Erinnerung',
+    html: '<p>Vergiss nicht, deinen Energy-/Koffein-Bedarf heute im Tracker zu erfassen.</p>',
+  });
+};
+
+const sendDiscordReminder = async ({ webhookUrl, email }) => {
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      content: `🔔 Erinnerung für ${email}: Bitte heute deinen Energy-/Koffein-Bedarf im Tracker eintragen.`,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Discord Webhook Fehler (${response.status})`);
+  }
+};
+
+const processRemindersTick = async () => {
+  if (!Array.isArray(dbState.reminders) || dbState.reminders.length === 0) return;
+
+  const now = new Date();
+  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const today = now.toISOString().slice(0, 10);
+
+  for (const reminder of dbState.reminders) {
+    const normalized = sanitizeReminder(reminder);
+    if (!normalized.enabled) continue;
+    if (normalized.time !== hhmm) continue;
+    if (normalized.lastTriggeredDate === today) continue;
+
+    try {
+      if (normalized.mailEnabled) {
+        await sendReminderEmail({ to: reminder.email });
+      }
+      if (normalized.discordEnabled && normalized.discordWebhook) {
+        await sendDiscordReminder({ webhookUrl: normalized.discordWebhook, email: reminder.email });
+      }
+
+      reminder.lastTriggeredDate = today;
+      reminder.updatedAt = new Date().toISOString();
+      persistDbState();
+      console.log(`[Reminder] Gesendet an ${reminder.email} (${normalized.time})`);
+    } catch (err) {
+      console.error(`[Reminder] Fehler für ${reminder.email}:`, err.message);
+    }
+  }
 };
 
 app.get('/api/health', async (req, res) => {
@@ -723,6 +836,55 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// ── User Reminder Settings ───────────────────────────────────────────────────
+app.get('/api/reminders/me', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const reminder = getReminderForUser({ userId, email });
+    res.json(reminder);
+  } catch (err) {
+    console.error('GET /api/reminders/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/reminders/me', async (req, res) => {
+  try {
+    const { userId, email, enabled, time, mailEnabled, discordEnabled, discordWebhook } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+
+    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
+    if (!isValidReminderTime(time)) return res.status(400).json({ error: 'Uhrzeit muss im Format HH:MM sein.' });
+    if (discordEnabled && !discordWebhook) {
+      return res.status(400).json({ error: 'Discord Webhook URL fehlt.' });
+    }
+    if (discordWebhook && !/^https:\/\/discord\.com\/api\/webhooks\/.+/i.test(discordWebhook)) {
+      return res.status(400).json({ error: 'Ungültige Discord Webhook URL.' });
+    }
+
+    const reminder = upsertReminderForUser({
+      userId: safeUserId,
+      email: safeEmail,
+      settings: {
+        enabled: enabled !== false,
+        time,
+        mailEnabled: mailEnabled !== false,
+        discordEnabled: !!discordEnabled,
+        discordWebhook: discordWebhook || '',
+      },
+    });
+
+    res.json({ success: true, reminder });
+  } catch (err) {
+    console.error('POST /api/reminders/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // SPA Fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
@@ -730,6 +892,11 @@ app.get('*', (req, res) => {
 
 initDb()
   .then(() => {
+    // Check every minute whether a reminder is due.
+    setInterval(() => {
+      processRemindersTick().catch((err) => console.error('[Reminder] Tick-Fehler:', err.message));
+    }, 60 * 1000);
+
     app.listen(PORT, () => {
       console.log(`🚀 API server running on http://localhost:${PORT}`);
       console.log(`📦 DB Type: ${DB_TYPE}`);

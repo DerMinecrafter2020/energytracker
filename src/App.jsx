@@ -5,6 +5,7 @@ import PresetDrinks from './components/PresetDrinks';
 import OnlineSearch from './components/OnlineSearch';
 import ManualCalculator from './components/ManualCalculator';
 import DrinkHistory from './components/DrinkHistory';
+import ReminderSettings from './components/ReminderSettings';
 import LoginPage from './components/LoginPage';
 import AdminPanel from './components/AdminPanel';
 import RegisterPage from './components/RegisterPage';
@@ -30,7 +31,12 @@ function App() {
   const [currentVersion, setCurrentVersion] = useState(null);
   const [latestVersion, setLatestVersion]   = useState(null);
   const [authView, setAuthView]   = useState('login'); // 'login' | 'register'
+  const [adminView, setAdminView] = useState('admin'); // 'admin' | 'user'
   const isFirstCheck = useRef(true);
+
+  useEffect(() => {
+    if (session?.role !== 'admin') setAdminView('admin');
+  }, [session]);
 
   // ── If not logged in, show Login / Register ───────────────────────────
   if (!session && authView === 'register') {
@@ -41,8 +47,14 @@ function App() {
   }
 
   // ── If admin, show Admin Panel ────────────────────────────────────────
-  if (session.role === 'admin') {
-    return <AdminPanel session={session} onLogout={() => setSession(null)} />;
+  if (session.role === 'admin' && adminView === 'admin') {
+    return (
+      <AdminPanel
+        session={session}
+        onLogout={() => setSession(null)}
+        onShowUserPanel={() => setAdminView('user')}
+      />
+    );
   }
 
   // ── Regular user tracker ──────────────────────────────────────────────
@@ -51,11 +63,12 @@ function App() {
     onLogout={() => { logout(); setSession(null); }}
     dataSource={dataSource}
     setDataSource={setDataSource}
+    onShowAdminPanel={session.role === 'admin' ? () => setAdminView('admin') : null}
   />;
 }
 
 // ── Tracker (extracted so hooks are always called in the same order) ────────
-function TrackerApp({ session, onLogout, dataSource, setDataSource }) {
+function TrackerApp({ session, onLogout, dataSource, setDataSource, onShowAdminPanel }) {
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [logs, setLogs]           = useState([]);
   const [error, setError]         = useState(null);
@@ -145,6 +158,7 @@ function TrackerApp({ session, onLogout, dataSource, setDataSource }) {
         isLoading={isOperationLoading}
         session={session}
         onLogout={onLogout}
+        onShowAdminPanel={onShowAdminPanel}
       />
 
       <main className="max-w-lg mx-auto px-4 pb-8">
@@ -221,6 +235,8 @@ function TrackerApp({ session, onLogout, dataSource, setDataSource }) {
             })
           }
         />
+
+        <ReminderSettings session={session} />
 
         <ManualCalculator
           onAddDrink={handleAddDrink}

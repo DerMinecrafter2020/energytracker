@@ -53,7 +53,7 @@ const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
 };
 
 // ── Main ────────────────────────────────────────────────────────────────────
-const AdminPanel = ({ session, onLogout }) => {
+const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
   const [allLogs, setAllLogs]     = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState(null);
@@ -165,6 +165,11 @@ const AdminPanel = ({ session, onLogout }) => {
   };
 
   const handleToggleRole = async (id, currentRole) => {
+    const isSelf = (session?.id && session.id === id) || (!session?.id && regUsers.find((u) => u.id === id)?.email === session?.email);
+    if (isSelf && currentRole === 'admin') {
+      setUsersMsg({ type: 'error', text: 'Du kannst deinen eigenen Admin-Account nicht herunterstufen.' });
+      return;
+    }
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     try {
       await setUserRole(id, newRole);
@@ -317,6 +322,17 @@ const AdminPanel = ({ session, onLogout }) => {
           </div>
 
           <div className="flex items-center gap-3">
+            {onShowUserPanel && (
+              <button
+                onClick={onShowUserPanel}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-amber-300
+                  bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-all text-sm"
+                title="Zur Benutzeransicht wechseln"
+              >
+                <Users className="w-4 h-4" />
+                <span className="hidden sm:inline">Benutzeransicht</span>
+              </button>
+            )}
             <span className="hidden sm:block text-xs text-slate-500">
               Angemeldet als <span className="text-amber-400 font-medium">{session.name}</span>
             </span>
@@ -618,6 +634,10 @@ const AdminPanel = ({ session, onLogout }) => {
                   </div>
                   <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto">
                     {regUsers.map((u) => (
+                      (() => {
+                        const isSelf = (session?.id && session.id === u.id) || (!session?.id && u.email === session?.email);
+                        const isSelfAdminDemotionBlocked = isSelf && u.role === 'admin';
+                        return (
                       <div key={u.id}
                         className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_auto] gap-3 px-5 py-3.5
                           hover:bg-white/5 transition-colors items-center text-sm">
@@ -646,12 +666,17 @@ const AdminPanel = ({ session, onLogout }) => {
                         <span className="text-slate-600 text-xs">{formatDate(u.createdAt)}</span>
                         <div className="flex items-center gap-1 justify-end">
                           <button onClick={() => handleToggleRole(u.id, u.role)}
+                            disabled={isSelfAdminDemotionBlocked}
                             className={`p-1.5 rounded-lg transition-all ${
-                              u.role === 'admin'
+                              isSelfAdminDemotionBlocked
+                                ? 'text-slate-700 cursor-not-allowed'
+                                : u.role === 'admin'
                                 ? 'text-amber-400 hover:text-slate-400 hover:bg-white/5'
                                 : 'text-slate-600 hover:text-amber-400 hover:bg-amber-500/10'
                             }`}
-                            title={u.role === 'admin' ? 'Zum Benutzer herabstufen' : 'Zum Admin befördern'}>
+                            title={isSelfAdminDemotionBlocked
+                              ? 'Eigenen Admin nicht herabstufen'
+                              : u.role === 'admin' ? 'Zum Benutzer herabstufen' : 'Zum Admin befördern'}>
                             <Shield className="w-4 h-4" />
                           </button>
                           {!u.verified && (
@@ -670,6 +695,8 @@ const AdminPanel = ({ session, onLogout }) => {
                           </button>
                         </div>
                       </div>
+                        );
+                      })()
                     ))}
                   </div>
                   <div className="px-5 py-3 border-t border-white/10 text-xs text-slate-600">

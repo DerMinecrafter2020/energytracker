@@ -38,3 +38,33 @@ export const deleteLog = async (id) => {
 
   return response.json();
 };
+
+export const fetchReminderSettings = async ({ userId, email }) => {
+  const url = new URL('/api/reminders/me', API_BASE_URL);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
+
+  const response = await fetch(url.toString());
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Fehler beim Laden der Erinnerungen');
+  }
+  return data;
+};
+
+export const saveReminderSettings = async (payload) => {
+  const response = await fetch(`${API_BASE_URL}/api/reminders/me`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Fehler beim Speichern der Erinnerungen');
+  }
+
+  return data;
+};

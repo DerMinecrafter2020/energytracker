@@ -1,7 +1,7 @@
 import React from 'react';
-import { Zap, Loader2, LogOut, User } from 'lucide-react';
+import { Zap, Loader2, LogOut, User, ShieldCheck } from 'lucide-react';
 
-const Header = ({ isAuthenticated, isLoading, session, onLogout }) => {
+const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel }) => {
   const today = new Date().toLocaleDateString('de-DE', {
     weekday: 'long',
     year: 'numeric',
@@ -32,6 +32,19 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout }) => {
         {/* User badge + logout */}
         {session && (
           <div className="flex items-center gap-2">
+            {session.role === 'admin' && onShowAdminPanel && (
+              <button
+                onClick={onShowAdminPanel}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
+                  bg-amber-500/10 border border-amber-500/30 text-amber-300
+                  hover:bg-amber-500/20 transition-all"
+                aria-label="Zum Admin-Panel wechseln"
+                title="Zum Admin-Panel"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span className="text-xs hidden sm:inline">Admin</span>
+              </button>
+            )}
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
               bg-white/5 border border-white/10">
               <User className="w-3.5 h-3.5 text-slate-400" />
