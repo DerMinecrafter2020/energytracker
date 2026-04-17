@@ -11,6 +11,7 @@ import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole,
+  checkDockerUpdate,
 } from '../services/adminApi';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -78,12 +79,18 @@ const AdminPanel = ({ session, onLogout }) => {
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersMsg, setUsersMsg]   = useState(null);
 
+  // ── Update state ──────────────────────────────────────────────────────
+  const [updateInfo, setUpdateInfo]   = useState(null);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateError, setUpdateError] = useState(null);
+
   // Load SMTP config when settings tab is opened
   useEffect(() => {
     if (activeTab === 'settings' && !smtpLoaded) {
       fetchSmtpConfig()
         .then((cfg) => { if (cfg) setSmtp(cfg); setSmtpLoaded(true); })
         .catch(() => setSmtpLoaded(true));
+      handleCheckUpdate();
     }
     if (activeTab === 'users') loadRegUsers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,6 +172,19 @@ const AdminPanel = ({ session, onLogout }) => {
       setUsersMsg({ type: 'success', text: `Rolle auf "${newRole === 'admin' ? 'Admin' : 'Benutzer'}" geändert.` });
     } catch (err) {
       setUsersMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setUpdateChecking(true);
+    setUpdateError(null);
+    try {
+      const info = await checkDockerUpdate();
+      setUpdateInfo(info);
+    } catch (err) {
+      setUpdateError(err.message);
+    } finally {
+      setUpdateChecking(false);
     }
   };
 
@@ -829,6 +849,70 @@ const AdminPanel = ({ session, onLogout }) => {
                     ${smtp.demoEnabled !== false ? 'left-7' : 'left-1'}`} />
                 </button>
               </div>
+            </div>
+
+            {/* Docker Auto-Update card */}
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-green-400" />
+                  Docker Auto-Update
+                </h3>
+                <button
+                  onClick={handleCheckUpdate}
+                  disabled={updateChecking}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs
+                    bg-white/5 border border-white/10 text-slate-300
+                    hover:bg-white/10 transition-all disabled:opacity-50"
+                >
+                  {updateChecking
+                    ? <span className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
+                    : <RefreshCw className="w-3 h-3" />}
+                  Prüfen
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-500">
+                <span className="text-green-400 font-medium">Watchtower</span> läuft als Sidecar-Container
+                und prüft Docker Hub automatisch stündlich. Bei einem neuen Image wird der Container
+                ohne Downtime neu gestartet.
+              </p>
+
+              {updateError && (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+                  {updateError}
+                </p>
+              )}
+
+              {updateInfo && !updateError && (
+                <div className="space-y-2 text-xs">
+                  <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border font-medium
+                    ${updateInfo.updateAvailable
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      : 'bg-green-500/10 border-green-500/30 text-green-300'}`}>
+                    {updateInfo.updateAvailable
+                      ? <AlertTriangle className="w-4 h-4 shrink-0" />
+                      : <CheckCircle className="w-4 h-4 shrink-0" />}
+                    {updateInfo.updateAvailable
+                      ? 'Update verfügbar – Watchtower installiert es beim nächsten Intervall'
+                      : 'Aktuell – kein Update verfügbar'}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-white/5 rounded-xl px-3 py-2 border border-white/8">
+                      <p className="text-slate-500 mb-0.5">Laufende Version</p>
+                      <p className="text-white font-mono font-semibold">{updateInfo.currentVersion}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl px-3 py-2 border border-white/8">
+                      <p className="text-slate-500 mb-0.5">Docker Hub aktualisiert</p>
+                      <p className="text-white">{new Date(updateInfo.dockerHubLastUpdated).toLocaleString('de-DE')}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl px-3 py-2 border border-white/8 col-span-2">
+                      <p className="text-slate-500 mb-0.5">Container gestartet</p>
+                      <p className="text-white">{new Date(updateInfo.containerStartedAt).toLocaleString('de-DE')}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Test email card */}

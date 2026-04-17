@@ -1,6 +1,36 @@
 version: '3.8'
 
 services:
+  # ── Watchtower: polls Docker Hub every hour, auto-pulls + restarts koffein-tracker ──
+  watchtower:
+    image: containrrr/watchtower
+    container_name: koffein-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Check every hour (3600 s). Only watch the koffein-tracker container.
+    command: --interval 3600 koffein-tracker
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: koffein-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-caffeine_tracker}
+      - MYSQL_USER=${MYSQL_USER:-koffein}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - koffein-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   app:
     image: derminecrafter2020/koffein-tracker:latest
     container_name: koffein-tracker
@@ -9,31 +39,21 @@ services:
     environment:
       - NODE_ENV=production
       - DB_TYPE=${DB_TYPE:-mysql}
-      - MYSQL_HOST=${MYSQL_HOST:-localhost}
-      - MYSQL_PORT=${MYSQL_PORT:-3306}
-      - MYSQL_USER=${MYSQL_USER:-root}
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=${MYSQL_USER:-koffein}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE:-caffeine_tracker}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3001}
       - PORT=3001
     volumes:
       - /root/energytracker/.env.local:/app/.env.local:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - koffein-network
-
-  # Optional: MySQL Service
-  # mysql:
-  #   image: mysql:8.0
-  #   container_name: koffein-mysql
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
-  #     MYSQL_DATABASE: ${MYSQL_DATABASE}
-  #   volumes:
-  #     - mysql-data:/var/lib/mysql
-  #   networks:
-  #     - koffein-network
-  #   restart: unless-stopped
 
 networks:
   koffein-network:

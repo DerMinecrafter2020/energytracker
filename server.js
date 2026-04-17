@@ -43,6 +43,8 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+const CONTAINER_START = new Date(Date.now() - process.uptime() * 1000);
+
 const packageJsonPath = path.join(__dirname, 'package.json');
 let appVersion = 'unknown';
 
@@ -210,6 +212,32 @@ app.get('/api/health', async (req, res) => {
 
 app.get('/api/version', async (req, res) => {
   res.json({ version: appVersion });
+});
+
+// ── Docker Hub update check ───────────────────────────────────────────────
+const DOCKER_IMAGE = 'derminecrafter2020/koffein-tracker';
+
+app.get('/api/update/check', requireAdmin, async (req, res) => {
+  try {
+    const r = await fetch(
+      `https://hub.docker.com/v2/repositories/${DOCKER_IMAGE}/tags/latest`,
+      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) }
+    );
+    if (!r.ok) return res.status(502).json({ error: 'Docker Hub nicht erreichbar.' });
+    const data = await r.json();
+    const hubUpdated      = new Date(data.last_updated);
+    const updateAvailable = hubUpdated > CONTAINER_START;
+    res.json({
+      currentVersion:       appVersion,
+      containerStartedAt:   CONTAINER_START.toISOString(),
+      dockerHubLastUpdated: data.last_updated,
+      updateAvailable,
+      // Watchtower checks every hour automatically
+      watcherInterval:      3600,
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
 });
 
 app.get('/api/logs', async (req, res) => {

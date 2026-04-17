@@ -55,3 +55,6 @@ export const setUserRole = (id, role) =>
 
 export const fetchPublicSettings = () =>
   fetch(`${API_BASE}/api/settings/public`).then(handle);
+
+export const checkDockerUpdate = () =>
+  fetch(`${API_BASE}/api/update/check`, { headers: adminHeaders() }).then(handle);

@@ -75,7 +75,17 @@ const OnlineSearch = ({ onSelect }) => {
                 {item.quantity ? ` • ${item.quantity}` : ''}
               </p>
               <p className="text-xs text-slate-600 mt-0.5">
-                Koffein/100ml: {item.caffeinePer100ml ?? 'unbekannt'}
+                Koffein/100ml:{' '}
+                {item.caffeinePer100ml != null ? (
+                  <>
+                    {item.caffeinePer100ml} mg
+                    {item.isCaffeineEstimated && (
+                      <span className="text-slate-500 ml-1">(Schätzwert)</span>
+                    )}
+                  </>
+                ) : (
+                  'unbekannt'
+                )}
               </p>
             </div>
             <button
