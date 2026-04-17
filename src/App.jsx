@@ -7,6 +7,7 @@ import ManualCalculator from './components/ManualCalculator';
 import DrinkHistory from './components/DrinkHistory';
 import LoginPage from './components/LoginPage';
 import AdminPanel from './components/AdminPanel';
+import RegisterPage from './components/RegisterPage';
 import {
   DATA_SOURCES,
   getSavedDataSource,
@@ -28,11 +29,15 @@ function App() {
   const [dataSource, setDataSource] = useState(getSavedDataSource());
   const [currentVersion, setCurrentVersion] = useState(null);
   const [latestVersion, setLatestVersion]   = useState(null);
+  const [authView, setAuthView]   = useState('login'); // 'login' | 'register'
   const isFirstCheck = useRef(true);
 
-  // ── If not logged in, show Login ──────────────────────────────────────
+  // ── If not logged in, show Login / Register ───────────────────────────
+  if (!session && authView === 'register') {
+    return <RegisterPage onBack={() => setAuthView('login')} />;
+  }
   if (!session) {
-    return <LoginPage onLogin={(s) => setSession(s)} />;
+    return <LoginPage onLogin={(s) => setSession(s)} onShowRegister={() => setAuthView('register')} />;
   }
 
   // ── If admin, show Admin Panel ────────────────────────────────────────

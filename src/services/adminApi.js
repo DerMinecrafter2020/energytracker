@@ -1,0 +1,47 @@
+const API_BASE     = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'et-admin-2024';
+
+const adminHeaders = () => ({
+  'Content-Type': 'application/json',
+  'X-Admin-Secret': ADMIN_SECRET,
+});
+
+const handle = async (resp) => {
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+  return data;
+};
+
+// ── SMTP ─────────────────────────────────────────────────────────────────
+export const fetchSmtpConfig = () =>
+  fetch(`${API_BASE}/api/admin/smtp`, { headers: adminHeaders() }).then(handle);
+
+export const saveSmtpConfig = (config) =>
+  fetch(`${API_BASE}/api/admin/smtp`, {
+    method:  'POST',
+    headers: adminHeaders(),
+    body:    JSON.stringify(config),
+  }).then(handle);
+
+export const testSmtpConfig = (testEmail) =>
+  fetch(`${API_BASE}/api/admin/smtp/test`, {
+    method:  'POST',
+    headers: adminHeaders(),
+    body:    JSON.stringify({ testEmail }),
+  }).then(handle);
+
+// ── Users ─────────────────────────────────────────────────────────────────
+export const fetchAdminUsers = () =>
+  fetch(`${API_BASE}/api/admin/users`, { headers: adminHeaders() }).then(handle);
+
+export const verifyAdminUser = (id) =>
+  fetch(`${API_BASE}/api/admin/users/${id}/verify`, {
+    method:  'POST',
+    headers: adminHeaders(),
+  }).then(handle);
+
+export const deleteAdminUser = (id) =>
+  fetch(`${API_BASE}/api/admin/users/${id}`, {
+    method:  'DELETE',
+    headers: adminHeaders(),
+  }).then(handle);

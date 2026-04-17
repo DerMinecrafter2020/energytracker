@@ -3,9 +3,15 @@ import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
+  Settings, Mail, Server, Lock, Eye, EyeOff, Send,
+  CheckCircle, UserCheck, UserX, Clock,
 } from 'lucide-react';
 import { logout } from '../services/auth';
 import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
+import {
+  fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
+  fetchAdminUsers, verifyAdminUser, deleteAdminUser,
+} from '../services/adminApi';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const formatDate = (isoStr) => {
@@ -56,7 +62,102 @@ const AdminPanel = ({ session, onLogout }) => {
   const [sortDir, setSortDir]     = useState('desc');
   const [activeTab, setActiveTab] = useState('overview');
 
-  // ── Fetch all logs for the last 30 days ────────────────────────────────
+  // ── SMTP state ─────────────────────────────────────────────────────────
+  const defaultSmtp = { host: '', port: 587, secure: false, auth: { user: '', pass: '' },
+    fromName: 'Koffein-Tracker', fromEmail: '', baseUrl: '', registrationEnabled: true };
+  const [smtp, setSmtp]           = useState(defaultSmtp);
+  const [smtpLoaded, setSmtpLoaded] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [showSmtpPw, setShowSmtpPw] = useState(false);
+  const [smtpSaving, setSmtpSaving] = useState(false);
+  const [smtpTesting, setSmtpTesting] = useState(false);
+  const [smtpMsg, setSmtpMsg]     = useState(null);
+
+  // ── Users state ────────────────────────────────────────────────────────
+  const [regUsers, setRegUsers]   = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersMsg, setUsersMsg]   = useState(null);
+
+  // Load SMTP config when settings tab is opened
+  useEffect(() => {
+    if (activeTab === 'settings' && !smtpLoaded) {
+      fetchSmtpConfig()
+        .then((cfg) => { if (cfg) setSmtp(cfg); setSmtpLoaded(true); })
+        .catch(() => setSmtpLoaded(true));
+    }
+    if (activeTab === 'users') loadRegUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const loadRegUsers = async () => {
+    setUsersLoading(true);
+    setUsersMsg(null);
+    try {
+      const data = await fetchAdminUsers();
+      setRegUsers(data);
+    } catch (err) {
+      setUsersMsg({ type: 'error', text: 'Fehler beim Laden der Benutzer: ' + err.message });
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleSmtpChange = (path, value) => {
+    setSmtp((prev) => {
+      if (path === 'auth.user') return { ...prev, auth: { ...prev.auth, user: value } };
+      if (path === 'auth.pass') return { ...prev, auth: { ...prev.auth, pass: value } };
+      return { ...prev, [path]: value };
+    });
+  };
+
+  const handleSmtpSave = async () => {
+    setSmtpSaving(true);
+    setSmtpMsg(null);
+    try {
+      await saveSmtpConfig(smtp);
+      setSmtpMsg({ type: 'success', text: 'SMTP-Einstellungen gespeichert.' });
+    } catch (err) {
+      setSmtpMsg({ type: 'error', text: err.message });
+    } finally {
+      setSmtpSaving(false);
+    }
+  };
+
+  const handleSmtpTest = async () => {
+    if (!testEmail.trim()) { setSmtpMsg({ type: 'error', text: 'Bitte Ziel-E-Mail-Adresse eingeben.' }); return; }
+    setSmtpTesting(true);
+    setSmtpMsg(null);
+    try {
+      const res = await testSmtpConfig(testEmail.trim());
+      setSmtpMsg({ type: 'success', text: res.message || 'Test-E-Mail gesendet.' });
+    } catch (err) {
+      setSmtpMsg({ type: 'error', text: err.message });
+    } finally {
+      setSmtpTesting(false);
+    }
+  };
+
+  const handleVerifyUser = async (id) => {
+    try {
+      await verifyAdminUser(id);
+      setRegUsers((prev) => prev.map((u) => u.id === id ? { ...u, verified: true } : u));
+      setUsersMsg({ type: 'success', text: 'Benutzer manuell verifiziert.' });
+    } catch (err) {
+      setUsersMsg({ type: 'error', text: err.message });
+    }
+  };
+
+  const handleDeleteUser = async (id) => {
+    if (!window.confirm('Diesen Benutzer wirklich löschen?')) return;
+    try {
+      await deleteAdminUser(id);
+      setRegUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err) {
+      setUsersMsg({ type: 'error', text: err.message });
+    }
+  };
+
+
   const loadAllLogs = async () => {
     setIsLoading(true);
     setError(null);
@@ -202,10 +303,12 @@ const AdminPanel = ({ session, onLogout }) => {
 
       {/* ── Tabs ── */}
       <div className="max-w-6xl mx-auto px-4 pt-6">
-        <div className="flex gap-1 glass-card rounded-2xl p-1 mb-6 w-fit">
+        <div className="flex gap-1 glass-card rounded-2xl p-1 mb-6 w-fit flex-wrap">
           {[
-            { id: 'overview', label: 'Übersicht',  icon: BarChart2 },
-            { id: 'logs',     label: 'Alle Logs',  icon: Database   },
+            { id: 'overview',  label: 'Übersicht',  icon: BarChart2  },
+            { id: 'logs',      label: 'Alle Logs',  icon: Database   },
+            { id: 'users',     label: 'Benutzer',   icon: Users      },
+            { id: 'settings',  label: 'Einstellungen', icon: Settings },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -432,6 +535,292 @@ const AdminPanel = ({ session, onLogout }) => {
             </div>
           </div>
         )}
+
+        {/* ══════════ USERS TAB ══════════ */}
+        {activeTab === 'users' && (
+          <div className="animate-fade-in pb-10 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-400" />
+                Registrierte Benutzer
+              </h2>
+              <button onClick={loadRegUsers} disabled={usersLoading}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl glass-card
+                  text-slate-400 hover:text-white text-sm transition-all disabled:opacity-50">
+                <RefreshCw className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`} />
+                Aktualisieren
+              </button>
+            </div>
+
+            {usersMsg && (
+              <div className={`glass-card rounded-2xl p-3 flex items-center gap-2 text-sm border animate-slide-in
+                ${usersMsg.type === 'success'
+                  ? 'bg-green-500/10 border-green-500/30 text-green-300'
+                  : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                {usersMsg.type === 'success'
+                  ? <CheckCircle className="w-4 h-4 shrink-0" />
+                  : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                {usersMsg.text}
+              </div>
+            )}
+
+            <div className="glass-card rounded-2xl overflow-hidden">
+              {usersLoading ? (
+                <div className="p-6 space-y-3">
+                  {[1, 2, 3].map((i) => <div key={i} className="h-14 shimmer rounded-xl" />)}
+                </div>
+              ) : regUsers.length === 0 ? (
+                <div className="py-16 text-center text-slate-500">
+                  <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>Noch keine registrierten Benutzer.</p>
+                  <p className="text-xs mt-1 text-slate-600">
+                    Konfiguriere SMTP und aktiviere die Registrierung im Tab "Einstellungen".
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Header */}
+                  <div className="grid grid-cols-[2fr_2fr_1fr_1fr_auto] gap-3 px-5 py-3
+                    border-b border-white/10 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <span>Name</span><span>E-Mail</span><span>Status</span><span>Registriert</span>
+                    <span className="text-right">Aktionen</span>
+                  </div>
+                  <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto">
+                    {regUsers.map((u) => (
+                      <div key={u.id}
+                        className="grid grid-cols-[2fr_2fr_1fr_1fr_auto] gap-3 px-5 py-3.5
+                          hover:bg-white/5 transition-colors items-center text-sm">
+                        <span className="text-white font-medium truncate">{u.name}</span>
+                        <span className="text-slate-400 truncate text-xs">{u.email}</span>
+                        <span>
+                          {u.verified
+                            ? <span className="flex items-center gap-1 text-xs text-green-400">
+                                <CheckCircle className="w-3.5 h-3.5" />Aktiv
+                              </span>
+                            : <span className="flex items-center gap-1 text-xs text-amber-400">
+                                <Clock className="w-3.5 h-3.5" />Ausstehend
+                              </span>
+                          }
+                        </span>
+                        <span className="text-slate-600 text-xs">{formatDate(u.createdAt)}</span>
+                        <div className="flex items-center gap-1 justify-end">
+                          {!u.verified && (
+                            <button onClick={() => handleVerifyUser(u.id)}
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-green-400
+                                hover:bg-green-500/10 transition-all"
+                              title="Manuell verifizieren">
+                              <UserCheck className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button onClick={() => handleDeleteUser(u.id)}
+                            className="p-1.5 rounded-lg text-slate-600 hover:text-red-400
+                              hover:bg-red-500/10 transition-all"
+                            title="Benutzer löschen">
+                            <UserX className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-5 py-3 border-t border-white/10 text-xs text-slate-600">
+                    {regUsers.length} Benutzer
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════ SETTINGS TAB ══════════ */}
+        {activeTab === 'settings' && (
+          <div className="animate-fade-in pb-10 space-y-6 max-w-2xl">
+
+            {/* SMTP config card */}
+            <div className="glass-card rounded-2xl p-6 space-y-5">
+              <h2 className="font-semibold text-white flex items-center gap-2">
+                <Server className="w-5 h-5 text-amber-400" />
+                SMTP-Server Konfiguration
+              </h2>
+
+              {/* Host + Port */}
+              <div className="grid grid-cols-[1fr_auto] gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    Server-Host
+                  </label>
+                  <input type="text" value={smtp.host} onChange={(e) => handleSmtpChange('host', e.target.value)}
+                    placeholder="smtp.gmail.com" className="input-dark" />
+                </div>
+                <div className="w-24">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    Port
+                  </label>
+                  <input type="number" value={smtp.port} min="1" max="65535"
+                    onChange={(e) => handleSmtpChange('port', Number(e.target.value))}
+                    className="input-dark" />
+                </div>
+              </div>
+
+              {/* Security */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Verbindungssicherheit
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { label: 'Unverschlüsselt', secure: false, port: 25  },
+                    { label: 'STARTTLS',         secure: false, port: 587 },
+                    { label: 'SSL/TLS',          secure: true,  port: 465 },
+                  ].map((opt) => (
+                    <button key={opt.label} type="button"
+                      onClick={() => { handleSmtpChange('secure', opt.secure); handleSmtpChange('port', opt.port); }}
+                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-all
+                        ${smtp.secure === opt.secure && smtp.port === opt.port
+                          ? 'bg-blue-600 text-white shadow-glow-blue'
+                          : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10'
+                        }`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Auth */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    Benutzername
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input type="email" value={smtp.auth.user}
+                      onChange={(e) => handleSmtpChange('auth.user', e.target.value)}
+                      placeholder="user@gmail.com" className="input-dark pl-10" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    Passwort / App-Token
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input type={showSmtpPw ? 'text' : 'password'} value={smtp.auth.pass}
+                      onChange={(e) => handleSmtpChange('auth.pass', e.target.value)}
+                      placeholder="••••••••" className="input-dark pl-10 pr-10" />
+                    <button type="button" onClick={() => setShowSmtpPw(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+                      {showSmtpPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* From name + email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    Absender-Name
+                  </label>
+                  <input type="text" value={smtp.fromName}
+                    onChange={(e) => handleSmtpChange('fromName', e.target.value)}
+                    placeholder="Koffein-Tracker" className="input-dark" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                    Absender-E-Mail
+                  </label>
+                  <input type="email" value={smtp.fromEmail}
+                    onChange={(e) => handleSmtpChange('fromEmail', e.target.value)}
+                    placeholder="noreply@deine-domain.de" className="input-dark" />
+                </div>
+              </div>
+
+              {/* Base URL */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  App-URL <span className="normal-case font-normal text-slate-600">(für Bestätigungslinks in E-Mails)</span>
+                </label>
+                <input type="url" value={smtp.baseUrl}
+                  onChange={(e) => handleSmtpChange('baseUrl', e.target.value)}
+                  placeholder="https://deine-app.de" className="input-dark" />
+              </div>
+
+              {/* Save button */}
+              <button onClick={handleSmtpSave} disabled={smtpSaving}
+                className="w-full py-3 rounded-xl font-semibold text-white
+                  bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
+                  disabled:opacity-60 transition-all shadow-glow-blue flex items-center justify-center gap-2">
+                {smtpSaving
+                  ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <Server className="w-4 h-4" />}
+                Einstellungen speichern
+              </button>
+            </div>
+
+            {/* Registration toggle card */}
+            <div className="glass-card rounded-2xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    <Users className="w-4 h-4 text-green-400" />
+                    Benutzer-Registrierung
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Erlaubt neuen Benutzern, sich selbst zu registrieren.
+                  </p>
+                </div>
+                <button type="button"
+                  onClick={() => handleSmtpChange('registrationEnabled', !smtp.registrationEnabled)}
+                  className={`relative w-12 h-6 rounded-full transition-all duration-300
+                    ${smtp.registrationEnabled ? 'bg-green-500' : 'bg-white/10'}`}>
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-300
+                    ${smtp.registrationEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Test email card */}
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <Send className="w-4 h-4 text-blue-400" />
+                SMTP-Verbindung testen
+              </h3>
+              <p className="text-xs text-slate-500">
+                Sendet eine Test-E-Mail um die Konfiguration zu prüfen. Speichere zuerst deine Einstellungen.
+              </p>
+              <div className="flex gap-2">
+                <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)}
+                  placeholder="test@example.com" className="input-dark flex-1" />
+                <button onClick={handleSmtpTest} disabled={smtpTesting || !testEmail.trim()}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl
+                    bg-amber-500/20 border border-amber-500/30 text-amber-300
+                    hover:bg-amber-500/30 transition-all text-sm disabled:opacity-50 shrink-0">
+                  {smtpTesting
+                    ? <span className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                    : <Send className="w-4 h-4" />}
+                  Test senden
+                </button>
+              </div>
+            </div>
+
+            {/* Feedback message */}
+            {smtpMsg && (
+              <div className={`glass-card rounded-2xl p-4 flex items-center gap-3 border animate-slide-in
+                ${smtpMsg.type === 'success'
+                  ? 'bg-green-500/10 border-green-500/30 text-green-300'
+                  : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                {smtpMsg.type === 'success'
+                  ? <CheckCircle className="w-5 h-5 shrink-0" />
+                  : <AlertTriangle className="w-5 h-5 shrink-0" />}
+                <span className="text-sm">{smtpMsg.text}</span>
+                <button onClick={() => setSmtpMsg(null)} className="ml-auto text-xs underline opacity-60 hover:opacity-100">
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );
