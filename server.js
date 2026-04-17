@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mysql from 'mysql2/promise';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -13,7 +12,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DB_TYPE = 'mysql';
+const DB_TYPE = 'file-json';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,50 +63,225 @@ app.use(express.json());
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
-// MySQL Pool (single storage backend)
-let pool = null;
+// File DB (simple embedded storage)
+const dataDir = path.join(__dirname, 'data');
+const dbFile = process.env.DB_FILE || path.join(dataDir, 'database.json');
 
-const validateDbConfig = () => {
-  const host = process.env.MYSQL_HOST || 'localhost';
-  const user = process.env.MYSQL_USER || 'root';
-  const password = process.env.MYSQL_PASSWORD || '';
-  const database = process.env.MYSQL_DATABASE || 'caffeine_tracker';
-  const port = Number(process.env.MYSQL_PORT || 3306);
+let dbState = {
+  caffeine_logs: [],
+  users: [],
+  smtp_settings: null,
+};
 
-  console.log(`[DB] 📋 Konfiguration:`);
-  console.log(`     Host:     ${host}`);
-  console.log(`     Port:     ${port}`);
-  console.log(`     User:     ${user}`);
-  console.log(`     Database: ${database}`);
-  console.log(`     Password: ${password ? '(gesetzt)' : '(LEER!)'}`);
-
-  // Warning if using localhost in Docker
-  if (host === 'localhost' || host === '127.0.0.1') {
-    console.warn(`[⚠️  WARNING] Host ist "${host}" - in Docker funktioniert das NICHT!`);
-    console.warn(`     In Docker: setze MYSQL_HOST auf den Service-Namen (z.B. "mysql")`);
-    console.warn(`     Lokal: MYSQL_HOST=localhost ist ok`);
-  }
-
-  if (!password) {
-    throw new Error(
-      '[DB] MYSQL_PASSWORD fehlt oder ist leer. Setze MYSQL_PASSWORD in deiner .env/.env.local oder in docker-compose.yml.'
-    );
+const ensureDbFile = () => {
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(dbFile)) {
+    fs.writeFileSync(dbFile, JSON.stringify(dbState, null, 2), 'utf8');
   }
 };
 
+const loadDbState = () => {
+  ensureDbFile();
+  const raw = fs.readFileSync(dbFile, 'utf8');
+  const parsed = raw ? JSON.parse(raw) : {};
+  dbState = {
+    caffeine_logs: Array.isArray(parsed.caffeine_logs) ? parsed.caffeine_logs : [],
+    users: Array.isArray(parsed.users) ? parsed.users : [],
+    smtp_settings: parsed.smtp_settings || null,
+  };
+};
+
+const persistDbState = () => {
+  fs.writeFileSync(dbFile, JSON.stringify(dbState, null, 2), 'utf8');
+};
+
+const makeResult = (affectedRows = 0, insertId = undefined) => {
+  const result = { affectedRows };
+  if (insertId !== undefined) result.insertId = insertId;
+  return result;
+};
+
+class FileDbAdapter {
+  async execute(sql, params = []) {
+    const q = String(sql).replace(/\s+/g, ' ').trim().toLowerCase();
+
+    if (q.startsWith('create table if not exists')) {
+      return [makeResult(0)];
+    }
+
+    if (q.startsWith('select * from smtp_settings where id = 1')) {
+      return [dbState.smtp_settings ? [dbState.smtp_settings] : []];
+    }
+
+    if (q.startsWith('insert into smtp_settings')) {
+      dbState.smtp_settings = {
+        id: 1,
+        host: params[0],
+        port: Number(params[1]) || 587,
+        secure: params[2] ? 1 : 0,
+        auth_user: params[3] || '',
+        auth_pass: params[4] || '',
+        from_name: params[5] || 'Koffein-Tracker',
+        from_email: params[6] || params[3] || '',
+        base_url: params[7] || '',
+        registration_enabled: params[8] ? 1 : 0,
+        demo_enabled: params[9] ? 1 : 0,
+        updated_at: new Date().toISOString(),
+      };
+      persistDbState();
+      return [makeResult(1, 1)];
+    }
+
+    if (q.startsWith('select * from caffeine_logs where date = ?')) {
+      const date = params[0];
+      const rows = dbState.caffeine_logs
+        .filter((r) => r.date === date)
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      return [rows];
+    }
+
+    if (q.startsWith('insert into caffeine_logs')) {
+      const nextId = (dbState.caffeine_logs.reduce((m, r) => Math.max(m, Number(r.id) || 0), 0) || 0) + 1;
+      const row = {
+        id: nextId,
+        name: params[0],
+        size: Number(params[1]),
+        caffeine: Number(params[2]),
+        caffeinePerMl: params[3] ?? null,
+        icon: params[4] ?? null,
+        isPreset: !!params[5],
+        date: params[6],
+        createdAt: new Date().toISOString(),
+      };
+      dbState.caffeine_logs.push(row);
+      persistDbState();
+      return [makeResult(1, nextId)];
+    }
+
+    if (q.startsWith('select * from caffeine_logs where id = ?')) {
+      const id = Number(params[0]);
+      const rows = dbState.caffeine_logs.filter((r) => Number(r.id) === id);
+      return [rows];
+    }
+
+    if (q.startsWith('delete from caffeine_logs where id = ?')) {
+      const id = Number(params[0]);
+      const before = dbState.caffeine_logs.length;
+      dbState.caffeine_logs = dbState.caffeine_logs.filter((r) => Number(r.id) !== id);
+      const affectedRows = before - dbState.caffeine_logs.length;
+      if (affectedRows > 0) persistDbState();
+      return [makeResult(affectedRows)];
+    }
+
+    if (q.includes('from users') && q.includes('order by created_at desc')) {
+      const rows = [...dbState.users]
+        .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+        .map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          verified: !!u.verified,
+          createdAt: u.created_at,
+          lastLogin: u.last_login || null,
+        }));
+      return [rows];
+    }
+
+    if (q.startsWith('update users set verified = true')) {
+      const id = params[0];
+      const user = dbState.users.find((u) => u.id === id);
+      if (!user) return [makeResult(0)];
+      user.verified = true;
+      user.verify_token = null;
+      user.verify_token_expiry = null;
+      persistDbState();
+      return [makeResult(1)];
+    }
+
+    if (q.startsWith('delete from users where id = ?')) {
+      const id = params[0];
+      const before = dbState.users.length;
+      dbState.users = dbState.users.filter((u) => u.id !== id);
+      const affectedRows = before - dbState.users.length;
+      if (affectedRows > 0) persistDbState();
+      return [makeResult(affectedRows)];
+    }
+
+    if (q.startsWith('update users set role = ? where id = ?')) {
+      const role = params[0];
+      const id = params[1];
+      const user = dbState.users.find((u) => u.id === id);
+      if (!user) return [makeResult(0)];
+      user.role = role;
+      persistDbState();
+      return [makeResult(1)];
+    }
+
+    if (q.startsWith('select id from users where email = ? limit 1')) {
+      const email = String(params[0] || '').toLowerCase();
+      const user = dbState.users.find((u) => u.email === email);
+      return [user ? [{ id: user.id }] : []];
+    }
+
+    if (q.startsWith('insert into users')) {
+      const row = {
+        id: params[0],
+        name: params[1],
+        email: String(params[2] || '').toLowerCase(),
+        password_hash: params[3],
+        role: 'user',
+        verified: false,
+        verify_token: params[4],
+        verify_token_expiry: params[5],
+        created_at: new Date().toISOString(),
+        last_login: null,
+      };
+      dbState.users.push(row);
+      persistDbState();
+      return [makeResult(1)];
+    }
+
+    if (q.includes('from users') && q.includes('where verify_token = ?')) {
+      const token = params[0];
+      const user = dbState.users.find((u) => u.verify_token === token);
+      if (!user) return [[]];
+      return [[{ id: user.id, verifyTokenExpiry: user.verify_token_expiry }]];
+    }
+
+    if (q.includes('from users') && q.includes('password_hash as passwordhash') && q.includes('where email = ?')) {
+      const email = String(params[0] || '').toLowerCase();
+      const user = dbState.users.find((u) => u.email === email);
+      if (!user) return [[]];
+      return [[{
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        verified: !!user.verified,
+        passwordHash: user.password_hash,
+      }]];
+    }
+
+    if (q.startsWith('update users set last_login = now() where id = ?')) {
+      const id = params[0];
+      const user = dbState.users.find((u) => u.id === id);
+      if (!user) return [makeResult(0)];
+      user.last_login = new Date().toISOString();
+      persistDbState();
+      return [makeResult(1)];
+    }
+
+    throw new Error(`Unsupported query in file DB adapter: ${sql}`);
+  }
+}
+
+let pool = null;
+
 const getPool = () => {
   if (!pool) {
-    pool = mysql.createPool({
-      host: process.env.MYSQL_HOST || 'localhost',
-      user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || '',
-      database: process.env.MYSQL_DATABASE || 'caffeine_tracker',
-      port: Number(process.env.MYSQL_PORT || 3306),
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      dateStrings: true,
-    });
+    loadDbState();
+    pool = new FileDbAdapter();
   }
   return pool;
 };
@@ -172,79 +346,9 @@ const saveSmtpConfig = async (cfg) => {
 };
 
 const initDb = async () => {
-  const MAX_RETRIES = 10;
-  const RETRY_DELAY_MS = 5000;
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    console.log(`[DB] 🗄️  Verbinde zu MySQL... (Versuch ${attempt}/${MAX_RETRIES})`);
-    const dbPool = getPool();
-
-    try {
-      const createLogsTableQuery = `
-        CREATE TABLE IF NOT EXISTS caffeine_logs (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          size INT NOT NULL,
-          caffeine INT NOT NULL,
-          caffeinePerMl FLOAT NULL,
-          icon VARCHAR(16) NULL,
-          isPreset BOOLEAN DEFAULT false,
-          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          date DATE NOT NULL
-        )
-      `;
-
-      const createUsersTableQuery = `
-        CREATE TABLE IF NOT EXISTS users (
-          id CHAR(36) PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255) NOT NULL UNIQUE,
-          password_hash VARCHAR(255) NOT NULL,
-          role VARCHAR(32) NOT NULL DEFAULT 'user',
-          verified BOOLEAN NOT NULL DEFAULT false,
-          verify_token VARCHAR(255) NULL,
-          verify_token_expiry BIGINT NULL,
-          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          last_login TIMESTAMP NULL DEFAULT NULL,
-          INDEX idx_users_email (email),
-          INDEX idx_users_verify_token (verify_token)
-        )
-      `;
-
-      const createSmtpTableQuery = `
-        CREATE TABLE IF NOT EXISTS smtp_settings (
-          id TINYINT PRIMARY KEY,
-          host VARCHAR(255) NULL,
-          port INT NOT NULL DEFAULT 587,
-          secure BOOLEAN NOT NULL DEFAULT false,
-          auth_user VARCHAR(255) NULL,
-          auth_pass VARCHAR(512) NULL,
-          from_name VARCHAR(255) NOT NULL DEFAULT 'Koffein-Tracker',
-          from_email VARCHAR(255) NULL,
-          base_url VARCHAR(512) NOT NULL DEFAULT '',
-          registration_enabled BOOLEAN NOT NULL DEFAULT true,
-          demo_enabled BOOLEAN NOT NULL DEFAULT true,
-          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )
-      `;
-
-      await dbPool.execute(createLogsTableQuery);
-      await dbPool.execute(createUsersTableQuery);
-      await dbPool.execute(createSmtpTableQuery);
-      console.log('[DB] ✓ Verbindung erfolgreich');
-      return; // success — exit the retry loop
-    } catch (error) {
-      const isLastAttempt = attempt === MAX_RETRIES;
-      console.error(
-        `[DB] ✗ Verbindung fehlgeschlagen (Versuch ${attempt}/${MAX_RETRIES}): ${error.message}`
-      );
-      if (isLastAttempt) throw error;
-      console.log(`[DB] ⏳ Nächster Versuch in ${RETRY_DELAY_MS / 1000}s...`);
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-      // Reset pool so next attempt opens a fresh connection
-      pool = null;
-    }
-  }
+  console.log('[DB] 🗄️  Starte lokale Datei-Datenbank...');
+  getPool();
+  console.log(`[DB] ✓ Datei-Datenbank bereit: ${dbFile}`);
 };
 
 app.get('/api/health', async (req, res) => {
@@ -623,9 +727,6 @@ app.post('/api/login', async (req, res) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
-
-// ── Startup Validation ────────────────────────────────────────────────────
-validateDbConfig();
 
 initDb()
   .then(() => {

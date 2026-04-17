@@ -26,6 +26,6 @@ COPY server.js .
 EXPOSE 3001
 
 ENV NODE_ENV=production
-ENV DB_TYPE=mysql
+ENV DB_TYPE=file-json
 
 CMD ["node", "server.js"]
