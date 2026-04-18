@@ -545,31 +545,6 @@ app.get('/api/version', async (req, res) => {
 });
 
 // ── Docker Hub update check ───────────────────────────────────────────────
-const DOCKER_IMAGE = 'derminecrafter2020/koffein-tracker';
-
-app.get('/api/update/check', requireAdmin, async (req, res) => {
-  try {
-    const r = await fetch(
-      `https://hub.docker.com/v2/repositories/${DOCKER_IMAGE}/tags/latest`,
-      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) }
-    );
-    if (!r.ok) return res.status(502).json({ error: 'Docker Hub nicht erreichbar.' });
-    const data = await r.json();
-    const hubUpdated      = new Date(data.last_updated);
-    const updateAvailable = hubUpdated > CONTAINER_START;
-    res.json({
-      currentVersion:       appVersion,
-      containerStartedAt:   CONTAINER_START.toISOString(),
-      dockerHubLastUpdated: data.last_updated,
-      updateAvailable,
-      // Watchtower checks every hour automatically
-      watcherInterval:      3600,
-    });
-  } catch (err) {
-    res.status(502).json({ error: err.message });
-  }
-});
-
 app.get('/api/logs', async (req, res) => {
   try {
     const date = req.query.date;
@@ -716,6 +691,53 @@ app.post('/api/admin/discord/test', requireAdmin, async (req, res) => {
   }
 });
 
+// ── Redis Health Check ────────────────────────────────────────────────────────
+app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
+  try {
+    // Ping Redis
+    const pong = await redis.ping();
+
+    // Check persistence config (CONFIG GET save)
+    let persistConfig = null;
+    try {
+      const cfg = await redis.config('GET', 'save');
+      persistConfig = cfg[1] || '';
+    } catch { /* Redis may not allow CONFIG in all setups */ }
+
+    // Check last RDB save time
+    let lastSaveTs = null;
+    try {
+      lastSaveTs = await redis.lastsave();
+    } catch { /* ignore */ }
+
+    // Count entries per key from in-memory state (mirrors what's in Redis)
+    const keys = await redis.keys('koffein:*');
+    const keyDetails = {};
+    for (const key of keys) {
+      const raw = await redis.get(key);
+      const parsed = safeParse(raw, null);
+      const shortKey = key.replace('koffein:', '');
+      if (Array.isArray(parsed)) {
+        keyDetails[shortKey] = { count: parsed.length, type: 'array' };
+      } else if (parsed && typeof parsed === 'object') {
+        keyDetails[shortKey] = { count: 1, type: 'object' };
+      } else {
+        keyDetails[shortKey] = { count: parsed ? 1 : 0, type: 'null' };
+      }
+    }
+
+    res.json({
+      connected:    pong === 'PONG',
+      persistMode:  persistConfig !== null ? (persistConfig === '' ? 'disabled' : `rdb: ${persistConfig}`) : 'unknown',
+      lastSave:     lastSaveTs ? new Date(lastSaveTs * 1000).toISOString() : null,
+      keys:         keyDetails,
+      totalKeys:    keys.length,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── User Management Routes ────────────────────────────────────────────────────
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
@@ -830,6 +852,17 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
     verified: !!verified,
     createdAt: newUser.created_at,
     lastLogin: null,
+  });
+});
+
+app.post('/api/admin/users/:id/impersonate', requireAdmin, (req, res) => {
+  const user = dbState.users.find((u) => u.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+  res.json({
+    id:    user.id,
+    name:  user.name,
+    email: user.email,
+    role:  user.role,
   });
 });
 

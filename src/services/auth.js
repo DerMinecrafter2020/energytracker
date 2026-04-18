@@ -80,3 +80,37 @@ export const getSession = () => {
 /** True when the current user has the admin role. */
 export const isAdmin = () => getSession()?.role === 'admin';
 
+// ── Impersonation ─────────────────────────────────────────────────────────────
+const IMPERSONATOR_KEY = 'et-impersonator';
+
+/** Start impersonating a user. Saves the current admin session and switches to the target. */
+export const startImpersonation = (targetUser) => {
+  const adminSession = getSession();
+  localStorage.setItem(IMPERSONATOR_KEY, JSON.stringify(adminSession));
+  const session = { ...targetUser, loginAt: Date.now(), impersonated: true };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  return session;
+};
+
+/** Stop impersonating and restore the original admin session. */
+export const stopImpersonation = () => {
+  const adminSession = localStorage.getItem(IMPERSONATOR_KEY);
+  localStorage.removeItem(IMPERSONATOR_KEY);
+  if (adminSession) {
+    localStorage.setItem(AUTH_KEY, adminSession);
+    return JSON.parse(adminSession);
+  }
+  localStorage.removeItem(AUTH_KEY);
+  return null;
+};
+
+/** Return the original admin session if currently impersonating, otherwise null. */
+export const getImpersonatorSession = () => {
+  try {
+    const raw = localStorage.getItem(IMPERSONATOR_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+

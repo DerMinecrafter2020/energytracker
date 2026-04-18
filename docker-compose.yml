@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   # ── Redis: persistent storage, survives app container updates ──
   redis:

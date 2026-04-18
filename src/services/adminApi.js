@@ -78,8 +78,14 @@ export const createAdminUser = ({ name, email, password, role, verified }) =>
     body:    JSON.stringify({ name, email, password, role, verified }),
   }).then(handle);
 
+export const impersonateUser = (id) =>
+  fetch(`${API_BASE}/api/admin/users/${id}/impersonate`, {
+    method:  'POST',
+    headers: adminHeaders(),
+  }).then(handle);
+
 export const fetchPublicSettings = () =>
   fetch(`${API_BASE}/api/settings/public`).then(handle);
 
-export const checkDockerUpdate = () =>
-  fetch(`${API_BASE}/api/update/check`, { headers: adminHeaders() }).then(handle);
+export const fetchRedisHealth = () =>
+  fetch(`${API_BASE}/api/admin/redis/health`, { headers: adminHeaders() }).then(handle);

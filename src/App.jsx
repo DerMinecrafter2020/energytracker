@@ -20,7 +20,7 @@ import {
   addLog,
   removeLog,
 } from './services/storage';
-import { getSession, logout } from './services/auth';
+import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
 
 const getTodayKey = () => new Date().toISOString().split('T')[0];
 
@@ -36,6 +36,20 @@ function App() {
   const [authView, setAuthView]   = useState('login'); // 'login' | 'register'
   const [adminView, setAdminView] = useState('admin'); // 'admin' | 'user'
   const isFirstCheck = useRef(true);
+
+  const impersonator = getImpersonatorSession();
+
+  const handleImpersonate = (userData) => {
+    const newSession = startImpersonation(userData);
+    setSession(newSession);
+    setAdminView('user');
+  };
+
+  const handleStopImpersonation = () => {
+    const adminSession = stopImpersonation();
+    setSession(adminSession);
+    setAdminView('admin');
+  };
 
   useEffect(() => {
     if (session?.role !== 'admin') setAdminView('admin');
@@ -56,18 +70,39 @@ function App() {
         session={session}
         onLogout={() => setSession(null)}
         onShowUserPanel={() => setAdminView('user')}
+        onImpersonate={handleImpersonate}
       />
     );
   }
 
-  // ── Regular user tracker ──────────────────────────────────────────────
-  return <TrackerApp
-    session={session}
-    onLogout={() => { logout(); setSession(null); }}
-    dataSource={dataSource}
-    setDataSource={setDataSource}
-    onShowAdminPanel={session.role === 'admin' ? () => setAdminView('admin') : null}
-  />;
+  // ── Regular user tracker ──────────────────────────────────
+  return (
+    <>
+      {impersonator && (
+        <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-3
+          px-4 py-2 bg-amber-500 text-amber-950 text-sm font-medium shadow-lg">
+          <span>
+            👁️ Du siehst die App als <strong>{session.name}</strong> ({session.email})
+          </span>
+          <button
+            onClick={handleStopImpersonation}
+            className="px-3 py-1 rounded-lg bg-amber-950/20 hover:bg-amber-950/30
+              text-amber-950 font-semibold transition-all text-xs shrink-0">
+            ← Zurück zum Admin-Panel
+          </button>
+        </div>
+      )}
+      <div style={impersonator ? { paddingTop: '2.5rem' } : undefined}>
+        <TrackerApp
+          session={session}
+          onLogout={() => { logout(); setSession(null); }}
+          dataSource={dataSource}
+          setDataSource={setDataSource}
+          onShowAdminPanel={session.role === 'admin' ? () => setAdminView('admin') : null}
+        />
+      </div>
+    </>
+  );
 }
 
 // ── Tracker (extracted so hooks are always called in the same order) ────────

@@ -10,8 +10,8 @@ import { logout } from '../services/auth';
 import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
-  fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser,
-  checkDockerUpdate, testDiscordWebhook, fetchAiConfig, saveAiConfig,
+  fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
+  testDiscordWebhook, fetchAiConfig, saveAiConfig, fetchRedisHealth,
 } from '../services/adminApi';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
 };
 
 // ── Main ────────────────────────────────────────────────────────────────────
-const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
+const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate }) => {
   const [allLogs, setAllLogs]     = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState(null);
@@ -93,11 +93,12 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
   const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', role: 'user', verified: true });
   const [createUserLoading, setCreateUserLoading] = useState(false);
   const [showCreatePw, setShowCreatePw] = useState(false);
+  const [impersonatingId, setImpersonatingId] = useState(null);
 
-  // ── Update state ──────────────────────────────────────────────────────
-  const [updateInfo, setUpdateInfo]   = useState(null);
-  const [updateChecking, setUpdateChecking] = useState(false);
-  const [updateError, setUpdateError] = useState(null);
+  // ── Redis health state ─────────────────────────────────────────
+  const [redisHealth, setRedisHealth]     = useState(null);
+  const [redisChecking, setRedisChecking] = useState(false);
+  const [redisError, setRedisError]       = useState(null);
 
   // Load SMTP config when settings tab is opened
   useEffect(() => {
@@ -108,11 +109,24 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
       fetchAiConfig()
         .then((cfg) => { setAiModel(cfg.model || 'google/gemini-2.0-flash-001'); setAiKeyMasked(cfg.apiKeyMasked || ''); })
         .catch(() => {});
-      handleCheckUpdate();
+      handleRedisCheck();
     }
     if (activeTab === 'users') loadRegUsers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  const handleRedisCheck = async () => {
+    setRedisChecking(true);
+    setRedisError(null);
+    try {
+      const data = await fetchRedisHealth();
+      setRedisHealth(data);
+    } catch (err) {
+      setRedisError(err.message);
+    } finally {
+      setRedisChecking(false);
+    }
+  };
 
   const loadRegUsers = async () => {
     setUsersLoading(true);
@@ -234,6 +248,19 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
     }
   };
 
+  const handleImpersonate = async (u) => {
+    if (!onImpersonate) return;
+    setImpersonatingId(u.id);
+    try {
+      const userData = await impersonateUser(u.id);
+      onImpersonate(userData);
+    } catch (err) {
+      setUsersMsg({ type: 'error', text: 'Fehler beim Wechseln: ' + err.message });
+    } finally {
+      setImpersonatingId(null);
+    }
+  };
+
   const handleToggleRole = async (id, currentRole) => {
     const isSelf = (session?.id && session.id === id) || (!session?.id && regUsers.find((u) => u.id === id)?.email === session?.email);
     if (isSelf && currentRole === 'admin') {
@@ -250,18 +277,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
     }
   };
 
-  const handleCheckUpdate = async () => {
-    setUpdateChecking(true);
-    setUpdateError(null);
-    try {
-      const info = await checkDockerUpdate();
-      setUpdateInfo(info);
-    } catch (err) {
-      setUpdateError(err.message);
-    } finally {
-      setUpdateChecking(false);
-    }
-  };
 
 
   const loadAllLogs = async () => {
@@ -865,6 +880,18 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
                               <UserCheck className="w-4 h-4" />
                             </button>
                           )}
+                          {onImpersonate && (
+                            <button
+                              onClick={() => handleImpersonate(u)}
+                              disabled={impersonatingId === u.id}
+                              className="p-1.5 rounded-lg text-slate-600 hover:text-blue-400
+                                hover:bg-blue-500/10 transition-all disabled:opacity-50"
+                              title={`Als ${u.name} anmelden`}>
+                              {impersonatingId === u.id
+                                ? <span className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin block" />
+                                : <Eye className="w-4 h-4" />}
+                            </button>
+                          )}
                           <button onClick={() => handleDeleteUser(u.id)}
                             className="p-1.5 rounded-lg text-slate-600 hover:text-red-400
                               hover:bg-red-500/10 transition-all"
@@ -1056,70 +1083,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
               </div>
             </div>
 
-            {/* Docker Auto-Update card */}
-            <div className="glass-card rounded-2xl p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 text-green-400" />
-                  Docker Auto-Update
-                </h3>
-                <button
-                  onClick={handleCheckUpdate}
-                  disabled={updateChecking}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs
-                    bg-white/5 border border-white/10 text-slate-300
-                    hover:bg-white/10 transition-all disabled:opacity-50"
-                >
-                  {updateChecking
-                    ? <span className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
-                    : <RefreshCw className="w-3 h-3" />}
-                  Prüfen
-                </button>
-              </div>
-
-              <p className="text-xs text-slate-500">
-                <span className="text-green-400 font-medium">Watchtower</span> läuft als Sidecar-Container
-                und prüft Docker Hub automatisch stündlich. Bei einem neuen Image wird der Container
-                ohne Downtime neu gestartet.
-              </p>
-
-              {updateError && (
-                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
-                  {updateError}
-                </p>
-              )}
-
-              {updateInfo && !updateError && (
-                <div className="space-y-2 text-xs">
-                  <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border font-medium
-                    ${updateInfo.updateAvailable
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                      : 'bg-green-500/10 border-green-500/30 text-green-300'}`}>
-                    {updateInfo.updateAvailable
-                      ? <AlertTriangle className="w-4 h-4 shrink-0" />
-                      : <CheckCircle className="w-4 h-4 shrink-0" />}
-                    {updateInfo.updateAvailable
-                      ? 'Update verfügbar – Watchtower installiert es beim nächsten Intervall'
-                      : 'Aktuell – kein Update verfügbar'}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-white/5 rounded-xl px-3 py-2 border border-white/8">
-                      <p className="text-slate-500 mb-0.5">Laufende Version</p>
-                      <p className="text-white font-mono font-semibold">{updateInfo.currentVersion}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-xl px-3 py-2 border border-white/8">
-                      <p className="text-slate-500 mb-0.5">Docker Hub aktualisiert</p>
-                      <p className="text-white">{new Date(updateInfo.dockerHubLastUpdated).toLocaleString('de-DE')}</p>
-                    </div>
-                    <div className="bg-white/5 rounded-xl px-3 py-2 border border-white/8 col-span-2">
-                      <p className="text-slate-500 mb-0.5">Container gestartet</p>
-                      <p className="text-white">{new Date(updateInfo.containerStartedAt).toLocaleString('de-DE')}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Test email card */}
             <div className="glass-card rounded-2xl p-6 space-y-4">
               <h3 className="font-semibold text-white flex items-center gap-2">
@@ -1216,6 +1179,86 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
                   {aiMsg.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
                   {aiMsg.text}
                   <button onClick={() => setAiMsg(null)} className="ml-auto text-xs opacity-60 hover:opacity-100">×</button>
+                </div>
+              )}
+            </div>
+
+            {/* Redis Health card */}
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Database className="w-4 h-4 text-green-400" />
+                  Redis Datenpersistenz
+                </h3>
+                <button
+                  onClick={handleRedisCheck}
+                  disabled={redisChecking}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs
+                    bg-white/5 border border-white/10 text-slate-300
+                    hover:bg-white/10 transition-all disabled:opacity-50">
+                  {redisChecking
+                    ? <span className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
+                    : <RefreshCw className="w-3 h-3" />}
+                  Prüfen
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">
+                Prüft ob Redis erreichbar ist, wie viele Einträge pro Datenschlüssel gespeichert sind
+                und wann zuletzt ein Snapshot gesichert wurde.
+              </p>
+              {redisError && (
+                <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {redisError}
+                </div>
+              )}
+              {redisHealth && !redisError && (
+                <div className="space-y-3">
+                  {/* Status row */}
+                  <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium
+                    ${redisHealth.connected
+                      ? 'bg-green-500/10 border-green-500/30 text-green-300'
+                      : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                    {redisHealth.connected
+                      ? <CheckCircle className="w-4 h-4 shrink-0" />
+                      : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                    {redisHealth.connected ? 'Redis verbunden und erreichbar' : 'Redis nicht erreichbar'}
+                  </div>
+                  {/* Info grid */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-white/5 rounded-xl px-3 py-2.5 border border-white/8">
+                      <p className="text-slate-500 mb-1">Persistenz-Modus</p>
+                      <p className="text-white font-mono">{redisHealth.persistMode}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl px-3 py-2.5 border border-white/8">
+                      <p className="text-slate-500 mb-1">Letzter Snapshot</p>
+                      <p className="text-white">
+                        {redisHealth.lastSave
+                          ? new Date(redisHealth.lastSave).toLocaleString('de-DE')
+                          : '–'}
+                      </p>
+                    </div>
+                  </div>
+                  {/* Keys table */}
+                  {Object.keys(redisHealth.keys).length > 0 && (
+                    <div className="rounded-xl border border-white/8 overflow-hidden text-xs">
+                      <div className="grid grid-cols-[1fr_auto] px-3 py-2 bg-white/5
+                        text-slate-500 font-semibold uppercase tracking-wider">
+                        <span>Schlüssel</span>
+                        <span className="text-right">Einträge</span>
+                      </div>
+                      {Object.entries(redisHealth.keys).map(([key, info]) => (
+                        <div key={key} className="grid grid-cols-[1fr_auto] px-3 py-2.5
+                          border-t border-white/5 hover:bg-white/5 transition-colors">
+                          <span className="text-slate-300 font-mono">{key}</span>
+                          <span className={`text-right font-semibold
+                            ${info.count > 0 ? 'text-green-400' : 'text-slate-600'}`}>
+                            {info.count}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
