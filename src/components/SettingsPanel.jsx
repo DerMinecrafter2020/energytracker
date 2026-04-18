@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Zap, Clock, AlertCircle, Shield, KeyRound, Trash2 } from 'lucide-react';
-import { startRegistration } from '@simplewebauthn/browser';
+import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import {
   fetchUserSettings,
   updateUserSettings,
@@ -29,6 +29,15 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
   const [totpDisablePassword, setTotpDisablePassword] = useState('');
   const [securityMessage, setSecurityMessage] = useState('');
   const [securityLoading, setSecurityLoading] = useState(false);
+  const [webauthnSupported, setWebauthnSupported] = useState(false);
+
+  useEffect(() => {
+    try {
+      setWebauthnSupported(browserSupportsWebAuthn());
+    } catch {
+      setWebauthnSupported(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!session?.email) return;
@@ -158,6 +167,11 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
   };
 
   const handleRegisterPasskey = async () => {
+    if (!webauthnSupported) {
+      setSecurityMessage('WebAuthn wird von diesem Browser nicht unterstützt. Nutze bitte TOTP oder einen aktuellen Browser.');
+      return;
+    }
+
     setSecurityLoading(true);
     setSecurityMessage('');
     try {
@@ -430,9 +444,15 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
               </span>
             </div>
 
+            {!webauthnSupported && (
+              <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+                Dieser Browser unterstützt WebAuthn/Sicherheitsschlüssel nicht.
+              </div>
+            )}
+
             <button
               onClick={handleRegisterPasskey}
-              disabled={securityLoading}
+              disabled={securityLoading || !webauthnSupported}
               className="w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <KeyRound className="w-4 h-4" /> Sicherheitsschlüssel hinzufügen

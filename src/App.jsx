@@ -364,6 +364,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         session={session}
         onLogout={onLogout}
         onShowAdminPanel={onShowAdminPanel}
+        onToggleSettings={() => setShowSettings((prev) => !prev)}
       />
 
       <main className="max-w-lg mx-auto px-4 pb-8">
@@ -389,6 +390,27 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
             </button>
           </div>
         )}
+
+        {/* Settings Section */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition flex items-center justify-between"
+          >
+            <span>⚙️ Einstellungen</span>
+            <span>{showSettings ? '▼' : '▶'}</span>
+          </button>
+
+          {showSettings && (
+            <div className="mt-4 space-y-4">
+              <SettingsPanel
+                session={session}
+                isLoading={isOperationLoading}
+                onSettingsChange={(newSettings) => setSettings(newSettings)}
+              />
+            </div>
+          )}
+        </div>
 
         <ProgressBar currentCaffeine={totalCaffeineToday} />
 
@@ -454,26 +476,6 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
           isLoading={isOperationLoading}
         />
 
-        {/* Settings Section */}
-        <div className="mt-8 border-t border-gray-700 pt-6">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition flex items-center justify-between"
-          >
-            <span>⚙️ Einstellungen</span>
-            <span>{showSettings ? '▼' : '▶'}</span>
-          </button>
-
-          {showSettings && (
-            <div className="mt-4 space-y-4">
-              <SettingsPanel
-                session={session}
-                isLoading={isOperationLoading}
-                onSettingsChange={(newSettings) => setSettings(newSettings)}
-              />
-            </div>
-          )}
-        </div>
       </main>
 
       <footer className="text-center py-6 text-slate-600 text-sm">

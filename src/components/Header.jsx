@@ -1,7 +1,7 @@
 import React from 'react';
-import { Zap, Loader2, LogOut, User, ShieldCheck } from 'lucide-react';
+import { Zap, Loader2, LogOut, User, ShieldCheck, Settings } from 'lucide-react';
 
-const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel }) => {
+const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel, onToggleSettings }) => {
   const today = new Date().toLocaleDateString('de-DE', {
     weekday: 'long',
     year: 'numeric',
@@ -50,6 +50,19 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
               <User className="w-3.5 h-3.5 text-slate-400" />
               <span className="text-xs text-slate-400 hidden sm:inline">{session.name}</span>
             </div>
+            {onToggleSettings && (
+              <button
+                onClick={onToggleSettings}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
+                  bg-blue-500/10 border border-blue-500/25 text-blue-300
+                  hover:bg-blue-500/20 transition-all"
+                aria-label="Einstellungen öffnen"
+                title="Einstellungen"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span className="text-xs hidden sm:inline">Einstellungen</span>
+              </button>
+            )}
             {onLogout && (
               <button
                 onClick={onLogout}

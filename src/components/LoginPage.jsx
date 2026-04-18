@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCircle, Clock, KeyRound, Shield } from 'lucide-react';
-import { login, completeLoginWithTotp, completeLoginWithPasskey } from '../services/auth';
+import { isWebAuthnSupported, login, completeLoginWithTotp, completeLoginWithPasskey } from '../services/auth';
 import { fetchPublicSettings } from '../services/adminApi';
 
 const LoginPage = ({ onLogin, onShowRegister }) => {
@@ -13,6 +13,11 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
   const [publicSettings, setPublicSettings] = useState({ demoEnabled: true, registrationEnabled: true });
   const [pending2FA, setPending2FA] = useState(null);
   const [totpCode, setTotpCode] = useState('');
+  const [webauthnSupported, setWebauthnSupported] = useState(false);
+
+  useEffect(() => {
+    setWebauthnSupported(isWebAuthnSupported());
+  }, []);
 
   // Load public settings (demo toggle, registration toggle)
   useEffect(() => {
@@ -212,16 +217,23 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
             )}
 
             {pending2FA.methods?.passkey && (
+              <>
+              {!webauthnSupported && (
+                <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+                  Passkey-Login wird von diesem Browser nicht unterstützt. Nutze den 2FA-Code.
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handlePasskeyVerify}
-                disabled={isLoading}
+                disabled={isLoading || !webauthnSupported}
                 className="w-full py-3 rounded-xl font-semibold text-white transition-all duration-200
                   bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500
                   disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <KeyRound className="w-4 h-4" /> Mit Sicherheitsschlüssel anmelden
               </button>
+              </>
             )}
 
             <button

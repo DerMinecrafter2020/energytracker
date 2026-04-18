@@ -1,4 +1,4 @@
-import { startAuthentication } from '@simplewebauthn/browser';
+import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 
 const AUTH_KEY = 'et-session';
 
@@ -14,6 +14,14 @@ const BUILTIN_USERS = [
 ];
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+
+export const isWebAuthnSupported = () => {
+  try {
+    return browserSupportsWebAuthn();
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Attempt login. Checks built-in credentials first (if demo enabled), then server-registered users.
@@ -89,6 +97,10 @@ export const completeLoginWithTotp = async ({ loginToken, code }) => {
 };
 
 export const completeLoginWithPasskey = async ({ loginToken }) => {
+  if (!isWebAuthnSupported()) {
+    throw new Error('WebAuthn wird von diesem Browser nicht unterstützt. Bitte nutze den 2FA-Code.');
+  }
+
   const optionsResp = await fetch(`${API_BASE}/api/login/2fa/passkey/options`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
