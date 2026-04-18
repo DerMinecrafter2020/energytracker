@@ -1,3 +1,5 @@
+import { startAuthentication } from '@simplewebauthn/browser';
+
 const AUTH_KEY = 'et-session';
 
 // Credentials from env or fallback defaults
@@ -57,7 +59,57 @@ export const login = async (email, password) => {
   const data = await resp.json();
   if (!resp.ok) throw new Error(data.error || 'Anmeldung fehlgeschlagen.');
 
+  if (data.requiresSecondFactor) {
+    return {
+      requiresSecondFactor: true,
+      loginToken: data.loginToken,
+      methods: data.methods || { totp: false, passkey: false },
+      user: data.user,
+    };
+  }
+
   const session = { ...data.user, loginAt: Date.now() };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  return session;
+};
+
+export const completeLoginWithTotp = async ({ loginToken, code }) => {
+  const resp = await fetch(`${API_BASE}/api/login/2fa/totp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ loginToken, code }),
+  });
+
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || '2FA-Code ungültig.');
+
+  const session = { ...data.user, loginAt: Date.now() };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  return session;
+};
+
+export const completeLoginWithPasskey = async ({ loginToken }) => {
+  const optionsResp = await fetch(`${API_BASE}/api/login/2fa/passkey/options`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ loginToken }),
+  });
+  const optionsData = await optionsResp.json();
+  if (!optionsResp.ok) throw new Error(optionsData.error || 'Passkey-Optionen konnten nicht geladen werden.');
+
+  const credential = await startAuthentication({
+    optionsJSON: optionsData.options,
+  });
+
+  const verifyResp = await fetch(`${API_BASE}/api/login/2fa/passkey/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ loginToken, response: credential }),
+  });
+  const verifyData = await verifyResp.json();
+  if (!verifyResp.ok) throw new Error(verifyData.error || 'Passkey-Verifikation fehlgeschlagen.');
+
+  const session = { ...verifyData.user, loginAt: Date.now() };
   localStorage.setItem(AUTH_KEY, JSON.stringify(session));
   return session;
 };

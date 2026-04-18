@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCircle, Clock } from 'lucide-react';
-import { login } from '../services/auth';
+import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCircle, Clock, KeyRound, Shield } from 'lucide-react';
+import { login, completeLoginWithTotp, completeLoginWithPasskey } from '../services/auth';
 import { fetchPublicSettings } from '../services/adminApi';
 
 const LoginPage = ({ onLogin, onShowRegister }) => {
@@ -11,6 +11,8 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [verifiedBanner, setVerifiedBanner] = useState(null);
   const [publicSettings, setPublicSettings] = useState({ demoEnabled: true, registrationEnabled: true });
+  const [pending2FA, setPending2FA] = useState(null);
+  const [totpCode, setTotpCode] = useState('');
 
   // Load public settings (demo toggle, registration toggle)
   useEffect(() => {
@@ -35,7 +37,47 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
     setError('');
     setIsLoading(true);
     try {
-      const session = await login(email, password);
+      const result = await login(email, password);
+      if (result?.requiresSecondFactor) {
+        setPending2FA(result);
+      } else {
+        onLogin(result);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTotpVerify = async () => {
+    if (!pending2FA?.loginToken) return;
+    if (!totpCode.trim()) {
+      setError('Bitte gib deinen 2FA-Code ein.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    try {
+      const session = await completeLoginWithTotp({
+        loginToken: pending2FA.loginToken,
+        code: totpCode,
+      });
+      onLogin(session);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasskeyVerify = async () => {
+    if (!pending2FA?.loginToken) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const session = await completeLoginWithPasskey({ loginToken: pending2FA.loginToken });
       onLogin(session);
     } catch (err) {
       setError(err.message);
@@ -92,6 +134,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
           )}
 
           {/* Form */}
+          {!pending2FA ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-Mail</label>
@@ -134,6 +177,66 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
               }
             </button>
           </form>
+          ) : (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200">
+              <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" />Zweiter Faktor erforderlich</p>
+              <p className="text-violet-300/90 mt-1">Für {pending2FA.user?.email} muss die Anmeldung bestätigt werden.</p>
+            </div>
+
+            {pending2FA.methods?.totp && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">2FA Code</label>
+                <div className="relative">
+                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="text"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\s+/g, ''))}
+                    placeholder="123456"
+                    className="input-dark pl-12"
+                    maxLength={8}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTotpVerify}
+                  disabled={isLoading}
+                  className="w-full mt-3 py-3 rounded-xl font-semibold text-white transition-all duration-200
+                    bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500
+                    disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Code prüfen
+                </button>
+              </div>
+            )}
+
+            {pending2FA.methods?.passkey && (
+              <button
+                type="button"
+                onClick={handlePasskeyVerify}
+                disabled={isLoading}
+                className="w-full py-3 rounded-xl font-semibold text-white transition-all duration-200
+                  bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500
+                  disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <KeyRound className="w-4 h-4" /> Mit Sicherheitsschlüssel anmelden
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setPending2FA(null);
+                setTotpCode('');
+                setPassword('');
+              }}
+              className="w-full py-2 text-sm text-slate-400 hover:text-slate-300 transition-colors"
+            >
+              Zurück zur normalen Anmeldung
+            </button>
+          </div>
+          )}
 
           {/* Register link */}
           {publicSettings.registrationEnabled && (

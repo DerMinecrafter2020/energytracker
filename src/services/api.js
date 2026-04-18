@@ -199,3 +199,81 @@ export const fetchWeeklyStats = async ({ userId, email }) => {
   if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Wochenstatistiken');
   return data.items || [];
 };
+
+// ── SECURITY (2FA / PASSKEYS) ──────────────────────────────────────────
+export const fetchSecurityStatus = async ({ userId, email }) => {
+  const url = new URL('/api/security/me', API_BASE_URL);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
+
+  const response = await fetch(url.toString());
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Sicherheitseinstellungen');
+  return data;
+};
+
+export const setupTotp = async ({ userId, email, password }) => {
+  const response = await fetch(`${API_BASE_URL}/api/security/totp/setup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, email, password }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'TOTP-Setup fehlgeschlagen');
+  return data;
+};
+
+export const enableTotp = async ({ userId, email, code }) => {
+  const response = await fetch(`${API_BASE_URL}/api/security/totp/enable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, email, code }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'TOTP-Aktivierung fehlgeschlagen');
+  return data;
+};
+
+export const disableTotp = async ({ userId, email, password }) => {
+  const response = await fetch(`${API_BASE_URL}/api/security/totp/disable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, email, password }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'TOTP-Deaktivierung fehlgeschlagen');
+  return data;
+};
+
+export const fetchPasskeyRegistrationOptions = async ({ userId, email }) => {
+  const response = await fetch(`${API_BASE_URL}/api/security/passkeys/register/options`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, email }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Passkey-Optionen konnten nicht geladen werden');
+  return data;
+};
+
+export const verifyPasskeyRegistration = async ({ userId, email, challengeToken, response, name }) => {
+  const apiResponse = await fetch(`${API_BASE_URL}/api/security/passkeys/register/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, email, challengeToken, response, name }),
+  });
+  const data = await apiResponse.json();
+  if (!apiResponse.ok) throw new Error(data.error || 'Passkey-Registrierung fehlgeschlagen');
+  return data;
+};
+
+export const removePasskey = async ({ userId, email, credentialId }) => {
+  const url = new URL(`/api/security/passkeys/${encodeURIComponent(credentialId)}`, API_BASE_URL);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
+
+  const response = await fetch(url.toString(), { method: 'DELETE' });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Sicherheitsschlüssel konnte nicht gelöscht werden');
+  return data;
+};

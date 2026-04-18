@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Wine } from 'lucide-react';
+import { Heart, HeartOff, Plus, Trash2, Wine } from 'lucide-react';
 import { fetchCustomDrinks, addCustomDrink, removeCustomDrink } from '../services/api';
 
-export default function CustomDrinks({ session, isLoading }) {
+export default function CustomDrinks({
+  session,
+  isLoading,
+  onAddDrink,
+  onToggleFavorite,
+  isFavoriteDrink,
+}) {
   const [customDrinks, setCustomDrinks] = useState([]);
   const [name, setName] = useState('');
   const [size, setSize] = useState('');
@@ -19,7 +25,7 @@ export default function CustomDrinks({ session, isLoading }) {
       setLoadingDrinks(true);
       try {
         const drinks = await fetchCustomDrinks({
-          userId: session.userId || null,
+          userId: session.id || session.userId || null,
           email: session.email,
         });
         setCustomDrinks(drinks);
@@ -45,7 +51,7 @@ export default function CustomDrinks({ session, isLoading }) {
 
     try {
       const newDrink = await addCustomDrink({
-        userId: session.userId || null,
+        userId: session.id || session.userId || null,
         email: session.email,
         name: name.trim(),
         size: Number(size),
@@ -71,7 +77,7 @@ export default function CustomDrinks({ session, isLoading }) {
   const handleRemoveDrink = async (drinkId) => {
     try {
       await removeCustomDrink({
-        userId: session.userId || null,
+        userId: session.id || session.userId || null,
         email: session.email,
         drinkId,
       });
@@ -82,6 +88,30 @@ export default function CustomDrinks({ session, isLoading }) {
       setMessage('error');
       console.error(err);
     }
+  };
+
+  const handleQuickAddDrink = (drink) => {
+    if (!onAddDrink) return;
+    onAddDrink({
+      name: drink.name,
+      size: Number(drink.size),
+      caffeine: Number(drink.caffeine),
+      caffeinePerMl: drink.size ? Number(drink.caffeine) / Number(drink.size) : null,
+      icon: drink.icon || '🥤',
+      isPreset: false,
+    });
+  };
+
+  const handleToggleFavoriteDrink = (drink) => {
+    if (!onToggleFavorite) return;
+    const favorite = !!isFavoriteDrink?.(drink);
+    onToggleFavorite({
+      name: drink.name,
+      size: Number(drink.size),
+      caffeine: Number(drink.caffeine),
+      caffeinePerMl: drink.size ? Number(drink.caffeine) / Number(drink.size) : null,
+      icon: drink.icon || '🥤',
+    }, favorite);
   };
 
   return (
@@ -200,17 +230,42 @@ export default function CustomDrinks({ session, isLoading }) {
                 hover:bg-white/10 hover:border-white/15
                 transition-all duration-200 group"
             >
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center
-                bg-gradient-to-br from-pink-600/30 to-pink-400/10 border border-pink-500/20 shrink-0 text-lg">
-                {drink.icon}
-              </div>
+              <button
+                type="button"
+                onClick={() => handleQuickAddDrink(drink)}
+                disabled={isLoading}
+                className="flex items-center gap-3 flex-1 min-w-0 text-left disabled:opacity-60 cursor-pointer"
+                title="Zum heutigen Konsum hinzufügen"
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center
+                  bg-gradient-to-br from-pink-600/30 to-pink-400/10 border border-pink-500/20 shrink-0 text-lg">
+                  {drink.icon}
+                </div>
 
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-white text-sm">{drink.name}</h4>
-                <p className="text-xs text-slate-500">
-                  {drink.size}ml • {drink.caffeine}mg
-                </p>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-white text-sm">{drink.name}</h4>
+                  <p className="text-xs text-slate-500">
+                    {drink.size}ml • {drink.caffeine}mg
+                  </p>
+                </div>
+
+                <div className="shrink-0 flex items-center gap-1 rounded-lg px-2 py-1
+                  bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="text-[11px] font-semibold">Hinzufügen</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleToggleFavoriteDrink(drink)}
+                className="p-1.5 text-slate-400 hover:text-pink-300 hover:bg-pink-500/10
+                  rounded-xl transition-all duration-200 opacity-0 group-hover:opacity-100"
+                aria-label="Favorit umschalten"
+                title="Als Favorit speichern"
+              >
+                {isFavoriteDrink?.(drink) ? <HeartOff className="w-4 h-4" /> : <Heart className="w-4 h-4" />}
+              </button>
 
               <button
                 onClick={() => handleRemoveDrink(drink.id)}

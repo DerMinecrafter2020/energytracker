@@ -7,6 +7,13 @@ import fs from 'fs';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import Redis from 'ioredis';
+import { authenticator } from 'otplib';
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from '@simplewebauthn/server';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -56,6 +63,31 @@ try {
 }
 
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN || ALLOWED_ORIGIN;
+const WEBAUTHN_RP_ID = process.env.WEBAUTHN_RP_ID || new URL(WEBAUTHN_ORIGIN).hostname;
+const WEBAUTHN_RP_NAME = process.env.WEBAUTHN_RP_NAME || 'Koffein-Tracker';
+
+authenticator.options = {
+  step: 30,
+  window: [1, 1],
+};
+
+const pendingSecondFactor = new Map();
+const pendingWebAuthn = new Map();
+const AUTH_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+const toBase64Url = (buffer) => Buffer.from(buffer).toString('base64url');
+const fromBase64Url = (input) => Buffer.from(String(input || ''), 'base64url');
+
+const cleanupAuthChallenges = () => {
+  const now = Date.now();
+  for (const [token, data] of pendingSecondFactor.entries()) {
+    if (now > Number(data?.expiresAt || 0)) pendingSecondFactor.delete(token);
+  }
+  for (const [token, data] of pendingWebAuthn.entries()) {
+    if (now > Number(data?.expiresAt || 0)) pendingWebAuthn.delete(token);
+  }
+};
 
 app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(express.json());
@@ -335,6 +367,10 @@ class FileDbAdapter {
         verified: false,
         verify_token: params[4],
         verify_token_expiry: params[5],
+        totp_enabled: false,
+        totp_secret: null,
+        totp_temp_secret: null,
+        passkeys: [],
         created_at: new Date().toISOString(),
         last_login: null,
       };
@@ -814,6 +850,68 @@ const removeCustomDrink = ({ userId, email, drinkId }) => {
   return true;
 };
 
+const getUserByIdentity = ({ userId, email }) => {
+  const safeUserId = String(userId || '').trim();
+  const safeEmail = String(email || '').toLowerCase().trim();
+  return dbState.users.find((u) =>
+    (safeUserId && String(u.id) === safeUserId)
+    || (safeEmail && String(u.email || '').toLowerCase() === safeEmail)
+  ) || null;
+};
+
+const ensureUserSecurityFields = (user) => {
+  if (!user) return;
+  if (!Array.isArray(user.passkeys)) user.passkeys = [];
+  if (typeof user.totp_enabled !== 'boolean') user.totp_enabled = false;
+  if (!user.totp_secret) user.totp_secret = null;
+  if (!user.totp_temp_secret) user.totp_temp_secret = null;
+};
+
+const createSecondFactorToken = (user) => {
+  const token = crypto.randomBytes(24).toString('hex');
+  pendingSecondFactor.set(token, {
+    userId: user.id,
+    email: user.email,
+    expiresAt: Date.now() + AUTH_CHALLENGE_TTL_MS,
+  });
+  return token;
+};
+
+const consumeSecondFactorToken = (token) => {
+  cleanupAuthChallenges();
+  const key = String(token || '').trim();
+  const payload = pendingSecondFactor.get(key);
+  if (!payload) return null;
+  pendingSecondFactor.delete(key);
+  return payload;
+};
+
+const peekSecondFactorToken = (token) => {
+  cleanupAuthChallenges();
+  const key = String(token || '').trim();
+  return pendingSecondFactor.get(key) || null;
+};
+
+const sanitizeSecurityOverview = (user) => {
+  ensureUserSecurityFields(user);
+  return {
+    totpEnabled: !!user.totp_enabled,
+    passkeys: user.passkeys.map((k) => ({
+      id: k.id,
+      name: k.name || 'Sicherheitsschluessel',
+      createdAt: k.createdAt,
+      lastUsedAt: k.lastUsedAt || null,
+      transports: Array.isArray(k.transports) ? k.transports : [],
+    })),
+  };
+};
+
+const completeLoginForUser = async (user) => {
+  const dbPool = getPool();
+  await dbPool.execute('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+  return { id: user.id, name: user.name, email: user.email, role: user.role };
+};
+
 // ── STATISTICS HELPERS ───────────────────────────────────────────────────────
 const getWeeklyStats = ({ userId, email }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
@@ -1235,6 +1333,10 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
     verified: !!verified,
     verify_token: null,
     verify_token_expiry: null,
+    totp_enabled: false,
+    totp_secret: null,
+    totp_temp_secret: null,
+    passkeys: [],
     created_at: new Date().toISOString(),
     last_login: null,
   };
@@ -1396,11 +1498,148 @@ app.post('/api/login', async (req, res) => {
     if (user.passwordHash !== hashPassword(password))
       return res.status(401).json({ error: 'Ung\u00fcltige Zugangsdaten.' });
 
-    await dbPool.execute('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
-    res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    const fullUser = getUserByIdentity({ userId: user.id, email: user.email });
+    ensureUserSecurityFields(fullUser);
+
+    const hasTotp = !!fullUser?.totp_enabled && !!fullUser?.totp_secret;
+    const hasPasskey = Array.isArray(fullUser?.passkeys) && fullUser.passkeys.length > 0;
+
+    if (hasTotp || hasPasskey) {
+      const loginToken = createSecondFactorToken(fullUser);
+      return res.json({
+        success: true,
+        requiresSecondFactor: true,
+        loginToken,
+        methods: {
+          totp: hasTotp,
+          passkey: hasPasskey,
+        },
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      });
+    }
+
+    const safeUser = await completeLoginForUser(fullUser || user);
+    res.json({ success: true, user: safeUser });
   } catch (err) {
     console.error('POST /api/login error:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/login/2fa/totp', async (req, res) => {
+  try {
+    const { loginToken, code } = req.body || {};
+    if (!loginToken || !code) return res.status(400).json({ error: 'loginToken und Code sind erforderlich.' });
+
+    const pending = peekSecondFactorToken(loginToken);
+    if (!pending) return res.status(401).json({ error: '2FA-Sitzung ist abgelaufen. Bitte neu anmelden.' });
+
+    const user = getUserByIdentity({ userId: pending.userId, email: pending.email });
+    ensureUserSecurityFields(user);
+    if (!user || !user.totp_enabled || !user.totp_secret) {
+      return res.status(400).json({ error: 'TOTP ist für dieses Konto nicht aktiv.' });
+    }
+
+    const ok = authenticator.verify({ token: String(code).replace(/\s+/g, ''), secret: user.totp_secret });
+    if (!ok) return res.status(401).json({ error: 'Ungültiger 2FA-Code.' });
+
+    consumeSecondFactorToken(loginToken);
+    const safeUser = await completeLoginForUser(user);
+    res.json({ success: true, user: safeUser });
+  } catch (err) {
+    console.error('POST /api/login/2fa/totp error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/login/2fa/passkey/options', async (req, res) => {
+  try {
+    const { loginToken } = req.body || {};
+    if (!loginToken) return res.status(400).json({ error: 'loginToken ist erforderlich.' });
+
+    const pending = peekSecondFactorToken(loginToken);
+    if (!pending) return res.status(401).json({ error: '2FA-Sitzung ist abgelaufen. Bitte neu anmelden.' });
+
+    const user = getUserByIdentity({ userId: pending.userId, email: pending.email });
+    ensureUserSecurityFields(user);
+    if (!user || user.passkeys.length === 0) {
+      return res.status(400).json({ error: 'Kein Sicherheitsschlüssel hinterlegt.' });
+    }
+
+    const options = await generateAuthenticationOptions({
+      rpID: WEBAUTHN_RP_ID,
+      userVerification: 'preferred',
+      allowCredentials: user.passkeys.map((k) => ({
+        id: k.id,
+        transports: Array.isArray(k.transports) ? k.transports : [],
+      })),
+      timeout: 60000,
+    });
+
+    pendingWebAuthn.set(`login:${loginToken}`, {
+      type: 'login',
+      userId: user.id,
+      challenge: options.challenge,
+      expiresAt: Date.now() + AUTH_CHALLENGE_TTL_MS,
+    });
+
+    res.json({ success: true, options });
+  } catch (err) {
+    console.error('POST /api/login/2fa/passkey/options error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/login/2fa/passkey/verify', async (req, res) => {
+  try {
+    const { loginToken, response } = req.body || {};
+    if (!loginToken || !response) return res.status(400).json({ error: 'loginToken und response sind erforderlich.' });
+
+    const pending = peekSecondFactorToken(loginToken);
+    if (!pending) return res.status(401).json({ error: '2FA-Sitzung ist abgelaufen. Bitte neu anmelden.' });
+
+    const challengeState = pendingWebAuthn.get(`login:${loginToken}`);
+    if (!challengeState || challengeState.type !== 'login') {
+      return res.status(401).json({ error: 'Passkey-Challenge fehlt oder ist abgelaufen.' });
+    }
+
+    const user = getUserByIdentity({ userId: pending.userId, email: pending.email });
+    ensureUserSecurityFields(user);
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+
+    const passkey = user.passkeys.find((k) => k.id === response.id);
+    if (!passkey) return res.status(401).json({ error: 'Unbekannter Sicherheitsschlüssel.' });
+
+    const verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: challengeState.challenge,
+      expectedOrigin: WEBAUTHN_ORIGIN,
+      expectedRPID: WEBAUTHN_RP_ID,
+      credential: {
+        id: passkey.id,
+        publicKey: fromBase64Url(passkey.publicKey),
+        counter: Number(passkey.counter || 0),
+        transports: Array.isArray(passkey.transports) ? passkey.transports : [],
+      },
+      requireUserVerification: false,
+    });
+
+    if (!verification.verified) return res.status(401).json({ error: 'Passkey-Überprüfung fehlgeschlagen.' });
+
+    if (verification.authenticationInfo) {
+      passkey.counter = verification.authenticationInfo.newCounter;
+      passkey.lastUsedAt = new Date().toISOString();
+      persistDbState();
+    }
+
+    pendingWebAuthn.delete(`login:${loginToken}`);
+    consumeSecondFactorToken(loginToken);
+
+    const safeUser = await completeLoginForUser(user);
+    res.json({ success: true, user: safeUser });
+  } catch (err) {
+    console.error('POST /api/login/2fa/passkey/verify error:', err);
+    res.status(500).json({ error: 'Passkey-Verifikation fehlgeschlagen.' });
   }
 });
 
@@ -1560,6 +1799,223 @@ app.post('/api/settings/me', async (req, res) => {
     res.json(settings);
   } catch (err) {
     console.error('POST /api/settings/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ── USER SECURITY (2FA + PASSKEYS) ─────────────────────────────────────────
+app.get('/api/security/me', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const user = getUserByIdentity({ userId, email });
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    res.json(sanitizeSecurityOverview(user));
+  } catch (err) {
+    console.error('GET /api/security/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/security/totp/setup', async (req, res) => {
+  try {
+    const { userId, email, password } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+    if (!safeEmail || !password) return res.status(400).json({ error: 'email und password sind erforderlich.' });
+
+    const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    if (user.password_hash !== hashPassword(password)) {
+      return res.status(401).json({ error: 'Passwort ist falsch.' });
+    }
+
+    ensureUserSecurityFields(user);
+    const secret = authenticator.generateSecret();
+    user.totp_temp_secret = secret;
+    persistDbState();
+
+    const otpauthUrl = authenticator.keyuri(user.email, WEBAUTHN_RP_NAME, secret);
+    res.json({ success: true, secret, otpauthUrl, issuer: WEBAUTHN_RP_NAME });
+  } catch (err) {
+    console.error('POST /api/security/totp/setup error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/security/totp/enable', async (req, res) => {
+  try {
+    const { userId, email, code } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+    if (!safeEmail || !code) return res.status(400).json({ error: 'email und code sind erforderlich.' });
+
+    const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    ensureUserSecurityFields(user);
+    if (!user.totp_temp_secret) return res.status(400).json({ error: 'Bitte zuerst TOTP-Setup starten.' });
+
+    const ok = authenticator.verify({ token: String(code).replace(/\s+/g, ''), secret: user.totp_temp_secret });
+    if (!ok) return res.status(401).json({ error: 'Ungültiger Verifizierungscode.' });
+
+    user.totp_secret = user.totp_temp_secret;
+    user.totp_temp_secret = null;
+    user.totp_enabled = true;
+    persistDbState();
+
+    res.json({ success: true, security: sanitizeSecurityOverview(user) });
+  } catch (err) {
+    console.error('POST /api/security/totp/enable error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/security/totp/disable', async (req, res) => {
+  try {
+    const { userId, email, password } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+    if (!safeEmail || !password) return res.status(400).json({ error: 'email und password sind erforderlich.' });
+
+    const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    if (user.password_hash !== hashPassword(password)) {
+      return res.status(401).json({ error: 'Passwort ist falsch.' });
+    }
+
+    ensureUserSecurityFields(user);
+    user.totp_enabled = false;
+    user.totp_secret = null;
+    user.totp_temp_secret = null;
+    persistDbState();
+
+    res.json({ success: true, security: sanitizeSecurityOverview(user) });
+  } catch (err) {
+    console.error('POST /api/security/totp/disable error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/security/passkeys/register/options', async (req, res) => {
+  try {
+    const { userId, email } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    ensureUserSecurityFields(user);
+
+    const options = await generateRegistrationOptions({
+      rpID: WEBAUTHN_RP_ID,
+      rpName: WEBAUTHN_RP_NAME,
+      userID: user.id,
+      userName: user.email,
+      userDisplayName: user.name || user.email,
+      timeout: 60000,
+      attestationType: 'none',
+      authenticatorSelection: {
+        residentKey: 'preferred',
+        userVerification: 'preferred',
+      },
+      excludeCredentials: user.passkeys.map((k) => ({ id: k.id, transports: k.transports || [] })),
+    });
+
+    const challengeToken = crypto.randomBytes(24).toString('hex');
+    pendingWebAuthn.set(`register:${challengeToken}`, {
+      type: 'register',
+      userId: user.id,
+      challenge: options.challenge,
+      expiresAt: Date.now() + AUTH_CHALLENGE_TTL_MS,
+    });
+
+    res.json({ success: true, challengeToken, options });
+  } catch (err) {
+    console.error('POST /api/security/passkeys/register/options error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/security/passkeys/register/verify', async (req, res) => {
+  try {
+    const { userId, email, challengeToken, response, name } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+    if (!safeEmail || !challengeToken || !response) {
+      return res.status(400).json({ error: 'email, challengeToken und response sind erforderlich.' });
+    }
+
+    const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    ensureUserSecurityFields(user);
+
+    const challengeState = pendingWebAuthn.get(`register:${challengeToken}`);
+    if (!challengeState || challengeState.type !== 'register' || challengeState.userId !== user.id) {
+      return res.status(401).json({ error: 'Registrierungs-Challenge fehlt oder ist abgelaufen.' });
+    }
+
+    const verification = await verifyRegistrationResponse({
+      response,
+      expectedChallenge: challengeState.challenge,
+      expectedOrigin: WEBAUTHN_ORIGIN,
+      expectedRPID: WEBAUTHN_RP_ID,
+      requireUserVerification: false,
+    });
+
+    if (!verification.verified || !verification.registrationInfo) {
+      return res.status(401).json({ error: 'Sicherheitsschlüssel konnte nicht verifiziert werden.' });
+    }
+
+    const credential = verification.registrationInfo.credential;
+    const credentialId = credential.id;
+    if (user.passkeys.some((k) => k.id === credentialId)) {
+      pendingWebAuthn.delete(`register:${challengeToken}`);
+      return res.status(409).json({ error: 'Dieser Schlüssel ist bereits registriert.' });
+    }
+
+    user.passkeys.push({
+      id: credentialId,
+      publicKey: toBase64Url(credential.publicKey),
+      counter: Number(credential.counter || 0),
+      transports: Array.isArray(response.response?.transports) ? response.response.transports : [],
+      name: String(name || 'Sicherheitsschlüssel').trim() || 'Sicherheitsschlüssel',
+      createdAt: new Date().toISOString(),
+      lastUsedAt: null,
+    });
+
+    pendingWebAuthn.delete(`register:${challengeToken}`);
+    persistDbState();
+    res.json({ success: true, security: sanitizeSecurityOverview(user) });
+  } catch (err) {
+    console.error('POST /api/security/passkeys/register/verify error:', err);
+    res.status(500).json({ error: 'Passkey-Registrierung fehlgeschlagen.' });
+  }
+});
+
+app.delete('/api/security/passkeys/:credentialId', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    const credentialId = String(req.params.credentialId || '').trim();
+    if (!email || !credentialId) return res.status(400).json({ error: 'email und credentialId sind erforderlich.' });
+
+    const user = getUserByIdentity({ userId, email });
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    ensureUserSecurityFields(user);
+
+    const before = user.passkeys.length;
+    user.passkeys = user.passkeys.filter((k) => k.id !== credentialId);
+    if (user.passkeys.length === before) {
+      return res.status(404).json({ error: 'Sicherheitsschlüssel nicht gefunden.' });
+    }
+
+    persistDbState();
+    res.json({ success: true, security: sanitizeSecurityOverview(user) });
+  } catch (err) {
+    console.error('DELETE /api/security/passkeys/:credentialId error:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
@@ -1868,6 +2324,10 @@ initDb()
     // Check every minute whether a reminder is due.
     setInterval(() => {
       processRemindersTick().catch((err) => console.error('[Reminder] Tick-Fehler:', err.message));
+    }, 60 * 1000);
+
+    setInterval(() => {
+      cleanupAuthChallenges();
     }, 60 * 1000);
 
     app.listen(PORT, () => {

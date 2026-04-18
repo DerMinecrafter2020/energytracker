@@ -407,7 +407,13 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
           isLoading={isOperationLoading}
         />
 
-        <CustomDrinks session={session} isLoading={isOperationLoading} />
+        <CustomDrinks
+          session={session}
+          isLoading={isOperationLoading}
+          onAddDrink={handleAddDrink}
+          onToggleFavorite={handleToggleFavorite}
+          isFavoriteDrink={isFavoriteLog}
+        />
 
         <OnlineSearch
           onSelect={(item) =>

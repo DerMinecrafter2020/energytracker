@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Zap, Clock, AlertCircle } from 'lucide-react';
-import { fetchUserSettings, updateUserSettings } from '../services/api';
+import { Settings, Zap, Clock, AlertCircle, Shield, KeyRound, Trash2 } from 'lucide-react';
+import { startRegistration } from '@simplewebauthn/browser';
+import {
+  fetchUserSettings,
+  updateUserSettings,
+  fetchSecurityStatus,
+  setupTotp,
+  enableTotp,
+  disableTotp,
+  fetchPasskeyRegistrationOptions,
+  verifyPasskeyRegistration,
+  removePasskey,
+} from '../services/api';
 
 export default function SettingsPanel({ session, isLoading, onSettingsChange }) {
   const [settings, setSettings] = useState(null);
@@ -10,21 +21,33 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
   const [notifyRapid, setNotifyRapid] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [security, setSecurity] = useState({ totpEnabled: false, passkeys: [] });
+  const [totpPassword, setTotpPassword] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
+  const [totpUri, setTotpUri] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [totpDisablePassword, setTotpDisablePassword] = useState('');
+  const [securityMessage, setSecurityMessage] = useState('');
+  const [securityLoading, setSecurityLoading] = useState(false);
 
   useEffect(() => {
     if (!session?.email) return;
 
     const loadSettings = async () => {
       try {
-        const data = await fetchUserSettings({
+        const userPayload = {
           userId: session.userId || null,
           email: session.email,
-        });
+        };
+        const data = await fetchUserSettings(userPayload);
         setSettings(data);
         setLocalLimit(String(data.dailyLimit || 400));
         setNotifyAtLimit(data.notifyAtLimit !== false);
         setNotifyLate(data.notifyLate !== false);
         setNotifyRapid(data.notifyRapid !== false);
+
+        const sec = await fetchSecurityStatus(userPayload);
+        setSecurity(sec);
       } catch (err) {
         console.error('Fehler beim Laden der Einstellungen:', err);
       }
@@ -59,6 +82,124 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
       console.error(err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleStartTotpSetup = async () => {
+    if (!totpPassword.trim()) {
+      setSecurityMessage('Bitte Passwort eingeben.');
+      return;
+    }
+    setSecurityLoading(true);
+    setSecurityMessage('');
+    try {
+      const data = await setupTotp({
+        userId: session.userId || null,
+        email: session.email,
+        password: totpPassword,
+      });
+      setTotpSecret(data.secret);
+      setTotpUri(data.otpauthUrl);
+      setSecurityMessage('TOTP vorbereitet. Code aus Authenticator-App eingeben.');
+    } catch (err) {
+      setSecurityMessage(err.message);
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleEnableTotp = async () => {
+    if (!totpCode.trim()) {
+      setSecurityMessage('Bitte den 2FA Code eingeben.');
+      return;
+    }
+    setSecurityLoading(true);
+    setSecurityMessage('');
+    try {
+      const data = await enableTotp({
+        userId: session.userId || null,
+        email: session.email,
+        code: totpCode,
+      });
+      setSecurity(data.security);
+      setTotpPassword('');
+      setTotpSecret('');
+      setTotpUri('');
+      setTotpCode('');
+      setSecurityMessage('2FA erfolgreich aktiviert.');
+    } catch (err) {
+      setSecurityMessage(err.message);
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleDisableTotp = async () => {
+    if (!totpDisablePassword.trim()) {
+      setSecurityMessage('Bitte Passwort eingeben, um 2FA zu deaktivieren.');
+      return;
+    }
+    setSecurityLoading(true);
+    setSecurityMessage('');
+    try {
+      const data = await disableTotp({
+        userId: session.userId || null,
+        email: session.email,
+        password: totpDisablePassword,
+      });
+      setSecurity(data.security);
+      setTotpDisablePassword('');
+      setSecurityMessage('2FA deaktiviert.');
+    } catch (err) {
+      setSecurityMessage(err.message);
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleRegisterPasskey = async () => {
+    setSecurityLoading(true);
+    setSecurityMessage('');
+    try {
+      const reg = await fetchPasskeyRegistrationOptions({
+        userId: session.userId || null,
+        email: session.email,
+      });
+
+      const attestation = await startRegistration({ optionsJSON: reg.options });
+      const label = `YubiKey ${new Date().toLocaleDateString('de-DE')}`;
+      const verified = await verifyPasskeyRegistration({
+        userId: session.userId || null,
+        email: session.email,
+        challengeToken: reg.challengeToken,
+        response: attestation,
+        name: label,
+      });
+
+      setSecurity(verified.security);
+      setSecurityMessage('Sicherheitsschlüssel erfolgreich registriert.');
+    } catch (err) {
+      setSecurityMessage(err.message || 'Passkey-Registrierung fehlgeschlagen.');
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const handleRemovePasskey = async (credentialId) => {
+    setSecurityLoading(true);
+    setSecurityMessage('');
+    try {
+      const data = await removePasskey({
+        userId: session.userId || null,
+        email: session.email,
+        credentialId,
+      });
+      setSecurity(data.security);
+      setSecurityMessage('Sicherheitsschlüssel entfernt.');
+    } catch (err) {
+      setSecurityMessage(err.message);
+    } finally {
+      setSecurityLoading(false);
     }
   };
 
@@ -204,6 +345,123 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
             × Fehler beim Speichern
           </div>
         )}
+
+        <div className="border-t border-white/10 pt-5 space-y-4">
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-cyan-400" />
+            Sicherheit (2FA)
+          </h4>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-white font-medium">Authenticator App (TOTP)</p>
+              <span className={`text-xs px-2.5 py-1 rounded-full ${security.totpEnabled ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-slate-700/50 text-slate-300 border border-white/10'}`}>
+                {security.totpEnabled ? 'Aktiv' : 'Inaktiv'}
+              </span>
+            </div>
+
+            {!security.totpEnabled ? (
+              <>
+                <input
+                  type="password"
+                  value={totpPassword}
+                  onChange={(e) => setTotpPassword(e.target.value)}
+                  className="input-dark"
+                  placeholder="Passwort zur Bestätigung"
+                />
+                <button
+                  onClick={handleStartTotpSetup}
+                  disabled={securityLoading}
+                  className="w-full px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold disabled:opacity-50"
+                >
+                  TOTP Setup starten
+                </button>
+
+                {totpSecret && (
+                  <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3 space-y-2">
+                    <p className="text-xs text-cyan-200">Secret: <span className="font-mono text-cyan-100">{totpSecret}</span></p>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(totpUri)}`}
+                      alt="TOTP QR Code"
+                      className="w-36 h-36 rounded-lg border border-white/10 bg-white p-1"
+                    />
+                    <input
+                      type="text"
+                      value={totpCode}
+                      onChange={(e) => setTotpCode(e.target.value.replace(/\s+/g, ''))}
+                      className="input-dark"
+                      placeholder="Code aus App"
+                    />
+                    <button
+                      onClick={handleEnableTotp}
+                      disabled={securityLoading}
+                      className="w-full px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold disabled:opacity-50"
+                    >
+                      2FA aktivieren
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <input
+                  type="password"
+                  value={totpDisablePassword}
+                  onChange={(e) => setTotpDisablePassword(e.target.value)}
+                  className="input-dark"
+                  placeholder="Passwort für Deaktivierung"
+                />
+                <button
+                  onClick={handleDisableTotp}
+                  disabled={securityLoading}
+                  className="w-full px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold disabled:opacity-50"
+                >
+                  2FA deaktivieren
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-white font-medium">Sicherheitsschlüssel (YubiKey / Passkey)</p>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-slate-700/50 text-slate-300 border border-white/10">
+                {Array.isArray(security.passkeys) ? security.passkeys.length : 0} hinterlegt
+              </span>
+            </div>
+
+            <button
+              onClick={handleRegisterPasskey}
+              disabled={securityLoading}
+              className="w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <KeyRound className="w-4 h-4" /> Sicherheitsschlüssel hinzufügen
+            </button>
+
+            {(security.passkeys || []).map((key) => (
+              <div key={key.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-100 truncate">{key.name || 'Sicherheitsschlüssel'}</p>
+                  <p className="text-xs text-slate-500 truncate">Hinzugefügt: {new Date(key.createdAt).toLocaleString('de-DE')}</p>
+                </div>
+                <button
+                  onClick={() => handleRemovePasskey(key.id)}
+                  disabled={securityLoading}
+                  className="p-2 rounded-lg text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                  title="Schlüssel entfernen"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {!!securityMessage && (
+            <div className="px-4 py-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-200 text-sm">
+              {securityMessage}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
