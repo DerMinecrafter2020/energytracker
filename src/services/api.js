@@ -116,3 +116,86 @@ export const removeFavorite = async ({ userId, email, favoriteId }) => {
 
   return data;
 };
+
+// ── USER SETTINGS ────────────────────────────────────────────────────────
+export const fetchUserSettings = async ({ userId, email }) => {
+  const url = new URL('/api/settings/me', API_BASE_URL);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
+
+  const response = await fetch(url.toString());
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Einstellungen');
+  return data;
+};
+
+export const updateUserSettings = async ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid }) => {
+  const response = await fetch(new URL('/api/settings/me', API_BASE_URL).toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Speichern der Einstellungen');
+  return data;
+};
+
+// ── CUSTOM DRINKS ───────────────────────────────────────────────────────
+export const fetchCustomDrinks = async ({ userId, email }) => {
+  const url = new URL('/api/custom-drinks/me', API_BASE_URL);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
+
+  const response = await fetch(url.toString());
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Getränke');
+  return data.items || [];
+};
+
+export const addCustomDrink = async ({ userId, email, name, size, caffeine, icon }) => {
+  const response = await fetch(new URL('/api/custom-drinks/me', API_BASE_URL).toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, email, name, size, caffeine, icon }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Hinzufügen des Getränks');
+  return data.item;
+};
+
+export const removeCustomDrink = async ({ userId, email, drinkId }) => {
+  const url = new URL('/api/custom-drinks/me', API_BASE_URL);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
+  if (drinkId) url.searchParams.set('drinkId', drinkId);
+
+  const response = await fetch(url.toString(), { method: 'DELETE' });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Löschen des Getränks');
+  return data;
+};
+
+// ── STATISTICS ──────────────────────────────────────────────────────────
+export const fetchTodayStats = async ({ userId, email }) => {
+  const url = new URL('/api/stats/today', API_BASE_URL);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
+
+  const response = await fetch(url.toString());
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Statistiken');
+  return data;
+};
+
+export const fetchWeeklyStats = async ({ userId, email }) => {
+  const url = new URL('/api/stats/weekly', API_BASE_URL);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
+
+  const response = await fetch(url.toString());
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Wochenstatistiken');
+  return data.items || [];
+};

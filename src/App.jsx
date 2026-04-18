@@ -12,10 +12,15 @@ import AIDailySummary from './components/AIDailySummary';
 import LoginPage from './components/LoginPage';
 import AdminPanel from './components/AdminPanel';
 import RegisterPage from './components/RegisterPage';
+import SettingsPanel from './components/SettingsPanel';
+import CustomDrinks from './components/CustomDrinks';
+import StatsPanel from './components/StatsPanel';
+import WarningAlert from './components/WarningAlert';
 import {
   fetchFavorites,
   addFavorite,
   removeFavorite,
+  fetchTodayStats,
 } from './services/api';
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
@@ -136,6 +141,9 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [favorites, setFavorites] = useState([]);
   const [currentVersion, setCurrentVersion] = useState(null);
   const [latestVersion, setLatestVersion]   = useState(null);
+  const [todayStats, setTodayStats] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
   const isFirstCheck = useRef(true);
 
   const getDrinkKey = useCallback((drink) => {
@@ -172,6 +180,27 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       }
     };
     loadFavorites();
+  }, [session?.id, session?.email]);
+
+  // Load today stats for warnings
+  useEffect(() => {
+    if (!session?.email) return;
+    
+    const loadStats = async () => {
+      try {
+        const stats = await fetchTodayStats({
+          userId: session?.id || null,
+          email: session?.email,
+        });
+        setTodayStats(stats);
+      } catch (err) {
+        console.error('Fehler beim Laden der Statistiken:', err);
+      }
+    };
+
+    loadStats();
+    const interval = setInterval(loadStats, 60000); // Refresh every minute
+    return () => clearInterval(interval);
   }, [session?.id, session?.email]);
 
   useEffect(() => {
@@ -238,13 +267,22 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       const payload = { ...drinkData, date: getTodayKey() };
       const created = await addLog(payload);
       setLogs((prev) => [created, ...prev]);
+
+      // Refresh stats
+      if (session?.email) {
+        const stats = await fetchTodayStats({
+          userId: session?.id || null,
+          email: session?.email,
+        });
+        setTodayStats(stats);
+      }
     } catch (err) {
       setError('Fehler beim Hinzufügen. Bitte versuche es erneut.');
       console.error(err);
     } finally {
       setIsOperationLoading(false);
     }
-  }, []);
+  }, [session?.id, session?.email]);
 
   const handleDeleteLog = useCallback(async (logId) => {
     setIsOperationLoading(true);
@@ -252,13 +290,22 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     try {
       await removeLog(logId);
       setLogs((prev) => prev.filter((log) => log.id !== logId));
+
+      // Refresh stats
+      if (session?.email) {
+        const stats = await fetchTodayStats({
+          userId: session?.id || null,
+          email: session?.email,
+        });
+        setTodayStats(stats);
+      }
     } catch (err) {
       setError('Fehler beim Löschen. Bitte versuche es erneut.');
       console.error(err);
     } finally {
       setIsOperationLoading(false);
     }
-  }, []);
+  }, [session?.id, session?.email]);
 
   const isFavoriteLog = useCallback((log) => {
     const key = getDrinkKey(log);
@@ -345,12 +392,28 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
         <ProgressBar currentCaffeine={totalCaffeineToday} />
 
+        {/* Warnings */}
+        {todayStats && settings && (
+          <div className="mt-4">
+            <WarningAlert todayStats={todayStats} settings={settings} />
+          </div>
+        )}
+
+        {/* Weekly Stats */}
+        <div className="mt-6">
+          <StatsPanel session={session} isLoading={isOperationLoading} />
+        </div>
+
         <PresetDrinks
           favorites={favorites}
           onAddDrink={handleAddDrink}
           onRemoveFavorite={handleRemoveFavorite}
           isLoading={isOperationLoading}
         />
+
+        <div className="mt-6">
+          <CustomDrinks session={session} isLoading={isOperationLoading} />
+        </div>
 
         <OnlineSearch
           onSelect={(item) =>
@@ -390,6 +453,27 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
           isFavoriteLog={isFavoriteLog}
           isLoading={isOperationLoading}
         />
+
+        {/* Settings Section */}
+        <div className="mt-8 border-t border-gray-700 pt-6">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition flex items-center justify-between"
+          >
+            <span>⚙️ Einstellungen</span>
+            <span>{showSettings ? '▼' : '▶'}</span>
+          </button>
+
+          {showSettings && (
+            <div className="mt-4 space-y-4">
+              <SettingsPanel
+                session={session}
+                isLoading={isOperationLoading}
+                onSettingsChange={(newSettings) => setSettings(newSettings)}
+              />
+            </div>
+          )}
+        </div>
       </main>
 
       <footer className="text-center py-6 text-slate-600 text-sm">

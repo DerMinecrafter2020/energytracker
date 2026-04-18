@@ -124,6 +124,8 @@ const REDIS_KEYS = {
   reminders:     'koffein:reminders',
   favorites:     'koffein:favorites',
   ai_config:     'koffein:ai_config',
+  user_settings: 'koffein:user_settings',
+  custom_drinks: 'koffein:custom_drinks',
 };
 
 let dbState = {
@@ -133,6 +135,8 @@ let dbState = {
   reminders: [],
   favorites: [],
   ai_config: { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '' },
+  user_settings: [], // [{userId/email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid}]
+  custom_drinks: [], // [{id, ownerKey, name, size, caffeine, icon}]
 };
 
 const safeParse = (s, fallback) => {
@@ -149,13 +153,15 @@ const loadDbState = async () => {
       return;
     }
 
-    const [logs, users, smtp, reminders, favorites, ai] = await redis.mget(
+    const [logs, users, smtp, reminders, favorites, ai, settings, drinks] = await redis.mget(
       REDIS_KEYS.caffeine_logs,
       REDIS_KEYS.users,
       REDIS_KEYS.smtp_settings,
       REDIS_KEYS.reminders,
       REDIS_KEYS.favorites,
       REDIS_KEYS.ai_config,
+      REDIS_KEYS.user_settings,
+      REDIS_KEYS.custom_drinks,
     );
     const parsedAi = safeParse(ai, {});
     dbState = {
@@ -169,6 +175,8 @@ const loadDbState = async () => {
         model:          parsedAi.model          || 'deepseek/deepseek-v3',
         braveSearchKey: parsedAi.braveSearchKey || '',
       },
+      user_settings: safeParse(settings, []),
+      custom_drinks: safeParse(drinks, []),
     };
   } catch (err) {
     console.error('[DB] Redis Ladefehler:', err.message);
@@ -183,6 +191,8 @@ const persistDbState = () => {
     REDIS_KEYS.reminders,      JSON.stringify(dbState.reminders),
     REDIS_KEYS.favorites,      JSON.stringify(dbState.favorites),
     REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
+    REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
+    REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
   ).catch((err) => console.error('[DB] Redis Speicherfehler:', err.message));
 };
 
@@ -742,6 +752,127 @@ const removeFavoriteForUser = ({ userId, email, favoriteId }) => {
     persistDbState();
   }
   return removed;
+};
+
+// ── USER SETTINGS HELPERS ────────────────────────────────────────────────────
+const getSettingsOwnerKey = ({ userId, email }) => {
+  if (userId) return `user:${userId}`;
+  if (email) return `email:${email}`;
+  throw new Error('userId oder email erforderlich');
+};
+
+const getUserSettings = ({ userId, email }) => {
+  const ownerKey = getSettingsOwnerKey({ userId, email });
+  const settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
+  return settings || {
+    ownerKey,
+    dailyLimit: 400,
+    notifyAtLimit: true,
+    notifyLate: true,
+    notifyRapid: true,
+    createdAt: new Date().toISOString(),
+  };
+};
+
+const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid }) => {
+  const ownerKey = getSettingsOwnerKey({ userId, email });
+  let settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
+  if (!settings) {
+    settings = { ownerKey, createdAt: new Date().toISOString() };
+    dbState.user_settings.push(settings);
+  }
+  if (dailyLimit !== undefined) settings.dailyLimit = dailyLimit;
+  if (notifyAtLimit !== undefined) settings.notifyAtLimit = notifyAtLimit;
+  if (notifyLate !== undefined) settings.notifyLate = notifyLate;
+  if (notifyRapid !== undefined) settings.notifyRapid = notifyRapid;
+  settings.updatedAt = new Date().toISOString();
+  persistDbState();
+  return settings;
+};
+
+// ── CUSTOM DRINKS HELPERS ────────────────────────────────────────────────────
+const getCustomDrinksForUser = ({ userId, email }) => {
+  const ownerKey = getSettingsOwnerKey({ userId, email });
+  return dbState.custom_drinks.filter((d) => d.ownerKey === ownerKey);
+};
+
+const addCustomDrink = ({ userId, email, name, size, caffeine, icon }) => {
+  const ownerKey = getSettingsOwnerKey({ userId, email });
+  const id = crypto.randomBytes(8).toString('hex');
+  const drink = { id, ownerKey, name, size, caffeine: Number(caffeine) || 0, icon: icon || '🥤', createdAt: new Date().toISOString() };
+  dbState.custom_drinks.push(drink);
+  persistDbState();
+  return drink;
+};
+
+const removeCustomDrink = ({ userId, email, drinkId }) => {
+  const ownerKey = getSettingsOwnerKey({ userId, email });
+  const idx = dbState.custom_drinks.findIndex((d) => d.ownerKey === ownerKey && d.id === drinkId);
+  if (idx < 0) return false;
+  dbState.custom_drinks.splice(idx, 1);
+  persistDbState();
+  return true;
+};
+
+// ── STATISTICS HELPERS ───────────────────────────────────────────────────────
+const getWeeklyStats = ({ userId, email }) => {
+  const ownerKey = getSettingsOwnerKey({ userId, email });
+  const today = new Date();
+  const week = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    week.push(d.toISOString().split('T')[0]);
+  }
+
+  const stats = week.map((dateStr) => {
+    const logsForDay = dbState.caffeine_logs.filter(
+      (log) => (log.userId === userId || log.email === email) && log.date === dateStr
+    );
+    const totalCaffeine = logsForDay.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
+    const count = logsForDay.length;
+    return { date: dateStr, totalCaffeine, count, logs: logsForDay };
+  });
+  return stats;
+};
+
+const getDailyStats = (date) => {
+  // Aggregiert statistiken für einen Tag (für Admin-Übersicht)
+  const logsForDay = dbState.caffeine_logs.filter((log) => log.date === date);
+  const users = new Set();
+  let totalCaffeine = 0;
+  const byUser = {};
+
+  logsForDay.forEach((log) => {
+    const user = log.email || log.userId || 'unknown';
+    users.add(user);
+    totalCaffeine += Number(log.caffeine) || 0;
+    byUser[user] = (byUser[user] || 0) + (Number(log.caffeine) || 0);
+  });
+
+  return { date, totalUsers: users.size, totalCaffeine, byUser, logCount: logsForDay.length };
+};
+
+const getTodayStats = ({ userId, email }) => {
+  const today = new Date().toISOString().split('T')[0];
+  const logsForToday = dbState.caffeine_logs.filter(
+    (log) => (log.userId === userId || log.email === email) && log.date === today
+  );
+  const totalCaffeine = logsForToday.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
+  const settings = getUserSettings({ userId, email });
+  const limit = settings.dailyLimit || 400;
+  const remainingCaffeine = Math.max(0, limit - totalCaffeine);
+  const isOverLimit = totalCaffeine > limit;
+
+  return {
+    date: today,
+    totalCaffeine,
+    dailyLimit: limit,
+    remainingCaffeine,
+    isOverLimit,
+    logCount: logsForToday.length,
+    logs: logsForToday,
+  };
 };
 
 const sendReminderEmail = async ({ to }) => {
@@ -1392,6 +1523,137 @@ app.delete('/api/favorites/me', async (req, res) => {
   }
 });
 
+// ── USER SETTINGS ────────────────────────────────────────────────────────────
+app.get('/api/settings/me', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const settings = getUserSettings({ userId, email });
+    res.json(settings);
+  } catch (err) {
+    console.error('GET /api/settings/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/settings/me', async (req, res) => {
+  try {
+    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+
+    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
+    if (dailyLimit !== undefined && (!Number.isFinite(dailyLimit) || dailyLimit < 0))
+      return res.status(400).json({ error: 'dailyLimit muss eine positive Zahl sein.' });
+
+    const settings = updateUserSettings({
+      userId: safeUserId,
+      email: safeEmail,
+      dailyLimit,
+      notifyAtLimit,
+      notifyLate,
+      notifyRapid,
+    });
+
+    res.json(settings);
+  } catch (err) {
+    console.error('POST /api/settings/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ── CUSTOM DRINKS ───────────────────────────────────────────────────────────
+app.get('/api/custom-drinks/me', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const drinks = getCustomDrinksForUser({ userId, email });
+    res.json({ items: drinks });
+  } catch (err) {
+    console.error('GET /api/custom-drinks/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/custom-drinks/me', async (req, res) => {
+  try {
+    const { userId, email, name, size, caffeine, icon } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+
+    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
+    if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name ist erforderlich.' });
+    if (!Number.isFinite(size) || size <= 0) return res.status(400).json({ error: 'size muss positiv sein.' });
+    if (!Number.isFinite(caffeine) || caffeine < 0) return res.status(400).json({ error: 'caffeine muss >= 0 sein.' });
+
+    const drink = addCustomDrink({
+      userId: safeUserId,
+      email: safeEmail,
+      name: String(name).trim(),
+      size: Math.round(size),
+      caffeine: Math.round(caffeine),
+      icon: icon || '🥤',
+    });
+
+    res.json({ success: true, item: drink });
+  } catch (err) {
+    console.error('POST /api/custom-drinks/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.delete('/api/custom-drinks/me', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    const drinkId = String(req.query.drinkId || '').trim();
+
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    if (!drinkId) return res.status(400).json({ error: 'drinkId ist erforderlich.' });
+
+    const removed = removeCustomDrink({ userId, email, drinkId });
+    if (!removed) return res.status(404).json({ error: 'Getränk nicht gefunden.' });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/custom-drinks/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ── STATISTICS ───────────────────────────────────────────────────────────────
+app.get('/api/stats/today', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const stats = getTodayStats({ userId, email });
+    res.json(stats);
+  } catch (err) {
+    console.error('GET /api/stats/today error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/stats/weekly', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const stats = getWeeklyStats({ userId, email });
+    res.json({ items: stats });
+  } catch (err) {
+    console.error('GET /api/stats/weekly error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // ── Admin AI Config ──────────────────────────────────────────────────────────
 app.get('/api/admin/ai', requireAdmin, (req, res) => {
   const cfg = loadAiConfig();
@@ -1590,6 +1852,8 @@ process.on('SIGTERM', async () => {
       REDIS_KEYS.reminders,      JSON.stringify(dbState.reminders),
       REDIS_KEYS.favorites,      JSON.stringify(dbState.favorites),
       REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
+      REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
+      REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
     );
     console.log('[DB] ✓ Letzter Stand gespeichert.');
   } catch (err) {
