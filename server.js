@@ -6,13 +6,14 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import Redis from 'ioredis';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DB_TYPE = 'file-json';
+const DB_TYPE = 'redis';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,9 +64,21 @@ app.use(express.json());
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
-// File DB (simple embedded storage)
-const dataDir = path.join(__dirname, 'data');
-const dbFile = process.env.DB_FILE || path.join(dataDir, 'database.json');
+// ── Redis DB ──────────────────────────────────────────────────────────────────
+const redis = new Redis(process.env.REDIS_URL || 'redis://redis:6379', {
+  retryStrategy: (times) => Math.min(times * 100, 3000),
+  enableReadyCheck: true,
+});
+redis.on('error', (err) => console.error('[Redis] Verbindungsfehler:', err.message));
+redis.on('connect', () => console.log('[Redis] ✓ Verbunden'));
+
+const REDIS_KEYS = {
+  caffeine_logs: 'koffein:caffeine_logs',
+  users:         'koffein:users',
+  smtp_settings: 'koffein:smtp_settings',
+  reminders:     'koffein:reminders',
+  ai_config:     'koffein:ai_config',
+};
 
 let dbState = {
   caffeine_logs: [],
@@ -75,48 +88,44 @@ let dbState = {
   ai_config: { apiKey: '', model: 'deepseek/deepseek-v3' },
 };
 
-const ensureDbFile = () => {
-  const dbDir = path.dirname(dbFile);
-  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
-  if (!fs.existsSync(dbFile)) {
-    fs.writeFileSync(dbFile, JSON.stringify(dbState, null, 2), 'utf8');
-  }
+const safeParse = (s, fallback) => {
+  if (!s) return fallback;
+  try { return JSON.parse(s); } catch { return fallback; }
 };
 
-const loadDbState = () => {
-  ensureDbFile();
-  const raw = fs.readFileSync(dbFile, 'utf8');
-  let parsed = {};
+const loadDbState = async () => {
   try {
-    parsed = raw ? JSON.parse(raw) : {};
+    const [logs, users, smtp, reminders, ai] = await redis.mget(
+      REDIS_KEYS.caffeine_logs,
+      REDIS_KEYS.users,
+      REDIS_KEYS.smtp_settings,
+      REDIS_KEYS.reminders,
+      REDIS_KEYS.ai_config,
+    );
+    const parsedAi = safeParse(ai, {});
+    dbState = {
+      caffeine_logs: safeParse(logs, []),
+      users:         safeParse(users, []),
+      smtp_settings: safeParse(smtp, null),
+      reminders:     safeParse(reminders, []),
+      ai_config: {
+        apiKey: parsedAi.apiKey || '',
+        model:  parsedAi.model  || 'deepseek/deepseek-v3',
+      },
+    };
   } catch (err) {
-    const backupPath = `${dbFile}.corrupt-${Date.now()}.bak`;
-    fs.copyFileSync(dbFile, backupPath);
-    console.error('[DB] JSON-Datei war defekt, Backup erstellt:', backupPath);
-    parsed = {};
+    console.error('[DB] Redis Ladefehler:', err.message);
   }
-
-  // Backward-compatible migration from older key names
-  const legacyLogs = Array.isArray(parsed.logs) ? parsed.logs : [];
-  const legacyUsers = Array.isArray(parsed.registered_users) ? parsed.registered_users : [];
-  const legacySmtp = parsed.smtpConfig || null;
-
-  dbState = {
-    caffeine_logs: Array.isArray(parsed.caffeine_logs) ? parsed.caffeine_logs : legacyLogs,
-    users: Array.isArray(parsed.users) ? parsed.users : legacyUsers,
-    smtp_settings: parsed.smtp_settings || legacySmtp,
-    reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
-    ai_config: parsed.ai_config && typeof parsed.ai_config === 'object'
-      ? { apiKey: parsed.ai_config.apiKey || '', model: parsed.ai_config.model || 'deepseek/deepseek-v3' }
-      : { apiKey: '', model: 'deepseek/deepseek-v3' },
-  };
 };
 
 const persistDbState = () => {
-  ensureDbFile();
-  const tmpPath = `${dbFile}.tmp`;
-  fs.writeFileSync(tmpPath, JSON.stringify(dbState, null, 2), 'utf8');
-  fs.renameSync(tmpPath, dbFile);
+  redis.mset(
+    REDIS_KEYS.caffeine_logs,  JSON.stringify(dbState.caffeine_logs),
+    REDIS_KEYS.users,          JSON.stringify(dbState.users),
+    REDIS_KEYS.smtp_settings,  JSON.stringify(dbState.smtp_settings),
+    REDIS_KEYS.reminders,      JSON.stringify(dbState.reminders),
+    REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
+  ).catch((err) => console.error('[DB] Redis Speicherfehler:', err.message));
 };
 
 const makeResult = (affectedRows = 0, insertId = undefined) => {
@@ -127,9 +136,6 @@ const makeResult = (affectedRows = 0, insertId = undefined) => {
 
 class FileDbAdapter {
   async execute(sql, params = []) {
-    // Reload each query so data remains consistent across restarts or multiple processes.
-    loadDbState();
-
     const q = String(sql).replace(/\s+/g, ' ').trim().toLowerCase();
 
     if (q.startsWith('create table if not exists')) {
@@ -307,7 +313,6 @@ let pool = null;
 
 const getPool = () => {
   if (!pool) {
-    loadDbState();
     pool = new FileDbAdapter();
   }
   return pool;
@@ -373,22 +378,21 @@ const saveSmtpConfig = async (cfg) => {
 };
 
 const initDb = async () => {
-  console.log('[DB] 🗄️  Starte lokale Datei-Datenbank...');
+  console.log('[DB] 🗄️  Starte Redis-Datenbank...');
   getPool();
-  console.log(`[DB] ✓ Datei-Datenbank bereit: ${dbFile}`);
+  await loadDbState();
+  console.log(`[DB] ✓ Redis bereit: ${process.env.REDIS_URL || 'redis://redis:6379'}`);
 };
 
 // ── AI / OpenRouter helpers ───────────────────────────────────────────────────
 const loadAiConfig = () => {
-  loadDbState();
-  return dbState.ai_config || { apiKey: '', model: 'google/gemini-2.0-flash-001' };
+  return dbState.ai_config || { apiKey: '', model: 'deepseek/deepseek-v3' };
 };
 
 const saveAiConfig = (cfg) => {
-  loadDbState();
   dbState.ai_config = {
     apiKey: String(cfg.apiKey || '').trim(),
-    model: String(cfg.model || 'google/gemini-2.0-flash-001').trim(),
+    model: String(cfg.model || 'deepseek/deepseek-v3').trim(),
   };
   persistDbState();
 };
@@ -1121,6 +1125,25 @@ Bitte: 1) kurze Bewertung, 2) ob ich noch Koffein trinken sollte, 3) ein praktis
 // SPA Fallback
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// Graceful shutdown — flush state to Redis before container stops
+process.on('SIGTERM', async () => {
+  console.log('[DB] SIGTERM empfangen, schreibe letzten Stand nach Redis...');
+  try {
+    await redis.mset(
+      REDIS_KEYS.caffeine_logs,  JSON.stringify(dbState.caffeine_logs),
+      REDIS_KEYS.users,          JSON.stringify(dbState.users),
+      REDIS_KEYS.smtp_settings,  JSON.stringify(dbState.smtp_settings),
+      REDIS_KEYS.reminders,      JSON.stringify(dbState.reminders),
+      REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
+    );
+    console.log('[DB] ✓ Letzter Stand gespeichert.');
+  } catch (err) {
+    console.error('[DB] Fehler beim Flush:', err.message);
+  }
+  await redis.quit();
+  process.exit(0);
 });
 
 initDb()
