@@ -45,13 +45,18 @@ function App() {
   const [authView, setAuthView]   = useState(initialViewState.authView || 'login'); // 'login' | 'register'
   const [adminView, setAdminView] = useState(initialViewState.adminView || 'admin'); // 'admin' | 'user'
   const [adminTab, setAdminTab]   = useState(initialViewState.adminTab || 'overview');
-  const [userScrollY, setUserScrollY] = useState(Number(initialViewState.userScrollY) || 0);
 
   const impersonator = getImpersonatorSession();
 
+  const persistScrollY = useCallback((scrollY) => {
+    const current = loadViewState();
+    saveViewState({ ...current, userScrollY: Math.max(0, Math.round(Number(scrollY) || 0)) });
+  }, []);
+
   useEffect(() => {
-    saveViewState({ authView, adminView, adminTab, userScrollY });
-  }, [authView, adminView, adminTab, userScrollY]);
+    const current = loadViewState();
+    saveViewState({ ...current, authView, adminView, adminTab });
+  }, [authView, adminView, adminTab]);
 
   const handleImpersonate = (userData) => {
     const newSession = startImpersonation(userData);
@@ -113,8 +118,8 @@ function App() {
           session={session}
           onLogout={() => { logout(); setSession(null); }}
           onShowAdminPanel={session.role === 'admin' ? () => setAdminView('admin') : null}
-          initialScrollY={userScrollY}
-          onScrollPositionChange={setUserScrollY}
+          initialScrollY={Number(initialViewState.userScrollY) || 0}
+          onPersistScrollY={persistScrollY}
         />
       </div>
     </>
@@ -122,7 +127,7 @@ function App() {
 }
 
 // ── Tracker (extracted so hooks are always called in the same order) ────────
-function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onScrollPositionChange }) {
+function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPersistScrollY }) {
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [logs, setLogs]           = useState([]);
   const [error, setError]         = useState(null);
@@ -155,13 +160,23 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onScr
   }, [initialScrollY]);
 
   useEffect(() => {
+    if (!onPersistScrollY) return undefined;
+
+    let timeoutId = null;
     const onScroll = () => {
-      if (onScrollPositionChange) onScrollPositionChange(window.scrollY || 0);
+      if (timeoutId) return;
+      timeoutId = window.setTimeout(() => {
+        timeoutId = null;
+        onPersistScrollY(window.scrollY || 0);
+      }, 150);
     };
 
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [onScrollPositionChange]);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [onPersistScrollY]);
 
   // Update-Check
   useEffect(() => {
