@@ -65,11 +65,35 @@ const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
 // ── Redis DB ──────────────────────────────────────────────────────────────────
-const redis = new Redis(process.env.REDIS_URL || 'redis://redis:6379', {
+const isDockerRuntime = fs.existsSync('/.dockerenv');
+const envRedisUrl = String(process.env.REDIS_URL || '').trim();
+const shouldUseLocalhostRedis = !isDockerRuntime && (!envRedisUrl || /^redis:\/\/redis(?::|\/|$)/i.test(envRedisUrl));
+const redisUrl = shouldUseLocalhostRedis
+  ? 'redis://127.0.0.1:6379'
+  : (envRedisUrl || 'redis://redis:6379');
+const REDIS_LOG_THROTTLE_MS = Number(process.env.REDIS_LOG_THROTTLE_MS || 15000);
+let lastRedisErrorLogAt = 0;
+let localRedisHintShown = false;
+
+const redis = new Redis(redisUrl, {
   retryStrategy: (times) => Math.min(times * 100, 3000),
   enableReadyCheck: true,
 });
-redis.on('error', (err) => console.error('[Redis] Verbindungsfehler:', err.message));
+redis.on('error', (err) => {
+  const now = Date.now();
+  if (now - lastRedisErrorLogAt >= REDIS_LOG_THROTTLE_MS) {
+    console.error('[Redis] Verbindungsfehler:', err.message);
+    lastRedisErrorLogAt = now;
+  }
+
+  const isLocalConnRefused = shouldUseLocalhostRedis
+    && (err?.code === 'ECONNREFUSED' || /ECONNREFUSED/i.test(String(err?.message || '')));
+
+  if (isLocalConnRefused && !localRedisHintShown) {
+    console.error('[Redis] Hinweis: Lokaler Start erkannt. Starte Redis lokal (z.B. Docker: "docker run --name dev-redis -p 6379:6379 -d redis:7-alpine") oder setze REDIS_URL auf einen erreichbaren Host.');
+    localRedisHintShown = true;
+  }
+});
 redis.on('connect', () => console.log('[Redis] ✓ Verbunden'));
 
 const REDIS_KEYS = {
@@ -381,7 +405,7 @@ const initDb = async () => {
   console.log('[DB] 🗄️  Starte Redis-Datenbank...');
   getPool();
   await loadDbState();
-  console.log(`[DB] ✓ Redis bereit: ${process.env.REDIS_URL || 'redis://redis:6379'}`);
+  console.log(`[DB] ✓ Redis bereit: ${redisUrl}`);
 };
 
 // ── AI / OpenRouter helpers ───────────────────────────────────────────────────
