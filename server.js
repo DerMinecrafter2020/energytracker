@@ -370,6 +370,7 @@ class FileDbAdapter {
         totp_enabled: false,
         totp_secret: null,
         totp_temp_secret: null,
+        webauthn_user_id: toBase64Url(crypto.randomBytes(32)),
         passkeys: [],
         created_at: new Date().toISOString(),
         last_login: null,
@@ -865,6 +866,7 @@ const ensureUserSecurityFields = (user) => {
   if (typeof user.totp_enabled !== 'boolean') user.totp_enabled = false;
   if (!user.totp_secret) user.totp_secret = null;
   if (!user.totp_temp_secret) user.totp_temp_secret = null;
+  if (!user.webauthn_user_id) user.webauthn_user_id = null;
 };
 
 const createSecondFactorToken = (user) => {
@@ -1336,6 +1338,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
     totp_enabled: false,
     totp_secret: null,
     totp_temp_secret: null,
+    webauthn_user_id: toBase64Url(crypto.randomBytes(32)),
     passkeys: [],
     created_at: new Date().toISOString(),
     last_login: null,
@@ -1909,10 +1912,15 @@ app.post('/api/security/passkeys/register/options', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
     ensureUserSecurityFields(user);
 
+    if (!user.webauthn_user_id) {
+      user.webauthn_user_id = toBase64Url(crypto.randomBytes(32));
+      persistDbState();
+    }
+
     const options = await generateRegistrationOptions({
       rpID: WEBAUTHN_RP_ID,
       rpName: WEBAUTHN_RP_NAME,
-      userID: user.id,
+      userID: fromBase64Url(user.webauthn_user_id),
       userName: user.email,
       userDisplayName: user.name || user.email,
       timeout: 60000,
