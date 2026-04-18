@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Wine } from 'lucide-react';
 import { fetchCustomDrinks, addCustomDrink, removeCustomDrink } from '../services/api';
 
 export default function CustomDrinks({ session, isLoading }) {
@@ -6,12 +7,11 @@ export default function CustomDrinks({ session, isLoading }) {
   const [name, setName] = useState('');
   const [size, setSize] = useState('');
   const [caffeine, setCaffeine] = useState('');
-  const [icon, setIcon] = useState('🥤');
+  const [icon, setIcon] = useState('🍷');
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState('');
   const [loadingDrinks, setLoadingDrinks] = useState(false);
 
-  // Load custom drinks
   useEffect(() => {
     if (!session?.email) return;
 
@@ -35,7 +35,8 @@ export default function CustomDrinks({ session, isLoading }) {
 
   const handleAddDrink = async () => {
     if (!name.trim() || !size || !caffeine) {
-      setMessage('❌ Bitte alle Felder ausfüllen');
+      setMessage('error');
+      setTimeout(() => setMessage(''), 2000);
       return;
     }
 
@@ -49,18 +50,19 @@ export default function CustomDrinks({ session, isLoading }) {
         name: name.trim(),
         size: Number(size),
         caffeine: Number(caffeine),
-        icon: icon || '🥤',
+        icon: icon || '🍷',
       });
 
       setCustomDrinks([...customDrinks, newDrink]);
       setName('');
       setSize('');
       setCaffeine('');
-      setIcon('🥤');
-      setMessage('✅ Getränk hinzugefügt!');
+      setIcon('🍷');
+      setMessage('saved');
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
-      setMessage('❌ ' + err.message);
+      setMessage('error');
+      console.error(err);
     } finally {
       setAdding(false);
     }
@@ -74,92 +76,150 @@ export default function CustomDrinks({ session, isLoading }) {
         drinkId,
       });
       setCustomDrinks(customDrinks.filter((d) => d.id !== drinkId));
-      setMessage('✅ Getränk gelöscht!');
+      setMessage('deleted');
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
-      setMessage('❌ ' + err.message);
+      setMessage('error');
+      console.error(err);
     }
   };
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-      <h2 className="text-lg font-semibold mb-4">🍷 Eigene Getränke</h2>
+    <div className="glass-card rounded-3xl p-6 mb-6 animate-fade-in">
+      <h3 className="text-base font-bold text-white mb-5 flex items-center gap-2">
+        <Wine className="w-5 h-5 text-pink-400" />
+        Eigene Getränke
+      </h3>
 
-      {/* Add Drink Form */}
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <h3 className="font-medium text-gray-700 mb-3">Neues Getränk</h3>
+      {/* Add Form */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-5">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+          Neues Getränk
+        </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <div className="space-y-3 mb-3">
           <input
             type="text"
             placeholder="Name (z.B. Espresso)"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input-dark"
           />
-          <input
-            type="number"
-            placeholder="Größe (ml)"
-            min="10"
-            value={size}
-            onChange={(e) => setSize(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="number"
-            placeholder="Koffein (mg)"
-            min="0"
-            value={caffeine}
-            onChange={(e) => setCaffeine(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            placeholder="Icon (Emoji)"
-            maxLength="2"
-            value={icon}
-            onChange={(e) => setIcon(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="relative">
+              <input
+                type="number"
+                placeholder="Größe"
+                min="10"
+                value={size}
+                onChange={(e) => setSize(e.target.value)}
+                className="input-dark"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-medium">
+                ml
+              </span>
+            </div>
+
+            <div className="relative">
+              <input
+                type="number"
+                placeholder="Koffein"
+                min="0"
+                value={caffeine}
+                onChange={(e) => setCaffeine(e.target.value)}
+                className="input-dark"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-medium">
+                mg
+              </span>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Icon"
+              maxLength="2"
+              value={icon}
+              onChange={(e) => setIcon(e.target.value)}
+              className="input-dark text-center"
+            />
+          </div>
         </div>
 
         <button
           onClick={handleAddDrink}
           disabled={adding || isLoading}
-          className="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-400 transition"
+          className="w-full px-4 py-2.5 bg-gradient-to-r from-pink-600 to-pink-500
+            text-white font-semibold rounded-xl
+            hover:from-pink-500 hover:to-pink-400 disabled:opacity-50
+            transition-all duration-200 flex items-center justify-center gap-2 text-sm"
         >
-          {adding ? '➕ Wird hinzugefügt...' : '➕ Hinzufügen'}
+          <Plus className="w-4 h-4" />
+          {adding ? 'Wird hinzugefügt...' : 'Hinzufügen'}
         </button>
       </div>
 
-      {message && (
-        <p className={`mb-3 text-sm ${message.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
-          {message}
-        </p>
+      {/* Messages */}
+      {message === 'saved' && (
+        <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
+          text-green-300 text-sm font-medium text-center mb-4 animate-fade-in">
+          ✓ Getränk hinzugefügt
+        </div>
+      )}
+      {message === 'deleted' && (
+        <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
+          text-green-300 text-sm font-medium text-center mb-4 animate-fade-in">
+          ✓ Getränk gelöscht
+        </div>
+      )}
+      {message === 'error' && (
+        <div className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/30
+          text-red-300 text-sm font-medium text-center mb-4 animate-fade-in">
+          × Fehler
+        </div>
       )}
 
-      {/* Custom Drinks List */}
+      {/* Drinks List */}
       {loadingDrinks ? (
-        <p className="text-gray-500">Lädt...</p>
+        <div className="flex items-center justify-center py-8">
+          <p className="text-slate-400 text-sm">Lädt...</p>
+        </div>
       ) : customDrinks.length === 0 ? (
-        <p className="text-gray-500 text-sm">Noch keine eigenen Getränke. Füge dein erstes Getränk hinzu!</p>
+        <div className="flex flex-col items-center justify-center py-8 text-slate-600">
+          <Wine className="w-8 h-8 mb-2 opacity-30" />
+          <p className="text-sm text-center">Noch keine eigenen Getränke.</p>
+          <p className="text-xs text-slate-500 mt-1">Füge dein erstes Getränk hinzu!</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-2.5">
           {customDrinks.map((drink) => (
-            <div key={drink.id} className="p-3 border border-gray-200 rounded-lg bg-gray-50 flex justify-between items-center">
-              <div>
-                <p className="font-medium text-gray-800">
-                  {drink.icon} {drink.name}
-                </p>
-                <p className="text-xs text-gray-600">
+            <div
+              key={drink.id}
+              className="flex items-center gap-3 p-3.5 rounded-2xl
+                bg-white/5 border border-white/8
+                hover:bg-white/10 hover:border-white/15
+                transition-all duration-200 group"
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center
+                bg-gradient-to-br from-pink-600/30 to-pink-400/10 border border-pink-500/20 shrink-0 text-lg">
+                {drink.icon}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-white text-sm">{drink.name}</h4>
+                <p className="text-xs text-slate-500">
                   {drink.size}ml • {drink.caffeine}mg
                 </p>
               </div>
+
               <button
                 onClick={() => handleRemoveDrink(drink.id)}
-                className="px-2 py-1 text-red-600 hover:text-red-800 text-sm"
+                className="p-1.5 text-slate-700 hover:text-red-400 hover:bg-red-500/10
+                  rounded-xl transition-all duration-200
+                  opacity-0 group-hover:opacity-100"
+                aria-label="Löschen"
               >
-                ✕
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           ))}

@@ -394,15 +394,11 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
         {/* Warnings */}
         {todayStats && settings && (
-          <div className="mt-4">
-            <WarningAlert todayStats={todayStats} settings={settings} />
-          </div>
+          <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
         )}
 
         {/* Weekly Stats */}
-        <div className="mt-6">
-          <StatsPanel session={session} isLoading={isOperationLoading} />
-        </div>
+        <StatsPanel session={session} isLoading={isOperationLoading} />
 
         <PresetDrinks
           favorites={favorites}
@@ -411,9 +407,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
           isLoading={isOperationLoading}
         />
 
-        <div className="mt-6">
-          <CustomDrinks session={session} isLoading={isOperationLoading} />
-        </div>
+        <CustomDrinks session={session} isLoading={isOperationLoading} />
 
         <OnlineSearch
           onSelect={(item) =>
