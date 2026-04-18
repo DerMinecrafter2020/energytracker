@@ -37,6 +37,17 @@ export const testDiscordWebhook = (webhookUrl) =>
     body:    JSON.stringify({ webhookUrl }),
   }).then(handle);
 
+// ── AI Config ──────────────────────────────────────────────────────────────
+export const fetchAiConfig = () =>
+  fetch(`${API_BASE}/api/admin/ai`, { headers: adminHeaders() }).then(handle);
+
+export const saveAiConfig = ({ apiKey, model }) =>
+  fetch(`${API_BASE}/api/admin/ai`, {
+    method:  'POST',
+    headers: adminHeaders(),
+    body:    JSON.stringify({ apiKey, model }),
+  }).then(handle);
+
 // ── Users ─────────────────────────────────────────────────────────────────
 export const fetchAdminUsers = () =>
   fetch(`${API_BASE}/api/admin/users`, { headers: adminHeaders() }).then(handle);

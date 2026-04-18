@@ -72,6 +72,7 @@ let dbState = {
   users: [],
   smtp_settings: null,
   reminders: [],
+  ai_config: { apiKey: '', model: 'deepseek/deepseek-v3' },
 };
 
 const ensureDbFile = () => {
@@ -105,6 +106,9 @@ const loadDbState = () => {
     users: Array.isArray(parsed.users) ? parsed.users : legacyUsers,
     smtp_settings: parsed.smtp_settings || legacySmtp,
     reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
+    ai_config: parsed.ai_config && typeof parsed.ai_config === 'object'
+      ? { apiKey: parsed.ai_config.apiKey || '', model: parsed.ai_config.model || 'deepseek/deepseek-v3' }
+      : { apiKey: '', model: 'deepseek/deepseek-v3' },
   };
 };
 
@@ -372,6 +376,49 @@ const initDb = async () => {
   console.log('[DB] 🗄️  Starte lokale Datei-Datenbank...');
   getPool();
   console.log(`[DB] ✓ Datei-Datenbank bereit: ${dbFile}`);
+};
+
+// ── AI / OpenRouter helpers ───────────────────────────────────────────────────
+const loadAiConfig = () => {
+  loadDbState();
+  return dbState.ai_config || { apiKey: '', model: 'google/gemini-2.0-flash-001' };
+};
+
+const saveAiConfig = (cfg) => {
+  loadDbState();
+  dbState.ai_config = {
+    apiKey: String(cfg.apiKey || '').trim(),
+    model: String(cfg.model || 'google/gemini-2.0-flash-001').trim(),
+  };
+  persistDbState();
+};
+
+const callOpenRouter = async (messages, { model, apiKey } = {}) => {
+  const cfg = loadAiConfig();
+  const key = apiKey || cfg.apiKey;
+  const mdl = model || cfg.model || 'deepseek/deepseek-v3';
+
+  if (!key) throw new Error('Kein OpenRouter API-Key konfiguriert. Bitte im Admin-Panel eintragen.');
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://github.com/DerMinecrafter2020/energytracker',
+      'X-Title': 'Koffein-Tracker',
+    },
+    body: JSON.stringify({ model: mdl, messages }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || `OpenRouter Fehler: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || '';
 };
 
 const getReminderOwnerKey = ({ userId, email }) => {
@@ -925,6 +972,149 @@ app.post('/api/reminders/me', async (req, res) => {
   } catch (err) {
     console.error('POST /api/reminders/me error:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ── Admin AI Config ──────────────────────────────────────────────────────────
+app.get('/api/admin/ai', requireAdmin, (req, res) => {
+  const cfg = loadAiConfig();
+  // Never expose the full key — mask it
+  const maskedKey = cfg.apiKey
+    ? cfg.apiKey.slice(0, 8) + '••••••••' + cfg.apiKey.slice(-4)
+    : '';
+  res.json({ apiKeySet: !!cfg.apiKey, apiKeyMasked: maskedKey, model: cfg.model });
+});
+
+app.post('/api/admin/ai', requireAdmin, (req, res) => {
+  const { apiKey, model } = req.body || {};
+  if (apiKey !== undefined && typeof apiKey !== 'string')
+    return res.status(400).json({ error: 'apiKey muss ein String sein.' });
+  const current = loadAiConfig();
+  saveAiConfig({
+    apiKey: typeof apiKey === 'string' ? apiKey.trim() : current.apiKey,
+    model: typeof model === 'string' && model.trim() ? model.trim() : current.model,
+  });
+  res.json({ success: true });
+});
+
+// ── AI Chat ──────────────────────────────────────────────────────────────────
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { messages, totalCaffeineToday, dailyLimit } = req.body || {};
+    if (!Array.isArray(messages) || messages.length === 0)
+      return res.status(400).json({ error: 'messages ist erforderlich.' });
+    if (messages.length > 40)
+      return res.status(400).json({ error: 'Zu viele Nachrichten (max. 40).' });
+
+    // Validate message structure
+    for (const m of messages) {
+      if (!['user', 'assistant', 'system'].includes(m?.role) || typeof m?.content !== 'string')
+        return res.status(400).json({ error: 'Ungültiges Nachrichtenformat.' });
+      if (m.content.length > 2000)
+        return res.status(400).json({ error: 'Nachricht zu lang (max. 2000 Zeichen).' });
+    }
+
+    const caffeineInfo = typeof totalCaffeineToday === 'number'
+      ? `Aktuelle Koffein-Einnahme heute: ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
+      : '';
+
+    const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${caffeineInfo}`.trim();
+
+    const fullMessages = [
+      { role: 'system', content: systemPrompt },
+      ...messages,
+    ];
+
+    const reply = await callOpenRouter(fullMessages);
+    res.json({ reply });
+  } catch (err) {
+    console.error('[AI Chat] Fehler:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── AI Drink Recognition ─────────────────────────────────────────────────────
+app.post('/api/ai/recognize-drink', async (req, res) => {
+  try {
+    const { description } = req.body || {};
+    if (!description || typeof description !== 'string' || description.trim().length < 2)
+      return res.status(400).json({ error: 'Beschreibung ist erforderlich.' });
+    if (description.length > 500)
+      return res.status(400).json({ error: 'Beschreibung zu lang (max. 500 Zeichen).' });
+
+    const messages = [
+      {
+        role: 'system',
+        content: `Du bist ein Experte für Getränke und Koffeingehalt. Analysiere die Beschreibung eines Getränks und antworte AUSSCHLIESSLICH mit einem JSON-Objekt ohne Markdown-Formatierung. Format:
+{"name":"Getränkename","caffeinePer100ml":Zahl,"sizeMl":Zahl,"confidence":"hoch|mittel|niedrig","hint":"optionaler Hinweis auf Deutsch"}
+Wichtig: caffeinePer100ml und sizeMl müssen Ganzzahlen sein. Typische Werte: Espresso=212mg/100ml, Red Bull=32mg/100ml, Kaffee=40mg/100ml, Cola=10mg/100ml, Monster=32mg/100ml.`,
+      },
+      { role: 'user', content: description.trim() },
+    ];
+
+    const raw = await callOpenRouter(messages);
+
+    // Extract JSON from response (strip markdown if present)
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Keine gültige Antwort vom AI-Modell.');
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.name || typeof parsed.caffeinePer100ml !== 'number')
+      throw new Error('Unvollständige AI-Antwort.');
+
+    res.json({
+      name: String(parsed.name),
+      caffeinePer100ml: Math.max(0, Math.round(Number(parsed.caffeinePer100ml))),
+      sizeMl: Math.max(1, Math.round(Number(parsed.sizeMl || 250))),
+      confidence: parsed.confidence || 'mittel',
+      hint: parsed.hint || '',
+    });
+  } catch (err) {
+    console.error('[AI Recognize] Fehler:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── AI Daily Summary ─────────────────────────────────────────────────────────
+app.post('/api/ai/daily-summary', async (req, res) => {
+  try {
+    const { logs, totalCaffeine, dailyLimit } = req.body || {};
+    if (!Array.isArray(logs))
+      return res.status(400).json({ error: 'logs ist erforderlich.' });
+
+    const limit = Number(dailyLimit) || 400;
+    const total = Number(totalCaffeine) || 0;
+    const remaining = Math.max(0, limit - total);
+    const percent = Math.round((total / limit) * 100);
+
+    const logList = logs.slice(0, 30).map((l) =>
+      `- ${l.name} (${l.caffeine}mg, ${l.sizeMl || l.size || '?'}ml)`
+    ).join('\n') || 'Keine Einträge heute.';
+
+    const messages = [
+      {
+        role: 'system',
+        content: `Du bist ein Gesundheitsassistent für einen Koffein-Tracker. Antworte auf Deutsch, freundlich und präzise. Maximal 200 Wörter.`,
+      },
+      {
+        role: 'user',
+        content: `Analysiere meine heutige Koffein-Aufnahme und gib mir eine persönliche Auswertung und Empfehlung.
+
+Heutiger Verbrauch: ${total}mg von ${limit}mg Tageslimit (${percent}%)
+Noch verfügbar: ${remaining}mg
+
+Einträge heute:
+${logList}
+
+Bitte: 1) kurze Bewertung, 2) ob ich noch Koffein trinken sollte, 3) ein praktischer Tipp.`,
+      },
+    ];
+
+    const summary = await callOpenRouter(messages);
+    res.json({ summary, total, limit, remaining, percent });
+  } catch (err) {
+    console.error('[AI Summary] Fehler:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

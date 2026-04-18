@@ -4,14 +4,14 @@ import {
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
   Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
-  CheckCircle, UserCheck, UserX, Clock, Shield,
+  CheckCircle, UserCheck, UserX, Clock, Shield, Bot,
 } from 'lucide-react';
 import { logout } from '../services/auth';
 import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole,
-  checkDockerUpdate, testDiscordWebhook,
+  checkDockerUpdate, testDiscordWebhook, fetchAiConfig, saveAiConfig,
 } from '../services/adminApi';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -76,6 +76,13 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
   const [discordWebhook, setDiscordWebhook] = useState('');
   const [smtpMsg, setSmtpMsg]     = useState(null);
 
+  // ── AI Config state ────────────────────────────────────────────────────
+  const [aiApiKey, setAiApiKey]   = useState('');
+  const [aiModel, setAiModel]     = useState('deepseek/deepseek-v3');
+  const [aiKeyMasked, setAiKeyMasked] = useState('');
+  const [aiSaving, setAiSaving]   = useState(false);
+  const [aiMsg, setAiMsg]         = useState(null);
+
   // ── Users state ────────────────────────────────────────────────────────
   const [regUsers, setRegUsers]   = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -92,6 +99,9 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
       fetchSmtpConfig()
         .then((cfg) => { if (cfg) setSmtp(cfg); setSmtpLoaded(true); })
         .catch(() => setSmtpLoaded(true));
+      fetchAiConfig()
+        .then((cfg) => { setAiModel(cfg.model || 'google/gemini-2.0-flash-001'); setAiKeyMasked(cfg.apiKeyMasked || ''); })
+        .catch(() => {});
       handleCheckUpdate();
     }
     if (activeTab === 'users') loadRegUsers();
@@ -161,6 +171,23 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
       setSmtpMsg({ type: 'error', text: err.message });
     } finally {
       setDiscordTesting(false);
+    }
+  };
+
+  const handleSaveAi = async () => {
+    setAiSaving(true);
+    setAiMsg(null);
+    try {
+      await saveAiConfig({ apiKey: aiApiKey.trim() || undefined, model: aiModel.trim() });
+      setAiMsg({ type: 'success', text: 'AI-Einstellungen gespeichert.' });
+      if (aiApiKey.trim()) {
+        setAiKeyMasked(aiApiKey.slice(0, 8) + '••••••••' + aiApiKey.slice(-4));
+        setAiApiKey('');
+      }
+    } catch (err) {
+      setAiMsg({ type: 'error', text: err.message });
+    } finally {
+      setAiSaving(false);
     }
   };
 
@@ -1008,6 +1035,58 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel }) => {
                   Test senden
                 </button>
               </div>
+            </div>
+
+            {/* AI / OpenRouter settings card */}
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <Bot className="w-4 h-4 text-violet-400" />
+                KI-Assistent (OpenRouter)
+              </h3>
+              <p className="text-xs text-slate-500">
+                API-Key von <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-violet-400 underline">openrouter.ai</a> eingeben, um KI-Funktionen zu aktivieren.
+                {aiKeyMasked && <span className="ml-1 text-slate-400">Aktueller Key: <span className="font-mono text-xs text-violet-300">{aiKeyMasked}</span></span>}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">API-Key</label>
+                  <input
+                    type="password"
+                    value={aiApiKey}
+                    onChange={(e) => setAiApiKey(e.target.value)}
+                    placeholder={aiKeyMasked ? 'Neuen Key eingeben zum Überschreiben…' : 'sk-or-v1-…'}
+                    className="input-dark"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Modell</label>
+                  <input
+                    type="text"
+                    value={aiModel}
+                    onChange={(e) => setAiModel(e.target.value)}
+                    placeholder="deepseek/deepseek-v3"
+                    className="input-dark font-mono text-sm"
+                  />
+                  <p className="text-xs text-slate-600 mt-1">z.B. google/gemini-2.0-flash-001, openai/gpt-4o-mini, meta-llama/llama-3.1-8b-instruct:free</p>
+                </div>
+              </div>
+              <button onClick={handleSaveAi} disabled={aiSaving}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl
+                  bg-violet-500/20 border border-violet-500/30 text-violet-300
+                  hover:bg-violet-500/30 transition-all text-sm disabled:opacity-50">
+                {aiSaving
+                  ? <span className="w-4 h-4 border-2 border-violet-400/30 border-t-violet-400 rounded-full animate-spin" />
+                  : <Bot className="w-4 h-4" />}
+                Speichern
+              </button>
+              {aiMsg && (
+                <div className={`rounded-xl p-3 flex items-center gap-2 text-sm
+                  ${aiMsg.type === 'success' ? 'bg-green-500/10 border border-green-500/30 text-green-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}>
+                  {aiMsg.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                  {aiMsg.text}
+                  <button onClick={() => setAiMsg(null)} className="ml-auto text-xs opacity-60 hover:opacity-100">×</button>
+                </div>
+              )}
             </div>
 
             {/* Feedback message */}

@@ -6,6 +6,9 @@ import OnlineSearch from './components/OnlineSearch';
 import ManualCalculator from './components/ManualCalculator';
 import DrinkHistory from './components/DrinkHistory';
 import ReminderSettings from './components/ReminderSettings';
+import AIAssistant from './components/AIAssistant';
+import AIDrinkRecognizer from './components/AIDrinkRecognizer';
+import AIDailySummary from './components/AIDailySummary';
 import LoginPage from './components/LoginPage';
 import AdminPanel from './components/AdminPanel';
 import RegisterPage from './components/RegisterPage';
@@ -238,6 +241,18 @@ function TrackerApp({ session, onLogout, dataSource, setDataSource, onShowAdminP
 
         <ReminderSettings session={session} />
 
+        <AIDailySummary logs={logs} totalCaffeine={totalCaffeineToday} />
+
+        <AIDrinkRecognizer
+          onRecognized={(drink) =>
+            setManualPrefill({
+              name: drink.name,
+              caffeinePer100ml: drink.caffeinePer100ml,
+              sizeMl: drink.sizeMl,
+            })
+          }
+        />
+
         <ManualCalculator
           onAddDrink={handleAddDrink}
           isLoading={isOperationLoading}
@@ -256,6 +271,8 @@ function TrackerApp({ session, onLogout, dataSource, setDataSource, onShowAdminP
         <p>Koffein-Tracker &copy; {new Date().getFullYear()}</p>
         <p className="text-xs mt-1">Empfohlenes Tageslimit: 400 mg</p>
       </footer>
+
+      <AIAssistant totalCaffeineToday={totalCaffeineToday} />
     </div>
   );
 }
