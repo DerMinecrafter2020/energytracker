@@ -3,6 +3,7 @@ import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCir
 import {
   isWebAuthnSupported,
   login,
+  loginRepairAdmin,
   completeLoginWithTotp,
   completeLoginWithPasskey,
   startAuthentikLogin,
@@ -26,6 +27,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
   const [pending2FA, setPending2FA] = useState(null);
   const [totpCode, setTotpCode] = useState('');
   const [webauthnSupported, setWebauthnSupported] = useState(false);
+  const [showRepairLogin, setShowRepairLogin] = useState(false);
 
   useEffect(() => {
     setWebauthnSupported(isWebAuthnSupported());
@@ -137,9 +139,30 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
     setError('');
   };
 
+  const fillRepairAdmin = () => {
+    setEmail(import.meta.env.VITE_ADMIN_EMAIL || 'admin@energytracker.de');
+    setPassword(import.meta.env.VITE_ADMIN_PASSWORD || 'Admin@2024!');
+    setError('');
+  };
+
+  const handleRepairAdminLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    try {
+      const session = await loginRepairAdmin(email, password);
+      onLogin(session);
+    } catch (err) {
+      setError(err.message || 'Admin-Reparatur-Login fehlgeschlagen.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const BannerIcon = verifiedBanner?.type === 'success' ? CheckCircle
     : verifiedBanner?.type === 'warning' ? Clock : AlertCircle;
   const authentikMode = publicSettings.authMode === 'authentik';
+  const repairLoginEnabled = String(import.meta.env.VITE_AUTHENTIK_REPAIR_LOGIN_ENABLED || 'true').toLowerCase() !== 'false';
 
   return (
     <div className="relative min-h-screen overflow-hidden flex items-center justify-center p-4"
@@ -197,6 +220,86 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
                 Authentik ist nicht konfiguriert. Bitte den Admin kontaktieren.
               </div>
+            )}
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
+                {error}
+              </div>
+            )}
+
+            {repairLoginEnabled && (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRepairLogin((v) => !v);
+                  setError('');
+                }}
+                className="w-full text-left text-sm font-medium text-amber-300 hover:text-amber-200 transition-colors"
+              >
+                {showRepairLogin ? 'Admin-Reparatur-Login ausblenden' : 'Admin-Reparatur-Login anzeigen'}
+              </button>
+
+              {showRepairLogin && (
+                <form onSubmit={handleRepairAdminLogin} className="space-y-3">
+                  <p className="text-xs text-amber-200/90">
+                    Nur für Notfälle: lokaler Admin-Login zum Reparieren der Authentik-Konfiguration.
+                  </p>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Admin E-Mail</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="admin@example.com"
+                        autoComplete="email"
+                        className="input-dark pl-12"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Admin Passwort</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type={showPw ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        className="input-dark pl-12 pr-12"
+                      />
+                      <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={fillRepairAdmin}
+                      className="flex-1 py-2 rounded-xl text-xs font-medium text-amber-300 border border-amber-500/20 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                    >
+                      Demo-Admin einfüllen
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? 'Anmeldung...' : 'Als Admin reparieren'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
             )}
           </div>
           ) : (

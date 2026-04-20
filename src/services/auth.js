@@ -102,6 +102,28 @@ export const login = async (email, password) => {
   return session;
 };
 
+export const loginRepairAdmin = async (email, password) => {
+  const trimmed = String(email || '').trim().toLowerCase();
+  const adminEmail = String(ADMIN_EMAIL || '').trim().toLowerCase();
+
+  if (!trimmed || !password) {
+    throw new Error('Bitte E-Mail und Passwort eingeben.');
+  }
+
+  if (trimmed !== adminEmail || password !== ADMIN_PASSWORD) {
+    throw new Error('Ungültiger Admin-Reparatur-Login.');
+  }
+
+  const session = {
+    email: ADMIN_EMAIL,
+    role: 'admin',
+    name: 'Administrator',
+    loginAt: Date.now(),
+  };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  return session;
+};
+
 export const completeLoginWithTotp = async ({ loginToken, code }) => {
   const resp = await fetch(`${API_BASE}/api/login/2fa/totp`, {
     method: 'POST',
