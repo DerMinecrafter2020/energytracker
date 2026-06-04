@@ -526,7 +526,12 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
       <footer className="text-center py-6 pb-32 text-slate-600 text-sm">
         <p>Koffein-Tracker &copy; {new Date().getFullYear()}</p>
-        <p className="text-xs mt-1">Empfohlenes Tageslimit: 400 mg</p>
+        <p className="text-xs mt-1 mb-2">Empfohlenes Tageslimit: 400 mg</p>
+        {(currentVersion || latestVersion) && (
+          <p className="text-[10px] text-slate-500 opacity-60 font-mono tracking-wider">
+            Version {latestVersion || currentVersion}
+          </p>
+        )}
       </footer>
 
       <AIAssistant totalCaffeineToday={totalCaffeineToday} onAddDrink={handleAddDrink} />

@@ -1042,7 +1042,7 @@ const sendReminderEmail = async ({ to }) => {
 
   const transporter = createTransporter(cfg);
   await transporter.sendMail({
-    from: \`"\${cfg.fromName}" <\${cfg.fromEmail || cfg.auth.user}>\`,
+    from: `"${cfg.fromName}" <${cfg.fromEmail || cfg.auth.user}>`,
     to,
     subject: '⚡ Dein täglicher Reminder - Koffein-Tracker',
     html: htmlContent,
