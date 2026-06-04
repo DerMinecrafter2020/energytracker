@@ -1,10 +1,10 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+﻿const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 export const sendAiChat = async ({ messages, totalCaffeineToday, dailyLimit }) => {
   const res = await fetch(`${API_BASE}/api/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, totalCaffeineToday, dailyLimit }),
+    body: JSON.stringify({ messages, totalCaffeineToday, dailyLimit, clientTime: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'AI-Fehler');
@@ -26,9 +26,10 @@ export const fetchDailySummary = async ({ logs, totalCaffeine, dailyLimit }) => 
   const res = await fetch(`${API_BASE}/api/ai/daily-summary`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ logs, totalCaffeine, dailyLimit }),
+    body: JSON.stringify({ logs, totalCaffeine, dailyLimit, clientTime: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'AI-Fehler');
   return data;
 };
+

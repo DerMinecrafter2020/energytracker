@@ -2455,12 +2455,9 @@ app.get('/api/stats/weekly', async (req, res) => {
   }
 });
 
-// ── Admin AI Config ──────────────────────────────────────────────────────────
 app.get('/api/admin/ai', requireAdmin, (req, res) => {
   const cfg = loadAiConfig();
-  const maskedKey = cfg.apiKey
-    ? cfg.apiKey.slice(0, 8) + '••••••••' + cfg.apiKey.slice(-4)
-    : '';
+  const maskedKey = cfg.apiKey ? cfg.apiKey.slice(0, 8) + '********' + cfg.apiKey.slice(-4) : '';
   const maskedBraveKey = cfg.braveSearchKey
     ? cfg.braveSearchKey.slice(0, 4) + '••••••••' + cfg.braveSearchKey.slice(-4)
     : '';
@@ -2494,7 +2491,7 @@ app.post('/api/admin/ai', requireAdmin, (req, res) => {
 // ── AI Chat ──────────────────────────────────────────────────────────────────
 app.post('/api/ai/chat', async (req, res) => {
   try {
-    const { messages, totalCaffeineToday, dailyLimit } = req.body || {};
+    const { messages, totalCaffeineToday, dailyLimit, clientTime } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0)
       return res.status(400).json({ error: 'messages ist erforderlich.' });
     if (messages.length > 40)
@@ -2512,7 +2509,9 @@ app.post('/api/ai/chat', async (req, res) => {
       ? `Aktuelle Koffein-Einnahme heute: ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
       : '';
 
-    const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${caffeineInfo}
+    const timeInfo = clientTime ? `Die aktuelle Uhrzeit beim Nutzer ist ${clientTime}. Berücksichtige diese Uhrzeit unbedingt bei deinen Empfehlungen (z.B. warne vor spätem Koffeinkonsum am Abend, oder gib morgens einen Energiekick-Tipp). ` : '';
+
+    const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo}
 Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen (z.B. 'Füge einen halben Liter Red Bull hinzu'), antworte ganz normal auf seine Anfrage und hänge GANZ AM ENDE deiner Antwort einen exakten JSON-Block in folgendem Format an:
 \`\`\`json
 {
@@ -2677,7 +2676,7 @@ Kein Markdown, nur das pure JSON-Array!`
 
 app.post('/api/ai/daily-summary', async (req, res) => {
   try {
-    const { logs, totalCaffeine, dailyLimit } = req.body || {};
+    const { logs, totalCaffeine, dailyLimit, clientTime } = req.body || {};
     if (!Array.isArray(logs))
       return res.status(400).json({ error: 'logs ist erforderlich.' });
 
@@ -2699,7 +2698,7 @@ app.post('/api/ai/daily-summary', async (req, res) => {
         role: 'user',
         content: `Analysiere meine heutige Koffein-Aufnahme und gib mir eine persönliche Auswertung und Empfehlung.
 
-Heutiger Verbrauch: ${total}mg von ${limit}mg Tageslimit (${percent}%)
+${clientTime ? `Aktuelle Uhrzeit: ${clientTime}\n  ` : ''}Heutiger Verbrauch: ${total}mg von ${limit}mg Tageslimit (${percent}%)
 Noch verfügbar: ${remaining}mg
 
 Einträge heute:
@@ -2775,5 +2774,14 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
+
+
+
+
+
+
+
+
+
 
 
