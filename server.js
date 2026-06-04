@@ -1023,6 +1023,24 @@ const getTodayStats = ({ userId, email }) => {
   };
 };
 
+const buildModernEmail = ({ icon, headerText, contentHtml, footerText }) => `
+  <div style="font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #02040A; color: #f1f5f9; padding: 40px 20px; text-align: center;">
+    <div style="max-width: 500px; margin: 0 auto; background-color: #0d1117; border: 1px solid #1f2937; border-radius: 24px; padding: 40px 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #3b82f6, #60a5fa, #fbbf24); margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(96,165,250,0.4);">
+        <span style="font-size: 28px; line-height: 56px; color: white;">${icon || '⚡'}</span>
+      </div>
+      <h1 style="margin: 0 0 15px 0; font-size: 24px; font-weight: 800; color: #60a5fa;">${headerText || 'Koffein-Tracker'}</h1>
+      <div style="font-size: 16px; color: #94a3b8; line-height: 1.6; margin-bottom: 35px; text-align: left;">
+        ${contentHtml}
+      </div>
+    </div>
+    <p style="font-size: 12px; color: #475569; margin-top: 30px;">
+      Koffein-Tracker &copy; ${new Date().getFullYear()}<br/>
+      ${footerText || ''}
+    </p>
+  </div>
+`;
+
 const sendReminderEmail = async ({ to }) => {
   const cfg = await loadSmtpConfig();
   if (!cfg?.host || !cfg?.auth?.user) {
@@ -1030,27 +1048,20 @@ const sendReminderEmail = async ({ to }) => {
   }
 
   const appUrl = process.env.WEBAUTHN_ORIGIN || 'http://localhost:8080';
-  const htmlContent = `
-    <div style="font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #02040A; color: #f1f5f9; padding: 40px 20px; text-align: center;">
-      <div style="max-width: 500px; margin: 0 auto; background-color: #0d1117; border: 1px solid #1f2937; border-radius: 24px; padding: 40px 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-        <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #3b82f6, #60a5fa, #fbbf24); margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(96,165,250,0.4);">
-          <span style="font-size: 28px; line-height: 56px; color: white;">⚡</span>
-        </div>
-        <h1 style="margin: 0 0 15px 0; font-size: 24px; font-weight: 800; color: #60a5fa;">Koffein-Tracker</h1>
-        <p style="font-size: 16px; color: #94a3b8; line-height: 1.6; margin-bottom: 35px;">
-          Hey! Kurze Erinnerung: Hast du heute schon deinen Energy-Drink oder Kaffee getrackt?<br/><br/>
-          Behalte deinen Koffeinpegel im Blick und bleib im gesunden Limit.
-        </p>
+  const htmlContent = buildModernEmail({
+    icon: '⚡',
+    headerText: 'Koffein-Tracker',
+    contentHtml: `
+      <p style="text-align: center; margin-top: 0;">Hey! Kurze Erinnerung: Hast du heute schon deinen Energy-Drink oder Kaffee getrackt?</p>
+      <p style="text-align: center;">Behalte deinen Koffeinpegel im Blick und bleib im gesunden Limit.</p>
+      <div style="text-align: center; margin-top: 25px;">
         <a href="${appUrl}" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #c084fc); color: white; text-decoration: none; padding: 14px 32px; border-radius: 16px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 14px rgba(139,92,246,0.4);">
           Jetzt eintragen
         </a>
       </div>
-      <p style="font-size: 12px; color: #475569; margin-top: 30px;">
-        Koffein-Tracker &copy; ${new Date().getFullYear()}<br/>
-        Du erhältst diese E-Mail aufgrund deiner Profil-Einstellungen.
-      </p>
-    </div>
-  `;
+    `,
+    footerText: 'Du erhältst diese E-Mail aufgrund deiner Profil-Einstellungen.',
+  });
 
   const transporter = createTransporter(cfg);
   await transporter.sendMail({
@@ -1286,7 +1297,11 @@ app.post('/api/admin/smtp/test', requireAdmin, async (req, res) => {
       from:    `"${cfg.fromName}" <${cfg.fromEmail}>`,
       to:      testEmail,
       subject: 'Koffein-Tracker \u2013 SMTP Test \u2713',
-      html:    '<p>SMTP-Server ist korrekt konfiguriert. Diese E-Mail best\u00e4tigt die Verbindung.</p>',
+      html:    buildModernEmail({
+        icon: '✉️',
+        headerText: 'SMTP Test Erfolgreich',
+        contentHtml: '<p style="text-align: center; margin: 0;">Der SMTP-Server ist korrekt konfiguriert. Diese E-Mail bestätigt die erfolgreiche Verbindung.</p>',
+      }),
     });
     res.json({ success: true, message: `Test-E-Mail an ${testEmail} gesendet.` });
   } catch (err) {
@@ -1562,18 +1577,20 @@ app.post('/api/register', async (req, res) => {
     await t.sendMail({
       from:    `"${cfg.fromName}" <${cfg.fromEmail}>`,
       to:      email,
-      subject: 'Koffein-Tracker \u2013 E-Mail-Adresse best\u00e4tigen',
-      html: `
-        <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
-          <h2 style="color:#3B82F6">Willkommen, ${name}!</h2>
-          <p>Bitte best\u00e4tige deine E-Mail-Adresse um dein Konto zu aktivieren:</p>
-          <a href="${link}" style="display:inline-block;padding:12px 24px;background:#3B82F6;
-            color:#fff;text-decoration:none;border-radius:8px;margin:16px 0;font-weight:bold">
-            E-Mail best\u00e4tigen
-          </a>
-          <p style="color:#94a3b8;font-size:12px">Dieser Link ist 24 Stunden g\u00fcltig.<br>
-          Falls du dich nicht registriert hast, ignoriere diese E-Mail.</p>
-        </div>`,
+      subject: 'Koffein-Tracker \u2013 E-Mail-Adresse bestätigen',
+      html: buildModernEmail({
+        icon: '👋',
+        headerText: `Willkommen, ${name}!`,
+        contentHtml: `
+          <p style="text-align: center; margin-top: 0;">Bitte bestätige deine E-Mail-Adresse, um dein Konto zu aktivieren:</p>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="${link}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #60a5fa); color: white; text-decoration: none; padding: 14px 32px; border-radius: 16px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 14px rgba(59,130,246,0.4);">
+              E-Mail bestätigen
+            </a>
+          </div>
+          <p style="text-align: center; color: #64748b; font-size: 13px; margin: 0;">Dieser Link ist 24 Stunden gültig.<br>Falls du dich nicht registriert hast, ignoriere diese E-Mail.</p>
+        `,
+      }),
     });
     res.status(201).json({ success: true });
   } catch (err) {
@@ -1948,11 +1965,15 @@ app.post('/api/user/test-email', async (req, res) => {
     // Die E-Mail Adresse aus den Benutzerdaten auslesen
     const user = dbState.users.find(u => (userId && String(u.id) === String(userId)) || (email && String(u.email).toLowerCase() === String(email).toLowerCase()));
     
-    if (!user || !user.email) {
-      return res.status(400).json({ error: 'Benutzerdaten konnten nicht gefunden werden oder keine E-Mail hinterlegt.' });
+    let targetEmail = user?.email || email;
+    if (userId === 'admin' && !targetEmail) {
+      const cfg = await loadSmtpConfig();
+      targetEmail = cfg?.auth?.user || cfg?.fromEmail;
     }
     
-    const targetEmail = user.email;
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'Benutzerdaten konnten nicht gefunden werden oder keine E-Mail hinterlegt.' });
+    }
 
     // Testemail senden
     const cfg = await loadSmtpConfig();
@@ -1972,13 +1993,14 @@ app.post('/api/user/test-email', async (req, res) => {
       to: targetEmail,
       subject: 'Test-Nachricht: Paulaner & Energy Tracker',
       text: 'Hallo! Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.',
-      html: `
-        <div style="font-family:sans-serif;color:#333;">
-          <h2>Test erfolgreich! 🎉</h2>
-          <p>Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.</p>
-          <p>Du erhältst ab sofort Benachrichtigungen für deine täglichen Reminder oder Warnungen (falls konfiguriert).</p>
-        </div>
-      `,
+      html: buildModernEmail({
+        icon: '🎉',
+        headerText: 'Test erfolgreich!',
+        contentHtml: `
+          <p style="text-align: center; margin-top: 0;">Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.</p>
+          <p style="text-align: center; margin-bottom: 0;">Du erhältst ab sofort Benachrichtigungen für deine täglichen Reminder oder Warnungen (falls konfiguriert).</p>
+        `,
+      }),
     });
 
     res.json({ success: true, message: `Test-E-Mail wurde erfolgreich an ${targetEmail} gesendet!` });

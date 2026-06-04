@@ -16,9 +16,20 @@ const parseMarkdown = (text) => {
 const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
   const [open, setOpen]       = useState(false);
   const [minimized, setMin]   = useState(false);
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hallo! Ich bin dein Koffein-Assistent. Stell mir Fragen zu Koffein, Schlaf oder Energie – oder frag mich, wie viel du heute noch trinken kannst.' },
-  ]);
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ai_chat_messages');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Error loading chat messages:', e);
+    }
+    return [
+      { role: 'assistant', content: 'Hallo! Ich bin dein Koffein-Assistent. Stell mir Fragen zu Koffein, Schlaf oder Energie – oder frag mich, wie viel du heute noch trinken kannst.' },
+    ];
+  });
   const [input, setInput]     = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
@@ -33,6 +44,15 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, open, minimized]);
+
+  // Persist messages to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('ai_chat_messages', JSON.stringify(messages));
+    } catch (e) {
+      console.error('Error saving chat messages:', e);
+    }
+  }, [messages]);
 
   // Resize Handling
   useEffect(() => {
