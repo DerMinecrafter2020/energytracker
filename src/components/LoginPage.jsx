@@ -316,7 +316,6 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
           Koffein-Tracker &copy; {new Date().getFullYear()}
         </p>
       </div>
-    </div>
   );
 };
 
