@@ -87,7 +87,9 @@ const AIDailySummary = ({ logs = [], totalCaffeine = 0 }) => {
 
           {result?.summary && (
             <div className="bg-white/5 border border-violet-500/15 rounded-2xl p-4">
-              <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{result.summary}</p>
+              <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                {result.summary.replace(/^#+\s*/gm, '').replace(/\*\*/g, '')}
+              </p>
             </div>
           )}
         </div>
