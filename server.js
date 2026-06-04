@@ -453,7 +453,7 @@ const mapSmtpRowToConfig = (row) => {
     secure: false,
     auth: { user: '', pass: '' },
     fromName: 'Koffein-Tracker',
-    fromEmail: '',
+    fromEmail: 'admin@fra03.de',
     baseUrl: '',
     registrationEnabled: true, // ✓ Default: Registrierung ENABLED
     demoEnabled: true,
@@ -470,7 +470,7 @@ const mapSmtpRowToConfig = (row) => {
       pass: row.auth_pass || defaults.auth.pass,
     },
     fromName: row.from_name || defaults.fromName,
-    fromEmail: row.from_email || row.auth_user || defaults.fromEmail,
+    fromEmail: row.from_email || defaults.fromEmail,
     baseUrl: row.base_url || defaults.baseUrl,
     registrationEnabled: row.registration_enabled !== 0,
     demoEnabled: row.demo_enabled !== 0,
@@ -1065,7 +1065,7 @@ const sendReminderEmail = async ({ to }) => {
 
   const transporter = createTransporter(cfg);
   await transporter.sendMail({
-    from: `"${cfg.fromName}" <${cfg.fromEmail || cfg.auth.user}>`,
+    from: `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
     to,
     subject: '⚡ Dein täglicher Reminder - Koffein-Tracker',
     html: htmlContent,
@@ -1273,7 +1273,7 @@ app.post('/api/admin/smtp', requireAdmin, async (req, res) => {
         pass: auth.pass === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' ? (prev?.auth?.pass || '') : auth.pass,
       },
       fromName: fromName || 'Koffein-Tracker',
-      fromEmail: fromEmail || auth.user,
+      fromEmail: fromEmail || 'admin@fra03.de',
       baseUrl: baseUrl || '',
       registrationEnabled: registrationEnabled !== false,
       demoEnabled: demoEnabled !== false,
@@ -1294,7 +1294,7 @@ app.post('/api/admin/smtp/test', requireAdmin, async (req, res) => {
     const t = createTransporter(cfg);
     await t.verify();
     await t.sendMail({
-      from:    `"${cfg.fromName}" <${cfg.fromEmail}>`,
+      from:    `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
       to:      testEmail,
       subject: 'Koffein-Tracker \u2013 SMTP Test \u2713',
       html:    buildModernEmail({
@@ -1575,7 +1575,7 @@ app.post('/api/register', async (req, res) => {
     const base     = (cfg.baseUrl || `http://localhost:${PORT}`).replace(/\/$/, '');
     const link     = `${base}/api/verify/${verifyToken}`;
     await t.sendMail({
-      from:    `"${cfg.fromName}" <${cfg.fromEmail}>`,
+      from:    `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
       to:      email,
       subject: 'Koffein-Tracker \u2013 E-Mail-Adresse bestätigen',
       html: buildModernEmail({
@@ -1968,7 +1968,7 @@ app.post('/api/user/test-email', async (req, res) => {
     let targetEmail = user?.email || email;
     if (userId === 'admin' && !targetEmail) {
       const cfg = await loadSmtpConfig();
-      targetEmail = cfg?.auth?.user || cfg?.fromEmail;
+      targetEmail = cfg?.fromEmail || 'admin@fra03.de';
     }
     
     if (!targetEmail) {
@@ -1989,7 +1989,7 @@ app.post('/api/user/test-email', async (req, res) => {
     });
 
     await transporter.sendMail({
-      from: `"${cfg.fromName}" <${cfg.fromEmail || cfg.auth.user}>`,
+      from: `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
       to: targetEmail,
       subject: 'Test-Nachricht: Paulaner & Energy Tracker',
       text: 'Hallo! Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.',
