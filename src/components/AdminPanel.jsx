@@ -81,10 +81,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [aiKeyMasked, setAiKeyMasked] = useState('');
   const [braveSearchKey, setBraveSearchKey] = useState('');
   const [braveKeyMasked, setBraveKeyMasked] = useState('');
-  const [discordBotToken, setDiscordBotToken] = useState('');
-  const [discordBotTokenMasked, setDiscordBotTokenMasked] = useState('');
-  const [discordBotEnabled, setDiscordBotEnabled] = useState(false);
-  const [discordBotStatus, setDiscordBotStatus] = useState('online');
+
   const [aiSaving, setAiSaving]   = useState(false);
   const [aiMsg, setAiMsg]         = useState(null);
 
@@ -117,9 +114,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           setAiModel(cfg.model || 'google/gemini-2.0-flash-001'); 
           setAiKeyMasked(cfg.apiKeyMasked || ''); 
           setBraveKeyMasked(cfg.braveSearchKeyMasked || ''); 
-          setDiscordBotTokenMasked(cfg.discordBotTokenMasked || '');
-          setDiscordBotEnabled(!!cfg.discordBotEnabled);
-          setDiscordBotStatus(cfg.discordBotStatus || 'online');
+
         })
         .catch(() => {});
       handleRedisCheck();
@@ -221,9 +216,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         apiKey: aiApiKey.trim() || undefined, 
         model: aiModel.trim(), 
         braveSearchKey: braveSearchKey.trim() || undefined,
-        discordBotToken: discordBotToken.trim() || undefined,
-        discordBotEnabled,
-        discordBotStatus
+
       });
       setAiMsg({ type: 'success', text: 'AI-Einstellungen gespeichert.' });
       if (aiApiKey.trim()) {
@@ -234,10 +227,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         setBraveKeyMasked(braveSearchKey.slice(0, 4) + '••••••••' + braveSearchKey.slice(-4));
         setBraveSearchKey('');
       }
-      if (discordBotToken.trim()) {
-        setDiscordBotTokenMasked(discordBotToken.slice(0, 8) + '••••••••' + discordBotToken.slice(-4));
-        setDiscordBotToken('');
-      }
+
     } catch (err) {
       setAiMsg({ type: 'error', text: err.message });
     } finally {
@@ -1223,58 +1213,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     Optionaler <a href="https://brave.com/search/api/" target="_blank" rel="noreferrer" className="text-orange-400 underline">Brave Search API</a>-Token. Wenn gesetzt, wird Brave Search statt OpenFoodFacts für die KI-Getränkeerkennung verwendet.
                   </p>
                 </div>
-                
-                <div className="pt-4 border-t border-white/5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="block text-sm font-semibold text-white flex items-center gap-2">
-                        Discord Bot 
-                        <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider">Experimentell</span>
-                      </label>
-                      <p className="text-xs text-slate-500">Lässt die KI als eigenen Discord Bot antworten.</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={discordBotEnabled} onChange={(e) => setDiscordBotEnabled(e.target.checked)} />
-                      <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
-                    </label>
-                  </div>
-                  {discordBotEnabled && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                          Bot Token
-                        </label>
-                        <input
-                          type="password"
-                          value={discordBotToken}
-                          onChange={(e) => setDiscordBotToken(e.target.value)}
-                          placeholder={discordBotTokenMasked ? 'Neuen Token eingeben zum Überschreiben…' : 'MT…'}
-                          className="input-dark"
-                        />
-                        {discordBotTokenMasked && (
-                          <p className="text-xs text-slate-500 mt-1">
-                            Aktueller Token: <span className="font-mono text-indigo-300">{discordBotTokenMasked}</span>
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                          Bot Status
-                        </label>
-                        <select
-                          value={discordBotStatus}
-                          onChange={(e) => setDiscordBotStatus(e.target.value)}
-                          className="input-dark bg-slate-800 text-white"
-                        >
-                          <option value="online">Online 🟢</option>
-                          <option value="idle">Abwesend 🌙</option>
-                          <option value="dnd">Bitte nicht stören 🔴</option>
-                          <option value="invisible">Unsichtbar 👻</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </div>
               <button onClick={handleSaveAi} disabled={aiSaving}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl
@@ -1399,3 +1337,4 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 };
 
 export default AdminPanel;
+

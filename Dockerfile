@@ -15,14 +15,14 @@ WORKDIR /app
 
 COPY package.json ./
 COPY --from=build /app/package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Kopiere gebuildetes Frontend von Build Stage
 COPY --from=build /app/dist ./dist
 
 # Kopiere Server
 COPY server.js .
-COPY discord-bot.js .
+
 
 # Declare persistent data directory
 VOLUME ["/app/data"]

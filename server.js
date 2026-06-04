@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { fork } from 'child_process';
+
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -532,7 +532,7 @@ const initDb = async () => {
 
 // ── AI / OpenRouter helpers ───────────────────────────────────────────────────
 const loadAiConfig = () => {
-  return dbState.ai_config || { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '', discordBotToken: '', discordBotEnabled: false };
+  return dbState.ai_config || { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '' };
 };
 
 const saveAiConfig = (cfg) => {
@@ -540,9 +540,6 @@ const saveAiConfig = (cfg) => {
     apiKey: String(cfg.apiKey || '').trim(),
     model: String(cfg.model || 'deepseek/deepseek-v3').trim(),
     braveSearchKey: String(cfg.braveSearchKey || '').trim(),
-    discordBotToken: String(cfg.discordBotToken || '').trim(),
-    discordBotEnabled: !!cfg.discordBotEnabled,
-    discordBotStatus: String(cfg.discordBotStatus || 'online').trim(),
   };
   persistDbState();
 };
@@ -2349,46 +2346,30 @@ app.get('/api/admin/ai', requireAdmin, (req, res) => {
   const maskedBraveKey = cfg.braveSearchKey
     ? cfg.braveSearchKey.slice(0, 4) + '••••••••' + cfg.braveSearchKey.slice(-4)
     : '';
-  const maskedDiscordBotToken = cfg.discordBotToken
-    ? cfg.discordBotToken.slice(0, 8) + '••••••••' + cfg.discordBotToken.slice(-4)
-    : '';
   res.json({
     apiKeySet: !!cfg.apiKey,
     apiKeyMasked: maskedKey,
     model: cfg.model,
     braveSearchKeySet: !!cfg.braveSearchKey,
     braveSearchKeyMasked: maskedBraveKey,
-    discordBotTokenSet: !!cfg.discordBotToken,
-    discordBotTokenMasked: maskedDiscordBotToken,
-    discordBotEnabled: !!cfg.discordBotEnabled,
-    discordBotStatus: cfg.discordBotStatus || 'online',
   });
 });
 
 app.post('/api/admin/ai', requireAdmin, (req, res) => {
-  const { apiKey, model, braveSearchKey, discordBotToken, discordBotEnabled, discordBotStatus } = req.body || {};
+  const { apiKey, model, braveSearchKey } = req.body || {};
   const aiCfg = loadAiConfig();
   
   const newApiKey = apiKey !== undefined ? String(apiKey).trim() : aiCfg.apiKey;
   const newModel = model !== undefined ? String(model).trim() : aiCfg.model;
   const newBraveSearchKey = braveSearchKey !== undefined ? String(braveSearchKey).trim() : aiCfg.braveSearchKey;
-  const newDiscordBotToken = discordBotToken !== undefined ? String(discordBotToken).trim() : aiCfg.discordBotToken;
-  const newDiscordBotEnabled = discordBotEnabled !== undefined ? Boolean(discordBotEnabled) : !!aiCfg.discordBotEnabled;
-  const newDiscordBotStatus = discordBotStatus !== undefined ? String(discordBotStatus) : (aiCfg.discordBotStatus || 'online');
 
   saveAiConfig({
     ...aiCfg,
     apiKey: newApiKey,
     model: newModel,
     braveSearchKey: newBraveSearchKey,
-    discordBotToken: newDiscordBotToken,
-    discordBotEnabled: newDiscordBotEnabled,
-    discordBotStatus: newDiscordBotStatus,
   });
   
-  // Discord bot manager is now external (discord-bot.js)
-  // It will poll the Redis store for ai_config changes.
-
   res.json({ success: true });
 });
 
@@ -2561,16 +2542,12 @@ app.get(/.*/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-let discordBotProcess = null;
-
 process.on('SIGINT', () => {
-  if (discordBotProcess) discordBotProcess.kill('SIGINT');
   process.exit(0);
 });
 
 // Graceful shutdown — flush state to Redis before container stops
 process.on('SIGTERM', async () => {
-  if (discordBotProcess) discordBotProcess.kill('SIGTERM');
   console.log('[DB] SIGTERM empfangen, schreibe letzten Stand nach Redis...');
   try {
     await redis.mset(
@@ -2593,11 +2570,7 @@ process.on('SIGTERM', async () => {
 });
 initDb()
   .then(() => {
-    // Starte den separaten Discord Bot Prozess
-    discordBotProcess = fork(path.join(__dirname, 'discord-bot.js'));
-    discordBotProcess.on('exit', (code) => {
-      console.log(`[Discord Bot] Prozess beendet mit Code ${code}`);
-    });
+
 
     // Check every minute whether a reminder is due.
     setInterval(() => {

@@ -9,7 +9,7 @@
     "prebuild": "npm run version:auto",
     "dev": "vite",
     "server": "node server.js",
-    "bot": "node discord-bot.js",
+    
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -17,7 +17,7 @@
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.1",
     "cors": "^2.8.6",
-    "discord.js": "^14.26.4",
+    
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "firebase": "^12.14.0",
