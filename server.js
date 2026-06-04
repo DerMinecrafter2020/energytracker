@@ -1,4 +1,5 @@
 import express from 'express';
+import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -529,7 +530,7 @@ const initDb = async () => {
 
 // ── AI / OpenRouter helpers ───────────────────────────────────────────────────
 const loadAiConfig = () => {
-  return dbState.ai_config || { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '' };
+  return dbState.ai_config || { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '', discordBotToken: '', discordBotEnabled: false };
 };
 
 const saveAiConfig = (cfg) => {
@@ -537,6 +538,8 @@ const saveAiConfig = (cfg) => {
     apiKey: String(cfg.apiKey || '').trim(),
     model: String(cfg.model || 'deepseek/deepseek-v3').trim(),
     braveSearchKey: String(cfg.braveSearchKey || '').trim(),
+    discordBotToken: String(cfg.discordBotToken || '').trim(),
+    discordBotEnabled: !!cfg.discordBotEnabled,
   };
   persistDbState();
 };
@@ -2306,27 +2309,47 @@ app.get('/api/admin/ai', requireAdmin, (req, res) => {
   const maskedBraveKey = cfg.braveSearchKey
     ? cfg.braveSearchKey.slice(0, 4) + '••••••••' + cfg.braveSearchKey.slice(-4)
     : '';
+  const maskedDiscordBotToken = cfg.discordBotToken
+    ? cfg.discordBotToken.slice(0, 8) + '••••••••' + cfg.discordBotToken.slice(-4)
+    : '';
   res.json({
     apiKeySet: !!cfg.apiKey,
     apiKeyMasked: maskedKey,
     model: cfg.model,
     braveSearchKeySet: !!cfg.braveSearchKey,
     braveSearchKeyMasked: maskedBraveKey,
+    discordBotTokenSet: !!cfg.discordBotToken,
+    discordBotTokenMasked: maskedDiscordBotToken,
+    discordBotEnabled: !!cfg.discordBotEnabled,
   });
 });
 
 app.post('/api/admin/ai', requireAdmin, (req, res) => {
-  const { apiKey, model, braveSearchKey } = req.body || {};
+  const { apiKey, model, braveSearchKey, discordBotToken, discordBotEnabled } = req.body || {};
   if (apiKey !== undefined && typeof apiKey !== 'string')
     return res.status(400).json({ error: 'apiKey muss ein String sein.' });
   if (braveSearchKey !== undefined && typeof braveSearchKey !== 'string')
     return res.status(400).json({ error: 'braveSearchKey muss ein String sein.' });
+  if (discordBotToken !== undefined && typeof discordBotToken !== 'string')
+    return res.status(400).json({ error: 'discordBotToken muss ein String sein.' });
+  
   const current = loadAiConfig();
+  const newDiscordBotToken = typeof discordBotToken === 'string' ? discordBotToken.trim() : current.discordBotToken;
+  const newDiscordBotEnabled = typeof discordBotEnabled === 'boolean' ? discordBotEnabled : current.discordBotEnabled;
+
   saveAiConfig({
     apiKey:         typeof apiKey         === 'string' ? apiKey.trim()         : current.apiKey,
     model:          typeof model          === 'string' && model.trim() ? model.trim() : current.model,
     braveSearchKey: typeof braveSearchKey === 'string' ? braveSearchKey.trim() : current.braveSearchKey,
+    discordBotToken: newDiscordBotToken,
+    discordBotEnabled: newDiscordBotEnabled,
   });
+  
+  // Inform discord bot manager to restart/stop if needed
+  if (typeof updateDiscordBotLifecycle === 'function') {
+    updateDiscordBotLifecycle(newDiscordBotToken, newDiscordBotEnabled).catch(err => console.error('Bot Lifecycle Error:', err));
+  }
+
   res.json({ success: true });
 });
 
@@ -2521,9 +2544,76 @@ process.on('SIGTERM', async () => {
   await redis.quit();
   process.exit(0);
 });
+// ── Experimental Discord Bot AI ──────────────────────────────────────────────
+let discordBotClient = null;
+
+const updateDiscordBotLifecycle = async (token, enabled) => {
+  try {
+    if (discordBotClient) {
+      discordBotClient.destroy();
+      discordBotClient = null;
+      console.log('[Discord Bot] Gestoppt.');
+    }
+
+    if (enabled && token) {
+      discordBotClient = new Client({
+        intents: [
+          GatewayIntentBits.Guilds,
+          GatewayIntentBits.GuildMessages,
+          GatewayIntentBits.MessageContent,
+          GatewayIntentBits.DirectMessages,
+        ],
+        partials: [Partials.Channel],
+      });
+
+      discordBotClient.on('ready', () => {
+        console.log(`[Discord Bot] Eingeloggt als ${discordBotClient.user.tag}`);
+      });
+
+      discordBotClient.on('messageCreate', async (message) => {
+        if (message.author.bot) return;
+
+        const isMentioned = message.mentions.has(discordBotClient.user.id);
+        const isDM = message.channel.type === 1 || message.channel.type === 'DM';
+
+        if (isMentioned || isDM) {
+          try {
+            message.channel.sendTyping();
+            
+            const content = message.content.replace(`<@${discordBotClient.user.id}>`, '').replace(`<@!${discordBotClient.user.id}>`, '').trim();
+
+            const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker, der jetzt auch auf Discord agiert. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. Aktuell bist du im experimentellen Modus und hast keinen Zugriff auf die individuellen Tracker-Daten der Discord-User.`;
+
+            const fullMessages = [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content }
+            ];
+
+            const reply = await callOpenRouter(fullMessages);
+            await message.reply(reply);
+          } catch (err) {
+            console.error('[Discord Bot] Fehler beim Verarbeiten:', err);
+            await message.reply('Es gab einen Fehler bei der Kommunikation mit der KI.');
+          }
+        }
+      });
+
+      await discordBotClient.login(token);
+    }
+  } catch (err) {
+    console.error('[Discord Bot] Lifecycle Error:', err);
+  }
+};
+
+// Start updateDiscordBotLifecycle wrapper to export if needed
+global.updateDiscordBotLifecycle = updateDiscordBotLifecycle;
 
 initDb()
   .then(() => {
+    // Starte Discord Bot, falls konfiguriert
+    const aiCfg = loadAiConfig();
+    updateDiscordBotLifecycle(aiCfg.discordBotToken, aiCfg.discordBotEnabled);
+
     // Check every minute whether a reminder is due.
     setInterval(() => {
       processRemindersTick().catch((err) => console.error('[Reminder] Tick-Fehler:', err.message));
