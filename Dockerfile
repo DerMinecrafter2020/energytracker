@@ -22,6 +22,7 @@ COPY --from=build /app/dist ./dist
 
 # Kopiere Server
 COPY server.js .
+COPY discord-bot.js .
 
 # Declare persistent data directory
 VOLUME ["/app/data"]

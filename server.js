@@ -540,6 +540,7 @@ const saveAiConfig = (cfg) => {
     braveSearchKey: String(cfg.braveSearchKey || '').trim(),
     discordBotToken: String(cfg.discordBotToken || '').trim(),
     discordBotEnabled: !!cfg.discordBotEnabled,
+    discordBotStatus: String(cfg.discordBotStatus || 'online').trim(),
   };
   persistDbState();
 };
@@ -1966,13 +1967,8 @@ app.post('/api/user/test-email', async (req, res) => {
     const user = dbState.users.find(u => (userId && String(u.id) === String(userId)) || (email && String(u.email).toLowerCase() === String(email).toLowerCase()));
     
     let targetEmail = user?.email || email;
-    if (userId === 'admin' && !targetEmail) {
-      const cfg = await loadSmtpConfig();
-      targetEmail = cfg?.fromEmail || 'admin@fra03.de';
-    }
-    
     if (!targetEmail) {
-      return res.status(400).json({ error: 'Benutzerdaten konnten nicht gefunden werden oder keine E-Mail hinterlegt.' });
+      targetEmail = 'admin@fra03.de';
     }
 
     // Testemail senden
