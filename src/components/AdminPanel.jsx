@@ -73,7 +73,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [smtpSaving, setSmtpSaving] = useState(false);
   const [smtpTesting, setSmtpTesting] = useState(false);
   const [discordTesting, setDiscordTesting] = useState(false);
-  const [discordWebhook, setDiscordWebhook] = useState('');
   const [smtpMsg, setSmtpMsg]     = useState(null);
 
   // ── AI Config state ────────────────────────────────────────────────────
@@ -186,7 +185,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   };
 
   const handleDiscordTest = async () => {
-    if (!discordWebhook.trim()) {
+    if (!smtp.discordWebhook?.trim()) {
       setSmtpMsg({ type: 'error', text: 'Bitte Discord Webhook URL eingeben.' });
       return;
     }
@@ -194,7 +193,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     setDiscordTesting(true);
     setSmtpMsg(null);
     try {
-      const res = await testDiscordWebhook(discordWebhook.trim());
+      const res = await testDiscordWebhook(smtp.discordWebhook.trim());
       setSmtpMsg({ type: 'success', text: res.message || 'Discord Testnachricht gesendet.' });
     } catch (err) {
       setSmtpMsg({ type: 'error', text: err.message });
@@ -1133,12 +1132,12 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                 Discord-Webhook testen
               </h3>
               <p className="text-xs text-slate-500">
-                Sendet eine Testnachricht an deinen Discord Webhook.
+                Sendet eine Testnachricht an deinen Discord Webhook. Die Webhook-URL wird mit den Systemeinstellungen gespeichert.
               </p>
               <div className="flex gap-2">
-                <input type="url" value={discordWebhook} onChange={(e) => setDiscordWebhook(e.target.value)}
+                <input type="url" value={smtp.discordWebhook || ''} onChange={(e) => setSmtp({ ...smtp, discordWebhook: e.target.value })}
                   placeholder="https://discord.com/api/webhooks/..." className="input-dark flex-1" />
-                <button onClick={handleDiscordTest} disabled={discordTesting || !discordWebhook.trim()}
+                <button onClick={handleDiscordTest} disabled={discordTesting || !smtp.discordWebhook?.trim()}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl
                     bg-indigo-500/20 border border-indigo-500/30 text-indigo-300
                     hover:bg-indigo-500/30 transition-all text-sm disabled:opacity-50 shrink-0">

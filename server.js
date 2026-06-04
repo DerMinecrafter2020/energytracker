@@ -473,6 +473,7 @@ const mapSmtpRowToConfig = (row) => {
     baseUrl: row.base_url || defaults.baseUrl,
     registrationEnabled: row.registration_enabled !== 0,
     demoEnabled: row.demo_enabled !== 0,
+    discordWebhook: row.discord_webhook || '',
   };
 };
 
@@ -488,9 +489,9 @@ const saveSmtpConfig = async (cfg) => {
   const dbPool = getPool();
   await dbPool.execute(
     `INSERT INTO smtp_settings
-      (id, host, port, secure, auth_user, auth_pass, from_name, from_email, base_url, registration_enabled, demo_enabled)
+      (id, host, port, secure, auth_user, auth_pass, from_name, from_email, base_url, registration_enabled, demo_enabled, discord_webhook)
      VALUES
-      (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
       host = VALUES(host),
       port = VALUES(port),
@@ -501,7 +502,8 @@ const saveSmtpConfig = async (cfg) => {
       from_email = VALUES(from_email),
       base_url = VALUES(base_url),
       registration_enabled = VALUES(registration_enabled),
-      demo_enabled = VALUES(demo_enabled)`
+      demo_enabled = VALUES(demo_enabled),
+      discord_webhook = VALUES(discord_webhook)`
     , [
       cfg.host,
       Number(cfg.port),
@@ -511,8 +513,9 @@ const saveSmtpConfig = async (cfg) => {
       cfg.fromName || 'Koffein-Tracker',
       cfg.fromEmail || cfg.auth?.user || '',
       cfg.baseUrl || '',
-      cfg.registrationEnabled !== false,
-      cfg.demoEnabled !== false,
+      !!cfg.registrationEnabled,
+      !!cfg.demoEnabled,
+      cfg.discordWebhook || ''
     ]
   );
 };
@@ -696,7 +699,6 @@ const sanitizeReminder = (reminder) => ({
   time: isValidReminderTime(reminder.time) ? reminder.time : '18:00',
   mailEnabled: reminder.mailEnabled !== false && reminder.mailEnabled !== 'false',
   discordEnabled: !!reminder.discordEnabled,
-  discordWebhook: reminder.discordWebhook || '',
   lastTriggeredDate: reminder.lastTriggeredDate || null,
 });
 
@@ -1056,12 +1058,12 @@ const sendReminderEmail = async ({ to }) => {
   });
 };
 
-const sendDiscordReminder = async ({ webhookUrl, email }) => {
+const sendDiscordReminder = async ({ webhookUrl, email, customMessage }) => {
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      content: `🔔 Erinnerung für ${email}: Bitte heute deinen Energy-/Koffein-Bedarf im Tracker eintragen.`,
+      content: customMessage || `🔔 Erinnerung für ${email}: Bitte heute deinen Energy-/Koffein-Bedarf im Tracker eintragen.`,
     }),
   });
   if (!response.ok) {
@@ -1075,6 +1077,7 @@ const processRemindersTick = async () => {
   const now = new Date();
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const today = now.toISOString().slice(0, 10);
+  const cfg = await loadSmtpConfig();
 
   for (const reminder of dbState.reminders) {
     const normalized = sanitizeReminder(reminder);
@@ -1083,11 +1086,15 @@ const processRemindersTick = async () => {
     if (normalized.lastTriggeredDate === today) continue;
 
     try {
+      // E-Mail Adresse sicher aus den aktuellen Benutzerdaten auslesen
+      const user = dbState.users.find(u => (reminder.userId && String(u.id) === String(reminder.userId)) || (reminder.email && String(u.email).toLowerCase() === String(reminder.email).toLowerCase()));
+      const targetEmail = user?.email || reminder.email;
+
       if (normalized.mailEnabled) {
-        await sendReminderEmail({ to: reminder.email });
+        await sendReminderEmail({ to: targetEmail });
       }
-      if (normalized.discordEnabled && normalized.discordWebhook) {
-        await sendDiscordReminder({ webhookUrl: normalized.discordWebhook, email: reminder.email });
+      if (normalized.discordEnabled && cfg.discordWebhook) {
+        await sendDiscordReminder({ webhookUrl: cfg.discordWebhook, email: targetEmail });
       }
 
       reminder.lastTriggeredDate = today;
@@ -1154,9 +1161,12 @@ app.post('/api/logs', async (req, res) => {
 
     // Notification Logic
     if (email) {
+      const user = dbState.users.find(u => (userId && String(u.id) === String(userId)) || (email && String(u.email).toLowerCase() === String(email).toLowerCase()));
+      const targetEmail = user?.email || email;
+
       const [todayLogs] = await dbPool.execute('SELECT * FROM caffeine_logs WHERE date = ?', [safeDate]);
       const totalCaffeine = todayLogs.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
-      const settings = getUserSettings({ userId: userId || null, email });
+      const settings = getUserSettings({ userId: userId || null, email: targetEmail });
       const limit = settings.dailyLimit || 400;
       
       const now = new Date();
@@ -1167,15 +1177,14 @@ app.post('/api/logs', async (req, res) => {
 
       const notifyPromises = [];
 
-      const tryNotify = (condition, title, message) => {
+      const tryNotify = async (condition, title, message) => {
         if (condition) {
-          // Send Email implicitly if limit warnings are checked (based on existing logic pattern, but we'll focus on Discord as requested)
-          // Actually, let's send Discord if enabled
-          if (settings.discordEnabled && settings.discordWebhook) {
+          const cfg = await loadSmtpConfig();
+          if (cfg.discordWebhook) {
             notifyPromises.push(
               sendDiscordReminder({ 
-                webhookUrl: settings.discordWebhook, 
-                email, 
+                webhookUrl: cfg.discordWebhook, 
+                email: targetEmail, 
                 customMessage: `**${title}**: ${message}` 
               }).catch(e => console.error('Discord notify error:', e))
             );
@@ -1185,15 +1194,15 @@ app.post('/api/logs', async (req, res) => {
 
       if (settings.notifyAtLimit && settings.discordNotifyAtLimit && totalCaffeine > limit) {
         const excess = totalCaffeine - limit;
-        tryNotify(true, 'Limit überschritten!', `Du hast dein Limit um ${excess}mg überschritten (${totalCaffeine}/${limit}mg)`);
+        await tryNotify(true, 'Limit überschritten!', `Du hast dein Limit um ${excess}mg überschritten (${totalCaffeine}/${limit}mg)`);
       }
 
       if (settings.notifyLate && settings.discordNotifyLate && hour >= 18) {
-        tryNotify(true, 'Spätes Koffein', `${newLog.name} um ${hour}:${String(now.getMinutes()).padStart(2, '0')} Uhr könnte deinen Schlaf beeinflussen`);
+        await tryNotify(true, 'Spätes Koffein', `${newLog.name} um ${hour}:${String(now.getMinutes()).padStart(2, '0')} Uhr könnte deinen Schlaf beeinflussen`);
       }
 
       if (settings.notifyRapid && settings.discordNotifyRapid && recentDrinks.length >= 3) {
-        tryNotify(true, 'Schnelle Folge erkannt', `${recentDrinks.length} Getränke in 2h – versuche langsamer zu trinken!`);
+        await tryNotify(true, 'Schnelle Folge erkannt', `${recentDrinks.length} Getränke in 2h – versuche langsamer zu trinken!`);
       }
 
       await Promise.all(notifyPromises);
@@ -1793,12 +1802,7 @@ app.post('/api/reminders/me', async (req, res) => {
 
     if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (!isValidReminderTime(time)) return res.status(400).json({ error: 'Uhrzeit muss im Format HH:MM sein.' });
-    if (discordEnabled && !discordWebhook) {
-      return res.status(400).json({ error: 'Discord Webhook URL fehlt.' });
-    }
-    if (discordWebhook && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/.+/i.test(discordWebhook)) {
-      return res.status(400).json({ error: 'Ungültige Discord Webhook URL.' });
-    }
+
 
     const reminder = upsertReminderForUser({
       userId: safeUserId,
@@ -1936,10 +1940,18 @@ app.post('/api/settings/me', async (req, res) => {
 // ── USER TEST ROUTES ────────────────────────────────────────────────────────
 app.post('/api/user/test-email', async (req, res) => {
   try {
-    const { email } = req.body || {};
-    if (!email) return res.status(400).json({ error: 'Email erforderlich' });
+    const { userId, email } = req.body || {};
     
-    // Testemail senden (wir nutzen sendReminderEmail mit einem custom subject/text falls möglich, oder rufen direkt sendMail auf)
+    // Die E-Mail Adresse aus den Benutzerdaten auslesen
+    const user = dbState.users.find(u => (userId && String(u.id) === String(userId)) || (email && String(u.email).toLowerCase() === String(email).toLowerCase()));
+    
+    if (!user || !user.email) {
+      return res.status(400).json({ error: 'Benutzerdaten konnten nicht gefunden werden oder keine E-Mail hinterlegt.' });
+    }
+    
+    const targetEmail = user.email;
+
+    // Testemail senden
     const cfg = await loadSmtpConfig();
     if (!cfg.host) {
       return res.status(400).json({ error: 'SMTP ist auf diesem Server noch nicht eingerichtet.' });
@@ -1954,7 +1966,7 @@ app.post('/api/user/test-email', async (req, res) => {
 
     await transporter.sendMail({
       from: `"${cfg.fromName}" <${cfg.fromEmail || cfg.auth.user}>`,
-      to: email,
+      to: targetEmail,
       subject: 'Test-Nachricht: Paulaner & Energy Tracker',
       text: 'Hallo! Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.',
       html: `
@@ -1966,7 +1978,7 @@ app.post('/api/user/test-email', async (req, res) => {
       `,
     });
 
-    res.json({ success: true, message: 'Test-E-Mail wurde erfolgreich gesendet!' });
+    res.json({ success: true, message: `Test-E-Mail wurde erfolgreich an ${targetEmail} gesendet!` });
   } catch (err) {
     console.error('Test-E-Mail Fehler:', err);
     res.status(500).json({ error: 'Fehler beim Senden der Test-E-Mail' });

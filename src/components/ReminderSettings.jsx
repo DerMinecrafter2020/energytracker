@@ -79,7 +79,7 @@ const ReminderSettings = ({ session }) => {
     setIsTestingEmail(true);
     setMessage(null);
     try {
-      await testUserEmail(session.email);
+      await testUserEmail({ userId: session.id, email: session.email });
       setMessage({ type: 'success', text: 'Test-E-Mail wurde erfolgreich gesendet!' });
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Fehler beim Senden der Test-E-Mail' });
@@ -161,21 +161,6 @@ const ReminderSettings = ({ session }) => {
               <p className="text-xs opacity-80">Reminder in deinen Discord-Channel</p>
             </button>
           </div>
-
-          {settings.discordEnabled && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Discord Webhook URL
-              </label>
-              <input
-                type="url"
-                value={settings.discordWebhook}
-                onChange={(e) => update('discordWebhook', e.target.value)}
-                placeholder="https://discord.com/api/webhooks/..."
-                className="input-dark"
-              />
-            </div>
-          )}
 
           {message && (
             <div

@@ -95,11 +95,11 @@ export const testDiscordWebhook = async (webhookUrl) => {
   return response.json();
 };
 
-export const testUserEmail = async (email) => {
+export const testUserEmail = async ({ userId, email }) => {
   const response = await fetch(`${API_BASE_URL}/api/user/test-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ userId, email }),
   });
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
