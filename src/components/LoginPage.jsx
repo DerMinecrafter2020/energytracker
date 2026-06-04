@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCircle, Clock, KeyRound, Shield } from 'lucide-react';
 import {
   isWebAuthnSupported,
@@ -27,33 +27,64 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
   const [totpCode, setTotpCode] = useState('');
   const [webauthnSupported, setWebauthnSupported] = useState(false);
   const [showRepairLogin, setShowRepairLogin] = useState(false);
+  const [view, setView] = useState('login');
+  const [resetToken, setResetToken] = useState(null);
+  const [msg, setMsg] = useState(null);
 
   useEffect(() => {
     setWebauthnSupported(isWebAuthnSupported());
   }, []);
 
-  // Load public settings (demo toggle, registration toggle)
   useEffect(() => {
-    fetchPublicSettings()
-      .then((s) => setPublicSettings(s))
-      .catch(() => {});
+    fetchPublicSettings().then((s) => setPublicSettings(s)).catch(() => {});
   }, []);
 
-
-
-  // Handle ?verified= query param (from email-verification redirect)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const rToken = params.get('resetToken');
+    if (rToken) {
+      setResetToken(rToken);
+      setView('reset');
+    }
     const v = params.get('verified');
-    if (v === '1')       setVerifiedBanner({ type: 'success', text: 'E-Mail erfolgreich bestätigt! Du kannst dich jetzt anmelden.' });
-    else if (v === 'expired') setVerifiedBanner({ type: 'warning', text: 'Der Bestätigungslink ist abgelaufen. Bitte registriere dich erneut.' });
-    else if (v === 'invalid') setVerifiedBanner({ type: 'error',   text: 'Ungültiger Bestätigungslink.' });
+    if (v === '1') setVerifiedBanner({ type: 'success', text: 'E-Mail erfolgreich best�tigt! Du kannst dich jetzt anmelden.' });
+    else if (v === 'expired') setVerifiedBanner({ type: 'warning', text: 'Der Best�tigungslink ist abgelaufen. Bitte registriere dich erneut.' });
+    else if (v === 'invalid') setVerifiedBanner({ type: 'error', text: 'Ung�ltiger Best�tigungslink.' });
     if (v) window.history.replaceState({}, '', window.location.pathname);
   }, []);
 
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    if (!email) return setError('Bitte gib deine E-Mail ein.');
+    setIsLoading(true); setError(''); setMsg(null);
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/auth/forgot-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+      });
+      if (!resp.ok) throw new Error('Fehler beim Senden.');
+      setMsg({ type: 'success', text: 'Falls ein Konto existiert, wurde eine E-Mail mit dem Reset-Link gesendet.' });
+    } catch (err) { setError(err.message); } finally { setIsLoading(false); }
+  };
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (password.length < 8) return setError('Passwort muss mindestens 8 Zeichen lang sein.');
+    setIsLoading(true); setError(''); setMsg(null);
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/auth/reset-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: resetToken, newPassword: password })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Fehler beim Zur�cksetzen.');
+      setMsg({ type: 'success', text: 'Dein Passwort wurde erfolgreich ge�ndert. Du kannst dich jetzt anmelden.' });
+      setView('login'); setPassword('');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (err) { setError(err.message); } finally { setIsLoading(false); }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password) { setError('Bitte alle Felder ausfüllen.'); return; }
+    if (!email.trim() || !password) { setError('Bitte alle Felder ausf�llen.'); return; }
     setError('');
     setIsLoading(true);
     try {
@@ -166,7 +197,68 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
           </div>
         )}
 
-        {!pending2FA ? (
+        {msg && (
+          <div className="mb-6 px-4 py-3 rounded-xl border flex gap-3 text-sm animate-fade-in bg-green-500/10 border-green-500/30 text-green-300">
+            <CheckCircle className="w-5 h-5 shrink-0" />
+            <p>{msg.text}</p>
+          </div>
+        )}
+
+        {view === 'forgot' ? (
+          <form onSubmit={handleForgot} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-Mail</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="deine@email.de" autoComplete="email" className="input-dark pl-12" />
+              </div>
+            </div>
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
+                {error}
+              </div>
+            )}
+            <button type="submit" disabled={isLoading}
+              className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-200
+                bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
+                disabled:opacity-60 disabled:cursor-not-allowed shadow-glow-blue
+                flex items-center justify-center gap-2 mt-2">
+              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort zurücksetzen'}
+            </button>
+            <div className="text-center mt-4">
+              <button type="button" onClick={() => { setView('login'); setError(''); setMsg(null); }} className="text-sm text-slate-400 hover:text-white transition-colors">
+                Zurück zur Anmeldung
+              </button>
+            </div>
+          </form>
+        ) : view === 'reset' ? (
+          <form onSubmit={handleReset} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Neues Passwort</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mind. 8 Zeichen" className="input-dark pl-12 pr-12" />
+                <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
+                {error}
+              </div>
+            )}
+            <button type="submit" disabled={isLoading}
+              className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-200
+                bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
+                disabled:opacity-60 shadow-glow-blue flex items-center justify-center gap-2 mt-2">
+              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort speichern'}
+            </button>
+          </form>
+        ) : !pending2FA ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-Mail</label>
@@ -188,6 +280,11 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
                 <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="text-right mt-1">
+                <button type="button" onClick={() => { setView('forgot'); setError(''); setMsg(null); }} tabIndex={-1} className="text-xs text-slate-400 hover:text-blue-400 transition-colors">
+                  Passwort vergessen?
                 </button>
               </div>
             </div>
@@ -320,3 +417,6 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 };
 
 export default LoginPage;
+
+
+

@@ -367,6 +367,30 @@ class FileDbAdapter {
       return [makeResult(1)];
     }
 
+    if (q.startsWith('update users set reset_token = ?')) {
+      const resetToken = params[0];
+      const resetExpiry = params[1];
+      const id = params[2];
+      const user = dbState.users.find((u) => u.id === id);
+      if (!user) return [makeResult(0)];
+      user.reset_token = resetToken;
+      user.reset_token_expiry = resetExpiry;
+      persistDbState();
+      return [makeResult(1)];
+    }
+
+    if (q.startsWith('update users set password_hash = ?')) {
+      const hash = params[0];
+      const id = params[1];
+      const user = dbState.users.find((u) => u.id === id);
+      if (!user) return [makeResult(0)];
+      user.password_hash = hash;
+      user.reset_token = null;
+      user.reset_token_expiry = null;
+      persistDbState();
+      return [makeResult(1)];
+    }
+
     if (q.startsWith('delete from users where id = ?')) {
       const id = params[0];
       const before = dbState.users.length;
@@ -1653,6 +1677,85 @@ app.get('/api/verify/:token', async (req, res) => {
   } catch (err) {
     console.error('GET /api/verify/:token error:', err);
     res.redirect('/?verified=invalid');
+  }
+});
+
+// ── Password Reset ────────────────────────────────────────────────────────────
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'E-Mail erforderlich.' });
+
+  try {
+    const lowerEmail = String(email).toLowerCase().trim();
+    const user = dbState.users.find((u) => u.email === lowerEmail);
+    if (!user) return res.json({ success: true }); // Silent return for security
+
+    const resetToken = toBase64Url(crypto.randomBytes(32));
+    const resetExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
+
+    const dbPool = getPool();
+    await dbPool.execute('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?', [
+      resetToken,
+      resetExpiry,
+      user.id
+    ]);
+    
+    // Send Email
+    const cfg = getMailConfig();
+    if (cfg.enabled) {
+      const t = createTransporter(cfg);
+      const base = (cfg.baseUrl || `http://localhost:${PORT}`).replace(/\/$/, '');
+      const link = `${base}/?resetToken=${resetToken}`;
+      
+      await t.sendMail({
+        from: `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
+        to: lowerEmail,
+        subject: 'Koffein-Tracker \u2013 Passwort zur\u00fccksetzen',
+        html: buildModernEmail({
+          icon: '\uD83D\uDD12',
+          headerText: 'Passwort zur\u00fccksetzen',
+          contentHtml: `
+            <p style="text-align: center;">Du hast eine R\u00fccksetzung deines Passworts angefordert. Klicke auf den Button, um ein neues Passwort zu vergeben:</p>
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="${link}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #60a5fa); color: white; text-decoration: none; padding: 14px 32px; border-radius: 16px; font-weight: bold; font-size: 16px;">
+                Neues Passwort vergeben
+              </a>
+            </div>
+            <p style="text-align: center; font-size: 12px; color: #94a3b8;">Dieser Link ist f\u00fcr 1 Stunde g\u00fcltig. Falls du diese \u00c4nderung nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>
+          `,
+          footerText: 'Koffein-Tracker Sicherheit',
+        }),
+      });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/auth/forgot-password error:', err);
+    res.status(500).json({ error: 'Interner Fehler.' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body || {};
+  if (!token || !newPassword) return res.status(400).json({ error: 'Token und neues Passwort erforderlich.' });
+  if (newPassword.length < 8) return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein.' });
+
+  try {
+    const user = dbState.users.find((u) => u.reset_token === token);
+    if (!user) return res.status(400).json({ error: 'Ung\u00fcltiger oder abgelaufener Token.' });
+    if (user.reset_token_expiry < Date.now()) return res.status(400).json({ error: 'Token ist abgelaufen.' });
+
+    const newHash = hashPassword(newPassword);
+    const dbPool = getPool();
+    await dbPool.execute('UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?', [
+      newHash,
+      user.id
+    ]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/auth/reset-password error:', err);
+    res.status(500).json({ error: 'Interner Fehler.' });
   }
 });
 
