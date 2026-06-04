@@ -2343,33 +2343,34 @@ app.get('/api/admin/ai', requireAdmin, (req, res) => {
     discordBotTokenSet: !!cfg.discordBotToken,
     discordBotTokenMasked: maskedDiscordBotToken,
     discordBotEnabled: !!cfg.discordBotEnabled,
+    discordBotStatus: cfg.discordBotStatus || 'online',
   });
 });
 
 app.post('/api/admin/ai', requireAdmin, (req, res) => {
-  const { apiKey, model, braveSearchKey, discordBotToken, discordBotEnabled } = req.body || {};
-  if (apiKey !== undefined && typeof apiKey !== 'string')
-    return res.status(400).json({ error: 'apiKey muss ein String sein.' });
-  if (braveSearchKey !== undefined && typeof braveSearchKey !== 'string')
-    return res.status(400).json({ error: 'braveSearchKey muss ein String sein.' });
-  if (discordBotToken !== undefined && typeof discordBotToken !== 'string')
-    return res.status(400).json({ error: 'discordBotToken muss ein String sein.' });
+  const { apiKey, model, braveSearchKey, discordBotToken, discordBotEnabled, discordBotStatus } = req.body || {};
+  const aiCfg = loadAiConfig();
   
-  const current = loadAiConfig();
-  const newDiscordBotToken = typeof discordBotToken === 'string' ? discordBotToken.trim() : current.discordBotToken;
-  const newDiscordBotEnabled = typeof discordBotEnabled === 'boolean' ? discordBotEnabled : current.discordBotEnabled;
+  const newApiKey = apiKey !== undefined ? String(apiKey).trim() : aiCfg.apiKey;
+  const newModel = model !== undefined ? String(model).trim() : aiCfg.model;
+  const newBraveSearchKey = braveSearchKey !== undefined ? String(braveSearchKey).trim() : aiCfg.braveSearchKey;
+  const newDiscordBotToken = discordBotToken !== undefined ? String(discordBotToken).trim() : aiCfg.discordBotToken;
+  const newDiscordBotEnabled = discordBotEnabled !== undefined ? Boolean(discordBotEnabled) : !!aiCfg.discordBotEnabled;
+  const newDiscordBotStatus = discordBotStatus !== undefined ? String(discordBotStatus) : (aiCfg.discordBotStatus || 'online');
 
   saveAiConfig({
-    apiKey:         typeof apiKey         === 'string' ? apiKey.trim()         : current.apiKey,
-    model:          typeof model          === 'string' && model.trim() ? model.trim() : current.model,
-    braveSearchKey: typeof braveSearchKey === 'string' ? braveSearchKey.trim() : current.braveSearchKey,
+    ...aiCfg,
+    apiKey: newApiKey,
+    model: newModel,
+    braveSearchKey: newBraveSearchKey,
     discordBotToken: newDiscordBotToken,
     discordBotEnabled: newDiscordBotEnabled,
+    discordBotStatus: newDiscordBotStatus,
   });
   
   // Inform discord bot manager to restart/stop if needed
   if (typeof updateDiscordBotLifecycle === 'function') {
-    updateDiscordBotLifecycle(newDiscordBotToken, newDiscordBotEnabled).catch(err => console.error('Bot Lifecycle Error:', err));
+    updateDiscordBotLifecycle(newDiscordBotToken, newDiscordBotEnabled, newDiscordBotStatus).catch(err => console.error('Bot Lifecycle Error:', err));
   }
 
   res.json({ success: true });
@@ -2569,7 +2570,7 @@ process.on('SIGTERM', async () => {
 // ── Experimental Discord Bot AI ──────────────────────────────────────────────
 let discordBotClient = null;
 
-const updateDiscordBotLifecycle = async (token, enabled) => {
+const updateDiscordBotLifecycle = async (token, enabled, status = 'online') => {
   try {
     if (discordBotClient) {
       discordBotClient.destroy();
@@ -2585,24 +2586,50 @@ const updateDiscordBotLifecycle = async (token, enabled) => {
           GatewayIntentBits.MessageContent,
           GatewayIntentBits.DirectMessages,
         ],
-        partials: [Partials.Channel],
+        partials: [Partials.Channel, Partials.Message],
+        presence: {
+          status: status,
+        }
       });
 
       discordBotClient.on('ready', () => {
-        console.log(`[Discord Bot] Eingeloggt als ${discordBotClient.user.tag}`);
+        console.log(`[Discord Bot] Eingeloggt als ${discordBotClient.user.tag} mit Status ${status}`);
+        discordBotClient.user.setStatus(status);
       });
 
       discordBotClient.on('messageCreate', async (message) => {
         if (message.author.bot) return;
 
         const isMentioned = message.mentions.has(discordBotClient.user.id);
-        const isDM = message.channel.type === 1 || message.channel.type === 'DM';
+        const isDM = message.channel.isDMBased ? message.channel.isDMBased() : (message.channel.type === 1 || message.channel.type === 'DM');
 
         if (isMentioned || isDM) {
           try {
             message.channel.sendTyping();
             
             const content = message.content.replace(`<@${discordBotClient.user.id}>`, '').replace(`<@!${discordBotClient.user.id}>`, '').trim();
+
+            if (content.toLowerCase().startsWith('!status ')) {
+              let newStatus = content.toLowerCase().replace('!status ', '').trim();
+              if (newStatus === 'do not disturb') newStatus = 'dnd';
+              
+              const validStatuses = ['online', 'idle', 'dnd', 'invisible'];
+              
+              if (validStatuses.includes(newStatus)) {
+                discordBotClient.user.setStatus(newStatus);
+                
+                // In der Konfiguration speichern
+                const aiCfg = loadAiConfig();
+                aiCfg.discordBotStatus = newStatus;
+                saveAiConfig(aiCfg);
+                
+                await message.reply(`Status erfolgreich auf **${newStatus}** gesetzt.`);
+                return;
+              } else {
+                await message.reply(`Ungültiger Status. Erlaubt sind: online, idle, dnd, invisible`);
+                return;
+              }
+            }
 
             const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker, der jetzt auch auf Discord agiert. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. Aktuell bist du im experimentellen Modus und hast keinen Zugriff auf die individuellen Tracker-Daten der Discord-User.`;
 
@@ -2633,8 +2660,10 @@ global.updateDiscordBotLifecycle = updateDiscordBotLifecycle;
 initDb()
   .then(() => {
     // Starte Discord Bot, falls konfiguriert
-    const aiCfg = loadAiConfig();
-    updateDiscordBotLifecycle(aiCfg.discordBotToken, aiCfg.discordBotEnabled);
+    setTimeout(() => {
+      const aiCfg = loadAiConfig();
+      updateDiscordBotLifecycle(aiCfg.discordBotToken, aiCfg.discordBotEnabled, aiCfg.discordBotStatus);
+    }, 1000);
 
     // Check every minute whether a reminder is due.
     setInterval(() => {

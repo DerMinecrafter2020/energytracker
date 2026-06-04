@@ -84,6 +84,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [discordBotToken, setDiscordBotToken] = useState('');
   const [discordBotTokenMasked, setDiscordBotTokenMasked] = useState('');
   const [discordBotEnabled, setDiscordBotEnabled] = useState(false);
+  const [discordBotStatus, setDiscordBotStatus] = useState('online');
   const [aiSaving, setAiSaving]   = useState(false);
   const [aiMsg, setAiMsg]         = useState(null);
 
@@ -118,6 +119,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           setBraveKeyMasked(cfg.braveSearchKeyMasked || ''); 
           setDiscordBotTokenMasked(cfg.discordBotTokenMasked || '');
           setDiscordBotEnabled(!!cfg.discordBotEnabled);
+          setDiscordBotStatus(cfg.discordBotStatus || 'online');
         })
         .catch(() => {});
       handleRedisCheck();
@@ -220,7 +222,8 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         model: aiModel.trim(), 
         braveSearchKey: braveSearchKey.trim() || undefined,
         discordBotToken: discordBotToken.trim() || undefined,
-        discordBotEnabled
+        discordBotEnabled,
+        discordBotStatus
       });
       setAiMsg({ type: 'success', text: 'AI-Einstellungen gespeichert.' });
       if (aiApiKey.trim()) {
@@ -1236,22 +1239,39 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     </label>
                   </div>
                   {discordBotEnabled && (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                        Bot Token
-                      </label>
-                      <input
-                        type="password"
-                        value={discordBotToken}
-                        onChange={(e) => setDiscordBotToken(e.target.value)}
-                        placeholder={discordBotTokenMasked ? 'Neuen Token eingeben zum Überschreiben…' : 'MT…'}
-                        className="input-dark"
-                      />
-                      {discordBotTokenMasked && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          Aktueller Token: <span className="font-mono text-indigo-300">{discordBotTokenMasked}</span>
-                        </p>
-                      )}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                          Bot Token
+                        </label>
+                        <input
+                          type="password"
+                          value={discordBotToken}
+                          onChange={(e) => setDiscordBotToken(e.target.value)}
+                          placeholder={discordBotTokenMasked ? 'Neuen Token eingeben zum Überschreiben…' : 'MT…'}
+                          className="input-dark"
+                        />
+                        {discordBotTokenMasked && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            Aktueller Token: <span className="font-mono text-indigo-300">{discordBotTokenMasked}</span>
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                          Bot Status
+                        </label>
+                        <select
+                          value={discordBotStatus}
+                          onChange={(e) => setDiscordBotStatus(e.target.value)}
+                          className="input-dark bg-slate-800 text-white"
+                        >
+                          <option value="online">Online 🟢</option>
+                          <option value="idle">Abwesend 🌙</option>
+                          <option value="dnd">Bitte nicht stören 🔴</option>
+                          <option value="invisible">Unsichtbar 👻</option>
+                        </select>
+                      </div>
                     </div>
                   )}
                 </div>
