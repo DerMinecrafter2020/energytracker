@@ -386,6 +386,8 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         session={session}
         onLogout={onLogout}
         onShowAdminPanel={onShowAdminPanel}
+        currentTab={currentTab}
+        onGoHome={() => setCurrentTab('home')}
       />
 
       <main className="max-w-lg mx-auto px-4 pb-28">

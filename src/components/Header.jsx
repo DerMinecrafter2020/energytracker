@@ -1,7 +1,7 @@
 import React from 'react';
-import { Zap, Loader2, LogOut, User, ShieldCheck, Settings } from 'lucide-react';
+import { Zap, Loader2, LogOut, User, ShieldCheck, Settings, ChevronLeft } from 'lucide-react';
 
-const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel }) => {
+const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel, currentTab, onGoHome }) => {
   const today = new Date().toLocaleDateString('de-DE', {
     weekday: 'long',
     year: 'numeric',
@@ -12,16 +12,29 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
   return (
     <header className="glass-card rounded-b-[2rem] sm:rounded-b-[2.5rem] border-x-0 border-t-0 border-white/5 px-4 py-4 sm:py-5 mb-8 sticky top-0 z-30 shadow-glass">
       <div className="max-w-lg mx-auto flex items-center gap-4">
-        {/* Logo */}
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0
-          bg-gradient-to-br from-blue-500 via-blue-400 to-amber-400 shadow-glow-blue animate-glow-pulse">
-          <Zap className="w-6 h-6 text-white" fill="currentColor" />
-        </div>
+        {/* Logo or Back Button */}
+        {currentTab && currentTab !== 'home' ? (
+          <button
+            onClick={onGoHome}
+            className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0
+              bg-white/5 border border-white/10 hover:bg-white/10 transition-all active:scale-95 text-slate-300 hover:text-white shadow-glass"
+            aria-label="Zurück zum Home"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        ) : (
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0
+            bg-gradient-to-br from-blue-500 via-blue-400 to-amber-400 shadow-glow-blue animate-glow-pulse">
+            <Zap className="w-6 h-6 text-white" fill="currentColor" />
+          </div>
+        )}
 
         {/* Title + date */}
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-gradient leading-tight tracking-tight">Koffein-Tracker</h1>
-          <p className="text-xs sm:text-sm text-slate-400 truncate">{today}</p>
+          <button onClick={onGoHome} className="text-left focus:outline-none transition-opacity hover:opacity-80">
+            <h1 className="text-xl sm:text-2xl font-bold text-gradient leading-tight tracking-tight">Koffein-Tracker</h1>
+            <p className="text-xs sm:text-sm text-slate-400 truncate">{today}</p>
+          </button>
         </div>
 
         {/* Spinner */}

@@ -692,9 +692,9 @@ const getReminderOwnerKey = ({ userId, email }) => {
 const isValidReminderTime = (time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(time || ''));
 
 const sanitizeReminder = (reminder) => ({
-  enabled: reminder.enabled !== false,
+  enabled: reminder.enabled !== false && reminder.enabled !== 'false',
   time: isValidReminderTime(reminder.time) ? reminder.time : '18:00',
-  mailEnabled: reminder.mailEnabled !== false,
+  mailEnabled: reminder.mailEnabled !== false && reminder.mailEnabled !== 'false',
   discordEnabled: !!reminder.discordEnabled,
   discordWebhook: reminder.discordWebhook || '',
   lastTriggeredDate: reminder.lastTriggeredDate || null,
@@ -1725,9 +1725,9 @@ app.post('/api/reminders/me', async (req, res) => {
       userId: safeUserId,
       email: safeEmail,
       settings: {
-        enabled: enabled !== false,
+        enabled: enabled !== false && enabled !== 'false',
         time,
-        mailEnabled: mailEnabled !== false,
+        mailEnabled: mailEnabled !== false && mailEnabled !== 'false',
         discordEnabled: !!discordEnabled,
         discordWebhook: discordWebhook || '',
       },
@@ -2343,6 +2343,11 @@ Bitte: 1) kurze Bewertung, 2) ob ich noch Koffein trinken sollte, 3) ein praktis
     console.error('[AI Summary] Fehler:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Reject unresolved asset requests with 404 instead of returning index.html
+app.use('/assets', (req, res) => {
+  res.status(404).send('Asset not found');
 });
 
 // SPA Fallback
