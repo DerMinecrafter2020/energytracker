@@ -7,7 +7,8 @@ import fs from 'fs';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import Redis from 'ioredis';
-import { authenticator } from 'otplib';
+import { OTP } from 'otplib';
+const authenticator = new OTP({ window: 1 });
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -77,10 +78,7 @@ const WEBAUTHN_RP_NAME = process.env.WEBAUTHN_RP_NAME || 'Koffein-Tracker';
 
 const AUTH_MODE = 'local';
 
-authenticator.options = {
-  step: 30,
-  window: [1, 1],
-};
+
 
 const pendingSecondFactor = new Map();
 const pendingWebAuthn = new Map();
@@ -1590,7 +1588,7 @@ app.post('/api/login/2fa/totp', async (req, res) => {
       return res.status(400).json({ error: 'TOTP ist für dieses Konto nicht aktiv.' });
     }
 
-    const ok = authenticator.verify({ token: String(code).replace(/\s+/g, ''), secret: user.totp_secret });
+    const ok = (await authenticator.verify({ token: String(code).replace(/\s+/g, ''), secret: user.totp_secret })).valid;
     if (!ok) return res.status(401).json({ error: 'Ungültiger 2FA-Code.' });
 
     consumeSecondFactorToken(loginToken);
@@ -1887,7 +1885,7 @@ app.post('/api/security/totp/setup', async (req, res) => {
     user.totp_temp_secret = secret;
     persistDbState();
 
-    const otpauthUrl = authenticator.keyuri(user.email, WEBAUTHN_RP_NAME, secret);
+    const otpauthUrl = authenticator.generateURI({ issuer: WEBAUTHN_RP_NAME, label: user.email, secret });
     res.json({ success: true, secret, otpauthUrl, issuer: WEBAUTHN_RP_NAME });
   } catch (err) {
     console.error('POST /api/security/totp/setup error:', err);
@@ -1907,7 +1905,7 @@ app.post('/api/security/totp/enable', async (req, res) => {
     ensureUserSecurityFields(user);
     if (!user.totp_temp_secret) return res.status(400).json({ error: 'Bitte zuerst TOTP-Setup starten.' });
 
-    const ok = authenticator.verify({ token: String(code).replace(/\s+/g, ''), secret: user.totp_temp_secret });
+    const ok = (await authenticator.verify({ token: String(code).replace(/\s+/g, ''), secret: user.totp_temp_secret })).valid;
     if (!ok) return res.status(401).json({ error: 'Ungültiger Verifizierungscode.' });
 
     user.totp_secret = user.totp_temp_secret;
@@ -2348,7 +2346,7 @@ Bitte: 1) kurze Bewertung, 2) ob ich noch Koffein trinken sollte, 3) ein praktis
 });
 
 // SPA Fallback
-app.get('*', (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
