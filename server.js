@@ -73,9 +73,20 @@ try {
 }
 
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN || ALLOWED_ORIGIN;
-const WEBAUTHN_RP_ID = process.env.WEBAUTHN_RP_ID || new URL(WEBAUTHN_ORIGIN).hostname;
 const WEBAUTHN_RP_NAME = process.env.WEBAUTHN_RP_NAME || 'Koffein-Tracker';
+
+const getWebAuthnConfig = (req) => {
+  const protocol = req?.headers?.['x-forwarded-proto'] || req?.protocol || 'http';
+  const reqOrigin = req?.headers?.origin || (req?.headers?.host ? `${protocol}://${req.headers.host}` : ALLOWED_ORIGIN);
+  const origin = process.env.WEBAUTHN_ORIGIN || reqOrigin;
+  let rpID;
+  try {
+    rpID = process.env.WEBAUTHN_RP_ID || new URL(origin).hostname;
+  } catch (e) {
+    rpID = 'localhost';
+  }
+  return { origin, rpID };
+};
 
 const AUTH_MODE = 'local';
 
@@ -1742,8 +1753,10 @@ app.post('/api/login/2fa/passkey/options', async (req, res) => {
       return res.status(400).json({ error: 'Kein Sicherheitsschlüssel hinterlegt.' });
     }
 
+    const { rpID } = getWebAuthnConfig(req);
+
     const options = await generateAuthenticationOptions({
-      rpID: WEBAUTHN_RP_ID,
+      rpID: rpID,
       userVerification: 'preferred',
       allowCredentials: user.passkeys.map((k) => ({
         id: k.id,
@@ -1789,8 +1802,8 @@ app.post('/api/login/2fa/passkey/verify', async (req, res) => {
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge: challengeState.challenge,
-      expectedOrigin: WEBAUTHN_ORIGIN,
-      expectedRPID: WEBAUTHN_RP_ID,
+      expectedOrigin: getWebAuthnConfig(req).origin,
+      expectedRPID: getWebAuthnConfig(req).rpID,
       credential: {
         id: passkey.id,
         publicKey: fromBase64Url(passkey.publicKey),
@@ -2136,8 +2149,10 @@ app.post('/api/security/passkeys/register/options', async (req, res) => {
       persistDbState();
     }
 
+    const { rpID } = getWebAuthnConfig(req);
+
     const options = await generateRegistrationOptions({
-      rpID: WEBAUTHN_RP_ID,
+      rpID: rpID,
       rpName: WEBAUTHN_RP_NAME,
       userID: fromBase64Url(user.webauthn_user_id),
       userName: user.email,
@@ -2187,8 +2202,8 @@ app.post('/api/security/passkeys/register/verify', async (req, res) => {
     const verification = await verifyRegistrationResponse({
       response,
       expectedChallenge: challengeState.challenge,
-      expectedOrigin: WEBAUTHN_ORIGIN,
-      expectedRPID: WEBAUTHN_RP_ID,
+      expectedOrigin: getWebAuthnConfig(req).origin,
+      expectedRPID: getWebAuthnConfig(req).rpID,
       requireUserVerification: false,
     });
 
