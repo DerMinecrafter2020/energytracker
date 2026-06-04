@@ -412,7 +412,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         onGoHome={() => setCurrentTab('home')}
       />
 
-      <main className="max-w-lg mx-auto px-4 pb-28">
+      <main className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-4 pb-28">
         {/* Update Banner */}
         {latestVersion && latestVersion !== currentVersion && (
           <div className="glass-card border border-blue-500/30 bg-blue-500/10

@@ -11,7 +11,7 @@ const BottomNavigation = ({ currentTab, onChangeTab }) => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-4 sm:pb-6 pt-2 pointer-events-none">
-      <div className="max-w-lg mx-auto pointer-events-auto">
+      <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto pointer-events-auto">
         <div className="glass-card rounded-[2rem] p-2 flex items-center justify-between shadow-glass backdrop-blur-2xl">
           {tabs.map((tab) => {
             const Icon = tab.icon;

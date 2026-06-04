@@ -149,7 +149,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
+        className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
         title="AI-Assistent öffnen"
       >
         <Bot className="w-7 h-7 text-white" />
@@ -160,7 +160,9 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
   return (
     <div
       ref={containerRef}
-      className={`fixed bottom-6 right-6 z-50 flex flex-col rounded-2xl shadow-2xl overflow-hidden transition-all duration-200 ${minimized ? 'cursor-auto' : 'cursor-auto'}`}
+      className={`fixed z-50 flex flex-col rounded-2xl shadow-2xl overflow-hidden transition-all duration-200 ${minimized ? 'cursor-auto' : 'cursor-auto'} 
+        bottom-24 left-4 right-4 md:bottom-6 md:left-auto md:right-6 
+        max-md:!w-auto ${minimized ? 'max-md:!h-[56px]' : 'max-md:!h-[60vh]'}`}
       style={{
         width: minimized ? 288 : `${width}px`,
         height: minimized ? 56 : `${height}px`,

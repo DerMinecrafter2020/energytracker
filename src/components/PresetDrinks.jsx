@@ -21,7 +21,7 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
       </h3>
 
       {Array.isArray(favorites) && favorites.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {favorites.map((drink) => (
             <div
               key={drink.id}

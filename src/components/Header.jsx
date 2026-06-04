@@ -11,7 +11,7 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
 
   return (
     <header className="glass-card rounded-b-[2rem] sm:rounded-b-[2.5rem] border-x-0 border-t-0 border-white/5 px-4 py-4 sm:py-5 mb-8 sticky top-0 z-30 shadow-glass">
-      <div className="max-w-lg mx-auto flex items-center gap-4">
+      <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto flex items-center gap-4">
         {/* Logo or Back Button */}
         {currentTab && currentTab !== 'home' ? (
           <button
