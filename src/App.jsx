@@ -178,7 +178,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     try {
       const today = getTodayKey();
       const [todayLogs, favData, statsData] = await Promise.all([
-        fetchTodayLogs(today),
+        fetchTodayLogs(today, { userId: session?.id, email: session?.email }),
         session?.email ? fetchFavorites({ userId: session?.id, email: session?.email }) : Promise.resolve({ items: [] }),
         session?.email ? fetchTodayStats({ userId: session?.id || null, email: session?.email }) : Promise.resolve(null),
       ]);

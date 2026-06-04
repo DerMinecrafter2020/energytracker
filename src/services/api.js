@@ -1,8 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
-export const fetchLogs = async (date) => {
+export const fetchLogs = async (date, { userId, email } = {}) => {
   const url = new URL('/api/logs', API_BASE_URL);
   url.searchParams.set('date', date);
+  if (userId) url.searchParams.set('userId', userId);
+  if (email) url.searchParams.set('email', email);
 
   const response = await fetch(url.toString());
   if (!response.ok) {

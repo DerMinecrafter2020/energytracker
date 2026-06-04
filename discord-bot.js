@@ -16,7 +16,22 @@ if (fs.existsSync(path.join(__dirname, '.env.local'))) {
   dotenv.config();
 }
 
-const REDIS_URL = process.env.REDIS_URL || process.env.KV_URL || 'redis://127.0.0.1:6379';
+const isDockerRuntime = fs.existsSync('/.dockerenv');
+const cleanEnvValue = (value) => String(value || '').trim().replace(/^['"]|['"]$/g, '');
+
+const resolveRedisUrl = () => {
+  const envRedisUrl = cleanEnvValue(process.env.REDIS_URL || process.env.KV_URL);
+  if (envRedisUrl) return envRedisUrl;
+
+  const envRedisHost = cleanEnvValue(process.env.REDIS_HOST);
+  const envRedisPort = cleanEnvValue(process.env.REDIS_PORT) || '6379';
+
+  if (envRedisHost) return `redis://${envRedisHost}:${envRedisPort}`;
+  if (isDockerRuntime) return 'redis://redis:6379';
+  return 'redis://127.0.0.1:6379';
+};
+
+const REDIS_URL = resolveRedisUrl();
 const redis = new Redis(REDIS_URL, {
   retryStrategy(times) {
     return Math.min(times * 50, 2000);

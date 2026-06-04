@@ -306,6 +306,8 @@ class FileDbAdapter {
         icon: params[4] ?? null,
         isPreset: !!params[5],
         date: params[6],
+        userId: params[7] ?? null,
+        email: params[8] ?? null,
         createdAt: new Date().toISOString(),
       };
       dbState.caffeine_logs.push(row);
@@ -975,9 +977,11 @@ const getWeeklyStats = ({ userId, email }) => {
   }
 
   const stats = week.map((dateStr) => {
-    const logsForDay = dbState.caffeine_logs.filter(
-      (log) => (log.userId === userId || log.email === email) && log.date === dateStr
-    );
+    const logsForDay = dbState.caffeine_logs.filter((log) => {
+      const matchId = userId && String(log.userId) === String(userId);
+      const matchEmail = email && String(log.email).toLowerCase() === String(email).toLowerCase();
+      return (matchId || matchEmail) && log.date === dateStr;
+    });
     const totalCaffeine = logsForDay.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
     const count = logsForDay.length;
     return { date: dateStr, totalCaffeine, count, logs: logsForDay };
@@ -1004,9 +1008,11 @@ const getDailyStats = (date) => {
 
 const getTodayStats = ({ userId, email }) => {
   const today = new Date().toISOString().split('T')[0];
-  const logsForToday = dbState.caffeine_logs.filter(
-    (log) => (log.userId === userId || log.email === email) && log.date === today
-  );
+  const logsForToday = dbState.caffeine_logs.filter((log) => {
+    const matchId = userId && String(log.userId) === String(userId);
+    const matchEmail = email && String(log.email).toLowerCase() === String(email).toLowerCase();
+    return (matchId || matchEmail) && log.date === today;
+  });
   const totalCaffeine = logsForToday.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
   const settings = getUserSettings({ userId, email });
   const limit = settings.dailyLimit || 400;
@@ -1134,6 +1140,9 @@ app.get('/api/version', async (req, res) => {
 app.get('/api/logs', async (req, res) => {
   try {
     const date = req.query.date;
+    const userId = req.query.userId || null;
+    const email = req.query.email || null;
+
     if (!date) {
       return res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
     }
@@ -1143,7 +1152,16 @@ app.get('/api/logs', async (req, res) => {
       'SELECT * FROM caffeine_logs WHERE date = ? ORDER BY createdAt DESC',
       [date]
     );
-    res.json(rows);
+
+    let filteredRows = rows;
+    if (userId || email) {
+      filteredRows = rows.filter(r => 
+        (userId && String(r.userId) === String(userId)) || 
+        (email && String(r.email).toLowerCase() === String(email).toLowerCase())
+      );
+    }
+
+    res.json(filteredRows);
   } catch (err) {
     console.error('GET /api/logs error:', err);
     res.status(500).json({ error: 'Database error' });
@@ -1161,9 +1179,9 @@ app.post('/api/logs', async (req, res) => {
 
     const dbPool = getPool();
     const [result] = await dbPool.execute(
-      `INSERT INTO caffeine_logs (name, size, caffeine, caffeinePerMl, icon, isPreset, date)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-      , [name, size, caffeine, caffeinePerMl ?? null, icon ?? null, !!isPreset, safeDate]
+      `INSERT INTO caffeine_logs (name, size, caffeine, caffeinePerMl, icon, isPreset, date, userId, email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      , [name, size, caffeine, caffeinePerMl ?? null, icon ?? null, !!isPreset, safeDate, userId || null, email || null]
     );
 
     const insertedId = result.insertId;
@@ -1179,7 +1197,11 @@ app.post('/api/logs', async (req, res) => {
       const user = dbState.users.find(u => (userId && String(u.id) === String(userId)) || (email && String(u.email).toLowerCase() === String(email).toLowerCase()));
       const targetEmail = user?.email || email;
 
-      const [todayLogs] = await dbPool.execute('SELECT * FROM caffeine_logs WHERE date = ?', [safeDate]);
+      const [allTodayLogs] = await dbPool.execute('SELECT * FROM caffeine_logs WHERE date = ?', [safeDate]);
+      const todayLogs = allTodayLogs.filter(r => 
+        (userId && String(r.userId) === String(userId)) || 
+        (targetEmail && String(r.email).toLowerCase() === String(targetEmail).toLowerCase())
+      );
       const totalCaffeine = todayLogs.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
       const settings = getUserSettings({ userId: userId || null, email: targetEmail });
       const limit = settings.dailyLimit || 400;
