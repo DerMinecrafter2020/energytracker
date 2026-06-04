@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Zap, Mail, Lock, Eye, EyeOff, User, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
@@ -58,18 +58,21 @@ const RegisterPage = ({ onBack }) => {
       <div className="orb w-72 h-72 bg-blue-600/20   bottom-[-6rem] left-[-4rem] animate-float-delayed" />
       <div className="orb w-56 h-56 bg-purple-600/10 top-1/3 left-1/2 -translate-x-1/2 animate-float-slow" />
 
-      <div className="relative z-10 w-full max-w-md animate-fade-in">
-        <div className="glass-card rounded-3xl p-8">
-
-          {/* Header */}
-          <div className="flex flex-col items-center mb-7">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4
-              bg-gradient-to-br from-green-500 to-blue-500 shadow-glow-green">
-              <Zap className="w-9 h-9 text-white" fill="white" />
+      <div className="relative z-10 w-full max-w-4xl animate-fade-in">
+        <div className="glass-card rounded-[2.5rem] relative overflow-hidden shadow-glass flex flex-col md:flex-row"><div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center items-center text-center bg-white/5 border-b md:border-b-0 md:border-r border-white/10">
+            <div className="w-20 h-20 rounded-3xl mx-auto bg-gradient-to-br from-green-500 via-teal-400 to-blue-500 flex items-center justify-center mb-6 shadow-glow-green animate-glow-pulse">
+              <Zap className="w-10 h-10 text-white" fill="currentColor" />
             </div>
-            <h1 className="text-2xl font-bold text-gradient-green">Registrieren</h1>
-            <p className="text-slate-400 text-sm mt-1">Erstelle dein Koffein-Tracker-Konto</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">Koffein-Tracker</h1>
+            <p className="text-slate-400 mt-4 max-w-xs leading-relaxed">
+              Werde Teil der Community. Tracke deine Energie und starte durch.
+            </p>
           </div>
+          <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
+            <div className="mb-8 text-center md:text-left">
+              <h2 className="text-2xl font-bold text-gradient-green">Registrieren</h2>
+              <p className="text-slate-400 text-sm mt-1">Erstelle dein Koffein-Tracker-Konto</p>
+            </div>
 
           {/* Success state */}
           {result?.type === 'success' ? (
@@ -183,9 +186,12 @@ const RegisterPage = ({ onBack }) => {
             </div>
           )}
         </div>
+        </div>
       </div>
     </div>
   );
 };
 
 export default RegisterPage;
+
+

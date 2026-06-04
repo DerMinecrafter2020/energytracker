@@ -2613,7 +2613,7 @@ app.get('/api/ai/search-drink', async (req, res) => {
     const query = req.query.q;
     if (!query) return res.json([]);
 
-    const aiCfg = getAiConfig();
+    const aiCfg = loadAiConfig();
     let webContext = '';
 
     if (aiCfg.braveSearchKey) {
@@ -2774,6 +2774,7 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
+
 
 
 
