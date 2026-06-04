@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Plus, Search, Loader2 } from 'lucide-react';
-import { searchProducts } from '../services/openFoodFacts';
+
 
 const OnlineSearch = ({ onSelect }) => {
   const [query, setQuery]       = useState('');
@@ -14,11 +14,13 @@ const OnlineSearch = ({ onSelect }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await searchProducts(query);
+      const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/ai/search-drink?q=${encodeURIComponent(query)}`);
+      if (!resp.ok) throw new Error('Fehler');
+      const data = await resp.json();
       setResults(data);
       if (data.length === 0) setError('Keine Treffer gefunden.');
     } catch (err) {
-      setError('Fehler bei der Online-Suche.');
+      setError('Fehler bei der KI-Suche.');
     } finally {
       setIsLoading(false);
     }
@@ -28,8 +30,8 @@ const OnlineSearch = ({ onSelect }) => {
     <div className="glass-card rounded-3xl p-6 mb-6 animate-fade-in">
       <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
         <Search className="w-5 h-5 text-blue-400" />
-        Online-Suche
-        <span className="text-xs font-normal text-slate-600">Open Food Facts</span>
+        KI Getränke-Suche
+        <span className="text-xs font-normal text-slate-600">Powered by Brave & AI</span>
       </h3>
 
       <form onSubmit={handleSearch} className="flex gap-2 mb-4">
@@ -104,3 +106,6 @@ const OnlineSearch = ({ onSelect }) => {
 };
 
 export default OnlineSearch;
+
+
+

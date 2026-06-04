@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 
 import dotenv from 'dotenv';
@@ -2608,6 +2608,73 @@ Wichtig: caffeinePer100ml und sizeMl müssen Ganzzahlen sein. Bei widersprüchli
 });
 
 // ── AI Daily Summary ─────────────────────────────────────────────────────────
+// ── AI Drink Search (Brave API) ─────────────────────────────────────────────
+app.get('/api/ai/search-drink', async (req, res) => {
+  try {
+    const query = req.query.q;
+    if (!query) return res.json([]);
+
+    const aiCfg = getAiConfig();
+    let webContext = '';
+
+    if (aiCfg.braveSearchKey) {
+      const url = new URL(BRAVE_SEARCH_URL);
+      url.searchParams.set('q', query + ' Koffeingehalt mg 100ml');
+      url.searchParams.set('count', '5');
+      url.searchParams.set('search_lang', 'de');
+
+      const resp = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip',
+          'X-Subscription-Token': aiCfg.braveSearchKey,
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const results = Array.isArray(data?.web?.results) ? data.web.results : [];
+        webContext = results.map(r => r.title + ': ' + r.description).join('\n');
+      }
+    }
+
+    const messages = [
+      {
+        role: 'system',
+        content: `Du bist eine Suchmaschine für Getränke und ihren Koffeingehalt. 
+Suche nach dem Getränk: "${query}".
+${webContext ? `Nutze diese aktuellen Suchergebnisse zur Verifizierung:\n${webContext}` : 'Es konnten keine Live-Suchdaten abgerufen werden, nutze dein Wissen.'}
+Antworte AUSSCHLIESSLICH mit einem JSON-Array von bis zu 3 gefundenen Getränken. 
+Formatiere JEDES Objekt im Array exakt so:
+{"name":"Getränkename", "brand":"Markenname", "caffeinePer100ml":Zahl, "sizeMl":Zahl}
+Wichtig: caffeinePer100ml und sizeMl müssen Ganzzahlen sein. Wenn keine Größe bekannt ist, nimm 330 oder 500.
+Kein Markdown, nur das pure JSON-Array!`
+      },
+      { role: 'user', content: query }
+    ];
+
+    const resultText = await callOpenRouter(messages);
+    const cleaned = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    const results = Array.isArray(parsed) ? parsed : [parsed];
+    const mapped = results.map((item, i) => ({
+      id: 'ai-' + Date.now() + '-' + i,
+      name: item.name || query,
+      brand: item.brand || 'Unbekannt',
+      caffeinePer100ml: Number(item.caffeinePer100ml) || 0,
+      sizeMl: Number(item.sizeMl) || 330,
+      isCaffeineEstimated: false,
+    }));
+
+    res.json(mapped);
+  } catch (err) {
+    console.error('AI Drink Search Error:', err);
+    res.status(500).json({ error: 'Fehler bei der Suche' });
+  }
+});
+
 app.post('/api/ai/daily-summary', async (req, res) => {
   try {
     const { logs, totalCaffeine, dailyLimit } = req.body || {};
@@ -2708,3 +2775,5 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
+
+
