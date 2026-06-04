@@ -11,7 +11,7 @@ import AIDrinkRecognizer from './components/AIDrinkRecognizer';
 import AIDailySummary from './components/AIDailySummary';
 import LoginPage from './components/LoginPage';
 import BottomNavigation from './components/BottomNavigation';
-
+import { Zap, Loader2 } from 'lucide-react';
 import AdminPanel from './components/AdminPanel';
 import RegisterPage from './components/RegisterPage';
 import SettingsPanel from './components/SettingsPanel';
@@ -152,6 +152,7 @@ function App() {
 
 // ── Tracker (extracted so hooks are always called in the same order) ────────
 function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPersistScrollY }) {
+  const [isAppLoading, setIsAppLoading] = useState(true);
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [logs, setLogs]           = useState([]);
   const [error, setError]         = useState(null);
@@ -172,54 +173,59 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     return `${name}|${size}|${caffeine}|${icon}`;
   }, []);
 
-  // Logs für heute laden
-  useEffect(() => {
-    const loadToday = async () => {
-      try {
-        const today = getTodayKey();
-        const todayLogs = await fetchTodayLogs(today);
-        setLogs(todayLogs);
-      } catch (err) {
-        setError('Fehler beim Laden der Daten.');
-        console.error(err);
-      }
-    };
-    loadToday();
-  }, []);
+  // Unified data fetch function
+  const fetchAllData = useCallback(async () => {
+    try {
+      const today = getTodayKey();
+      const [todayLogs, favData, statsData] = await Promise.all([
+        fetchTodayLogs(today),
+        session?.email ? fetchFavorites({ userId: session?.id, email: session?.email }) : Promise.resolve({ items: [] }),
+        session?.email ? fetchTodayStats({ userId: session?.id || null, email: session?.email }) : Promise.resolve(null),
+      ]);
+      setLogs(todayLogs);
+      if (favData?.items) setFavorites(favData.items);
+      if (statsData) setTodayStats(statsData);
+    } catch (err) {
+      console.error('Fehler beim Laden der Daten:', err);
+      setError('Fehler beim Laden der Daten.');
+    }
+  }, [session?.id, session?.email, getTodayKey]);
 
+  // Initial load and visibility events
   useEffect(() => {
-    const loadFavorites = async () => {
-      try {
-        const payload = { userId: session?.id, email: session?.email };
-        const data = await fetchFavorites(payload);
-        setFavorites(Array.isArray(data?.items) ? data.items : []);
-      } catch (err) {
-        console.error('Fehler beim Laden der Favoriten:', err);
-      }
-    };
-    loadFavorites();
-  }, [session?.id, session?.email]);
-
-  // Load today stats for warnings
-  useEffect(() => {
-    if (!session?.email) return;
+    let isMounted = true;
     
-    const loadStats = async () => {
-      try {
-        const stats = await fetchTodayStats({
-          userId: session?.id || null,
-          email: session?.email,
-        });
-        setTodayStats(stats);
-      } catch (err) {
-        console.error('Fehler beim Laden der Statistiken:', err);
-      }
+    const initialize = async () => {
+      await fetchAllData();
+      if (isMounted) setIsAppLoading(false);
     };
 
-    loadStats();
-    const interval = setInterval(loadStats, 60000); // Refresh every minute
-    return () => clearInterval(interval);
-  }, [session?.id, session?.email]);
+    initialize();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchAllData();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    // Refresh stats every minute
+    const interval = setInterval(() => {
+      if (session?.email) {
+        fetchTodayStats({ userId: session?.id || null, email: session?.email })
+          .then(stats => setTodayStats(stats))
+          .catch(console.error);
+      }
+    }, 60000);
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [fetchAllData, session?.id, session?.email]);
+
 
   useEffect(() => {
     if (typeof initialScrollY === 'number' && initialScrollY > 0) {
@@ -374,6 +380,22 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     }
   }, [session?.email, session?.id]);
 
+  if (isAppLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#02040A] text-white">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-400 to-amber-400 shadow-glow-blue animate-glow-pulse mb-6 relative">
+          <div className="absolute inset-0 bg-white/20 rounded-2xl animate-ping"></div>
+          <Zap className="w-8 h-8 text-white relative z-10" fill="currentColor" />
+        </div>
+        <h1 className="text-2xl font-bold text-gradient mb-3 tracking-tight">Koffein-Tracker</h1>
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+          <span>Datenbank wird geladen...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden bg-transparent">
       {/* Animated Background Orbs */}
@@ -507,7 +529,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         <p className="text-xs mt-1">Empfohlenes Tageslimit: 400 mg</p>
       </footer>
 
-      <AIAssistant totalCaffeineToday={totalCaffeineToday} />
+      <AIAssistant totalCaffeineToday={totalCaffeineToday} onAddDrink={handleAddDrink} />
       <BottomNavigation currentTab={currentTab} onChangeTab={setCurrentTab} />
     </div>
   );

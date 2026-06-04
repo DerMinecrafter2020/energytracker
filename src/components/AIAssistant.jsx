@@ -13,7 +13,7 @@ const parseMarkdown = (text) => {
     .replace(/_(.*?)_/g, '<em>$1</em>');
 };
 
-const AIAssistant = ({ totalCaffeineToday = 0 }) => {
+const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
   const [open, setOpen]       = useState(false);
   const [minimized, setMin]   = useState(false);
   const [messages, setMessages] = useState([
@@ -78,12 +78,39 @@ const AIAssistant = ({ totalCaffeineToday = 0 }) => {
     try {
       // Only send user/assistant messages (not system) to API
       const history = [...messages.slice(1), userMsg].map(({ role, content }) => ({ role, content }));
-      const reply = await sendAiChat({
+      let reply = await sendAiChat({
         messages: history,
         totalCaffeineToday,
         dailyLimit: DAILY_LIMIT,
       });
+
+      let drinkToAdd = null;
+      const jsonMatch = reply.match(/```json\s*([\s\S]*?)\s*```/);
+      
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          if (parsed.action === 'ADD_DRINK') {
+            drinkToAdd = parsed;
+          }
+        } catch (e) {
+          console.error('Fehler beim Parsen der AI JSON-Antwort', e);
+        }
+        // Remove the JSON block from the displayed reply
+        reply = reply.replace(/```json\s*([\s\S]*?)\s*```/, '').trim();
+      }
+
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+
+      if (drinkToAdd && onAddDrink) {
+        // Automatically add the drink
+        await onAddDrink({
+          name: drinkToAdd.name || 'AI Drink',
+          size: Number(drinkToAdd.size) || 0,
+          caffeine: Number(drinkToAdd.caffeine) || 0,
+          icon: '🤖'
+        });
+      }
     } catch (err) {
       setError(err.message);
     } finally {

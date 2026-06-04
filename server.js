@@ -1017,12 +1017,35 @@ const sendReminderEmail = async ({ to }) => {
     throw new Error('SMTP ist nicht vollständig konfiguriert.');
   }
 
+  const appUrl = process.env.WEBAUTHN_ORIGIN || 'http://localhost:8080';
+  const htmlContent = `
+    <div style="font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #02040A; color: #f1f5f9; padding: 40px 20px; text-align: center;">
+      <div style="max-width: 500px; margin: 0 auto; background-color: #0d1117; border: 1px solid #1f2937; border-radius: 24px; padding: 40px 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #3b82f6, #60a5fa, #fbbf24); margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(96,165,250,0.4);">
+          <span style="font-size: 28px; line-height: 56px; color: white;">⚡</span>
+        </div>
+        <h1 style="margin: 0 0 15px 0; font-size: 24px; font-weight: 800; color: #60a5fa;">Koffein-Tracker</h1>
+        <p style="font-size: 16px; color: #94a3b8; line-height: 1.6; margin-bottom: 35px;">
+          Hey! Kurze Erinnerung: Hast du heute schon deinen Energy-Drink oder Kaffee getrackt?<br/><br/>
+          Behalte deinen Koffeinpegel im Blick und bleib im gesunden Limit.
+        </p>
+        <a href="${appUrl}" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #c084fc); color: white; text-decoration: none; padding: 14px 32px; border-radius: 16px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 14px rgba(139,92,246,0.4);">
+          Jetzt eintragen
+        </a>
+      </div>
+      <p style="font-size: 12px; color: #475569; margin-top: 30px;">
+        Koffein-Tracker &copy; ${new Date().getFullYear()}<br/>
+        Du erhältst diese E-Mail aufgrund deiner Profil-Einstellungen.
+      </p>
+    </div>
+  `;
+
   const transporter = createTransporter(cfg);
   await transporter.sendMail({
-    from: `"${cfg.fromName}" <${cfg.fromEmail || cfg.auth.user}>`,
+    from: \`"\${cfg.fromName}" <\${cfg.fromEmail || cfg.auth.user}>\`,
     to,
-    subject: 'Koffein-Tracker Erinnerung',
-    html: '<p>Vergiss nicht, deinen Energy-/Koffein-Bedarf heute im Tracker zu erfassen.</p>',
+    subject: '⚡ Dein täglicher Reminder - Koffein-Tracker',
+    html: htmlContent,
   });
 };
 
@@ -1210,7 +1233,7 @@ app.post('/api/admin/discord/test', requireAdmin, async (req, res) => {
   if (!safeWebhook) {
     return res.status(400).json({ error: 'Discord Webhook URL fehlt.' });
   }
-  if (!/^https:\/\/discord\.com\/api\/webhooks\/.+/i.test(safeWebhook)) {
+  if (!/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/.+/i.test(safeWebhook)) {
     return res.status(400).json({ error: 'Ungültige Discord Webhook URL.' });
   }
 
@@ -1717,7 +1740,7 @@ app.post('/api/reminders/me', async (req, res) => {
     if (discordEnabled && !discordWebhook) {
       return res.status(400).json({ error: 'Discord Webhook URL fehlt.' });
     }
-    if (discordWebhook && !/^https:\/\/discord\.com\/api\/webhooks\/.+/i.test(discordWebhook)) {
+    if (discordWebhook && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/.+/i.test(discordWebhook)) {
       return res.status(400).json({ error: 'Ungültige Discord Webhook URL.' });
     }
 
@@ -2217,7 +2240,17 @@ app.post('/api/ai/chat', async (req, res) => {
       ? `Aktuelle Koffein-Einnahme heute: ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
       : '';
 
-    const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${caffeineInfo}`.trim();
+    const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${caffeineInfo}
+Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen (z.B. 'Füge einen halben Liter Red Bull hinzu'), antworte ganz normal auf seine Anfrage und hänge GANZ AM ENDE deiner Antwort einen exakten JSON-Block in folgendem Format an:
+\`\`\`json
+{
+  "action": "ADD_DRINK",
+  "name": "Name des Getränks",
+  "size": 500,
+  "caffeine": 160
+}
+\`\`\`
+Berechne das gesamte Koffein ('caffeine') basierend auf der ml-Menge ('size') und dem typischen Koffeingehalt des Getränks (z.B. Red Bull hat 32mg/100ml, also 160mg für 500ml). Lass das JSON-Feld weg, wenn kein Getränk hinzugefügt werden soll.`.trim();
 
     const fullMessages = [
       { role: 'system', content: systemPrompt },
