@@ -10,7 +10,7 @@ import AIAssistant from './components/AIAssistant';
 import AIDrinkRecognizer from './components/AIDrinkRecognizer';
 import AIDailySummary from './components/AIDailySummary';
 import LoginPage from './components/LoginPage';
-import AuthentikSetupPage from './components/AuthentikSetupPage';
+
 import AdminPanel from './components/AdminPanel';
 import RegisterPage from './components/RegisterPage';
 import SettingsPanel from './components/SettingsPanel';
@@ -95,20 +95,7 @@ function App() {
     if (session?.role !== 'admin') setAdminView('admin');
   }, [session]);
 
-  if (!session && publicSettings?.authMode === 'authentik' && publicSettings?.setupRequired) {
-    return (
-      <AuthentikSetupPage
-        onConfigured={async () => {
-          try {
-            const settings = await fetchPublicSettings();
-            setPublicSettings(settings || { authMode: 'local', setupRequired: false });
-          } catch {
-            // Ignore refresh errors, login page will show connection errors if needed.
-          }
-        }}
-      />
-    );
-  }
+
 
   // ── If not logged in, show Login / Register ───────────────────────────
   if (!session && authView === 'register') {

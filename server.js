@@ -75,59 +75,7 @@ const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN || ALLOWED_ORIGIN;
 const WEBAUTHN_RP_ID = process.env.WEBAUTHN_RP_ID || new URL(WEBAUTHN_ORIGIN).hostname;
 const WEBAUTHN_RP_NAME = process.env.WEBAUTHN_RP_NAME || 'Koffein-Tracker';
 
-const AUTH_MODE = String(process.env.AUTH_MODE || 'authentik').toLowerCase();
-const AUTHENTIK_ENV_DEFAULTS = {
-  baseUrl: String(process.env.AUTHENTIK_BASE_URL || '').replace(/\/$/, ''),
-  clientId: String(process.env.AUTHENTIK_CLIENT_ID || '').trim(),
-  clientSecret: String(process.env.AUTHENTIK_CLIENT_SECRET || '').trim(),
-  redirectUri: String(process.env.AUTHENTIK_REDIRECT_URI || `${ALLOWED_ORIGIN}/api/auth/authentik/callback`).trim(),
-  scopes: String(process.env.AUTHENTIK_SCOPES || 'openid profile email').trim(),
-  authorizeUrl: String(process.env.AUTHENTIK_AUTHORIZE_URL || '').trim(),
-  tokenUrl: String(process.env.AUTHENTIK_TOKEN_URL || '').trim(),
-  userInfoUrl: String(process.env.AUTHENTIK_USERINFO_URL || '').trim(),
-  adminEmails: String(process.env.AUTHENTIK_ADMIN_EMAILS || '')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean),
-};
-
-const normalizeAuthConfig = (cfg = {}) => {
-  const baseUrl = String(cfg.baseUrl || AUTHENTIK_ENV_DEFAULTS.baseUrl || '').replace(/\/$/, '');
-  const redirectUri = String(cfg.redirectUri || AUTHENTIK_ENV_DEFAULTS.redirectUri || `${ALLOWED_ORIGIN}/api/auth/authentik/callback`).trim();
-  const scopes = String(cfg.scopes || AUTHENTIK_ENV_DEFAULTS.scopes || 'openid profile email').trim();
-  const authorizeUrl = String(cfg.authorizeUrl || AUTHENTIK_ENV_DEFAULTS.authorizeUrl || `${baseUrl}/application/o/authorize/`).trim();
-  const tokenUrl = String(cfg.tokenUrl || AUTHENTIK_ENV_DEFAULTS.tokenUrl || `${baseUrl}/application/o/token/`).trim();
-  const userInfoUrl = String(cfg.userInfoUrl || AUTHENTIK_ENV_DEFAULTS.userInfoUrl || `${baseUrl}/application/o/userinfo/`).trim();
-  const adminEmailsRaw = Array.isArray(cfg.adminEmails)
-    ? cfg.adminEmails
-    : String(cfg.adminEmails || AUTHENTIK_ENV_DEFAULTS.adminEmails.join(',')).split(',');
-
-  return {
-    baseUrl,
-    clientId: String(cfg.clientId || AUTHENTIK_ENV_DEFAULTS.clientId || '').trim(),
-    clientSecret: String(cfg.clientSecret || AUTHENTIK_ENV_DEFAULTS.clientSecret || '').trim(),
-    redirectUri,
-    scopes,
-    authorizeUrl,
-    tokenUrl,
-    userInfoUrl,
-    adminEmails: adminEmailsRaw
-      .map((s) => String(s || '').trim().toLowerCase())
-      .filter(Boolean),
-  };
-};
-
-const getAuthConfig = () => normalizeAuthConfig(dbState.auth_config || {});
-
-const isAuthentikConfigured = (cfg = getAuthConfig()) => {
-  return !!(cfg.baseUrl && cfg.clientId && cfg.clientSecret);
-};
-
-const saveAuthConfig = (cfg = {}) => {
-  dbState.auth_config = normalizeAuthConfig(cfg);
-  persistDbState();
-  return dbState.auth_config;
-};
+const AUTH_MODE = 'local';
 
 authenticator.options = {
   step: 30,
@@ -1003,63 +951,6 @@ const completeLoginForUser = async (user) => {
   return { id: user.id, name: user.name, email: user.email, role: user.role };
 };
 
-const upsertUserFromAuthentik = async ({ email, name, sub }) => {
-  const safeEmail = String(email || '').toLowerCase().trim();
-  const safeName = String(name || '').trim() || safeEmail || 'Authentik Nutzer';
-  if (!safeEmail) throw new Error('Authentik liefert keine E-Mail-Adresse.');
-
-  let user = getUserByIdentity({ email: safeEmail });
-  if (!user) {
-    const authCfg = getAuthConfig();
-    const hasAdmin = dbState.users.some((u) => String(u.role || '').toLowerCase() === 'admin');
-    const role = (!hasAdmin || authCfg.adminEmails.includes(safeEmail)) ? 'admin' : 'user';
-    user = {
-      id: crypto.randomUUID(),
-      name: safeName,
-      email: safeEmail,
-      password_hash: hashPassword(crypto.randomBytes(24).toString('hex')),
-      role,
-      verified: true,
-      verify_token: null,
-      verify_token_expiry: null,
-      authentik_sub: String(sub || '').trim() || null,
-      totp_enabled: false,
-      totp_secret: null,
-      totp_temp_secret: null,
-      webauthn_user_id: toBase64Url(crypto.randomBytes(32)),
-      passkeys: [],
-      created_at: new Date().toISOString(),
-      last_login: null,
-    };
-    dbState.users.push(user);
-  } else {
-    user.verified = true;
-    if (safeName && safeName !== user.name) user.name = safeName;
-    const incomingSub = String(sub || '').trim();
-    if (incomingSub) user.authentik_sub = incomingSub;
-  }
-
-  persistDbState();
-  return user;
-};
-
-const createOidcSessionToken = (user) => {
-  const token = crypto.randomBytes(24).toString('hex');
-  pendingOidcSessions.set(token, {
-    user,
-    expiresAt: Date.now() + AUTH_CHALLENGE_TTL_MS,
-  });
-  return token;
-};
-
-const consumeOidcSessionToken = (token) => {
-  cleanupAuthChallenges();
-  const key = String(token || '').trim();
-  const payload = pendingOidcSessions.get(key);
-  if (!payload) return null;
-  pendingOidcSessions.delete(key);
-  return payload;
-};
 
 // ── STATISTICS HELPERS ───────────────────────────────────────────────────────
 const getWeeklyStats = ({ userId, email }) => {
@@ -1520,14 +1411,12 @@ app.post('/api/admin/users/:id/impersonate', requireAdmin, (req, res) => {
 app.get('/api/settings/public', async (req, res) => {
   try {
     const cfg = await loadSmtpConfig();
-    const authCfg = getAuthConfig();
-    const authentikReady = AUTH_MODE === 'authentik' && isAuthentikConfigured(authCfg);
     res.json({
       demoEnabled: cfg?.demoEnabled !== false,
       registrationEnabled: cfg?.registrationEnabled !== false,
-      authMode: AUTH_MODE,
-      authentikEnabled: authentikReady,
-      setupRequired: AUTH_MODE === 'authentik' && !authentikReady,
+      authMode: 'local',
+      authentikEnabled: false,
+      setupRequired: false,
     });
   } catch (err) {
     console.error('GET /api/settings/public error:', err);
@@ -1535,208 +1424,11 @@ app.get('/api/settings/public', async (req, res) => {
   }
 });
 
-app.get('/api/setup/authentik/status', (req, res) => {
-  try {
-    const authCfg = getAuthConfig();
-    res.json({
-      authMode: AUTH_MODE,
-      configured: AUTH_MODE === 'authentik' && isAuthentikConfigured(authCfg),
-      setupRequired: AUTH_MODE === 'authentik' && !isAuthentikConfigured(authCfg),
-      config: {
-        baseUrl: authCfg.baseUrl,
-        clientId: authCfg.clientId,
-        redirectUri: authCfg.redirectUri,
-        scopes: authCfg.scopes,
-        authorizeUrl: authCfg.authorizeUrl,
-        tokenUrl: authCfg.tokenUrl,
-        userInfoUrl: authCfg.userInfoUrl,
-        adminEmails: authCfg.adminEmails,
-      },
-    });
-  } catch (err) {
-    console.error('GET /api/setup/authentik/status error:', err);
-    res.status(500).json({ error: 'Setup-Status konnte nicht geladen werden.' });
-  }
-});
 
-app.post('/api/setup/authentik', (req, res) => {
-  try {
-    if (AUTH_MODE !== 'authentik') {
-      return res.status(400).json({ error: 'Authentik-Setup ist im aktuellen Modus nicht verfügbar.' });
-    }
-
-    const current = getAuthConfig();
-    const alreadyConfigured = isAuthentikConfigured(current);
-    const hasAnyUser = Array.isArray(dbState.users) && dbState.users.length > 0;
-    const hasAdminSecret = req.headers['x-admin-secret'] === ADMIN_SECRET;
-    if (alreadyConfigured && hasAnyUser && !hasAdminSecret) {
-      return res.status(403).json({ error: 'Authentik ist bereits eingerichtet.' });
-    }
-
-    const payload = req.body || {};
-    const next = normalizeAuthConfig({
-      ...payload,
-      redirectUri: payload.redirectUri || `${ALLOWED_ORIGIN}/api/auth/authentik/callback`,
-      scopes: payload.scopes || 'openid profile email',
-    });
-
-    if (!next.baseUrl || !next.clientId || !next.clientSecret) {
-      return res.status(400).json({ error: 'baseUrl, clientId und clientSecret sind erforderlich.' });
-    }
-
-    saveAuthConfig(next);
-    res.json({ success: true, configured: true });
-  } catch (err) {
-    console.error('POST /api/setup/authentik error:', err);
-    res.status(500).json({ error: 'Authentik-Setup konnte nicht gespeichert werden.' });
-  }
-});
-
-app.get('/api/admin/authentik/export', requireAdmin, (req, res) => {
-  try {
-    if (AUTH_MODE !== 'authentik') {
-      return res.status(400).json({ error: 'Authentik-Export ist im aktuellen Modus nicht verfügbar.' });
-    }
-
-    const authCfg = getAuthConfig();
-    return res.json({ success: true, config: authCfg });
-  } catch (err) {
-    console.error('GET /api/admin/authentik/export error:', err);
-    return res.status(500).json({ error: 'Authentik-Konfiguration konnte nicht exportiert werden.' });
-  }
-});
-
-app.post('/api/admin/authentik/reset', requireAdmin, (req, res) => {
-  try {
-    if (AUTH_MODE !== 'authentik') {
-      return res.status(400).json({ error: 'Authentik-Reset ist im aktuellen Modus nicht verfügbar.' });
-    }
-
-    dbState.auth_config = null;
-    persistDbState();
-
-    return res.json({ success: true, setupRequired: true });
-  } catch (err) {
-    console.error('POST /api/admin/authentik/reset error:', err);
-    return res.status(500).json({ error: 'Authentik-Konfiguration konnte nicht zurückgesetzt werden.' });
-  }
-});
-
-app.get('/api/auth/authentik/start', async (req, res) => {
-  try {
-    if (AUTH_MODE !== 'authentik') {
-      return res.status(400).json({ error: 'Authentik-Login ist deaktiviert.' });
-    }
-    const authCfg = getAuthConfig();
-    if (!isAuthentikConfigured(authCfg)) {
-      return res.status(500).json({ error: 'Authentik ist nicht vollständig konfiguriert.' });
-    }
-
-    const state = crypto.randomBytes(24).toString('hex');
-    pendingOidcStates.set(state, {
-      state,
-      expiresAt: Date.now() + AUTH_CHALLENGE_TTL_MS,
-    });
-
-    const url = new URL(authCfg.authorizeUrl);
-    url.searchParams.set('client_id', authCfg.clientId);
-    url.searchParams.set('redirect_uri', authCfg.redirectUri);
-    url.searchParams.set('response_type', 'code');
-    url.searchParams.set('scope', authCfg.scopes);
-    url.searchParams.set('state', state);
-
-    res.redirect(url.toString());
-  } catch (err) {
-    console.error('GET /api/auth/authentik/start error:', err);
-    res.status(500).json({ error: 'Authentik-Login konnte nicht gestartet werden.' });
-  }
-});
-
-app.get('/api/auth/authentik/callback', async (req, res) => {
-  try {
-    if (AUTH_MODE !== 'authentik') {
-      return res.redirect(`${ALLOWED_ORIGIN}/?auth_error=${encodeURIComponent('Authentik-Login ist deaktiviert.')}`);
-    }
-
-    const authCfg = getAuthConfig();
-    if (!isAuthentikConfigured(authCfg)) {
-      return res.redirect(`${ALLOWED_ORIGIN}/?auth_error=${encodeURIComponent('Authentik ist nicht konfiguriert.')}`);
-    }
-
-    const code = String(req.query.code || '').trim();
-    const state = String(req.query.state || '').trim();
-    if (!code || !state) {
-      return res.redirect(`${ALLOWED_ORIGIN}/?auth_error=${encodeURIComponent('Ungültiger Authentik-Callback.')}`);
-    }
-
-    cleanupAuthChallenges();
-    const pending = pendingOidcStates.get(state);
-    if (!pending) {
-      return res.redirect(`${ALLOWED_ORIGIN}/?auth_error=${encodeURIComponent('Anmeldung abgelaufen. Bitte erneut versuchen.')}`);
-    }
-    pendingOidcStates.delete(state);
-
-    const tokenResp = await fetch(authCfg.tokenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        client_id: authCfg.clientId,
-        client_secret: authCfg.clientSecret,
-        redirect_uri: authCfg.redirectUri,
-      }).toString(),
-    });
-
-    const tokenData = await tokenResp.json().catch(() => ({}));
-    if (!tokenResp.ok || !tokenData.access_token) {
-      throw new Error(tokenData.error_description || tokenData.error || 'Token-Austausch fehlgeschlagen.');
-    }
-
-    const userInfoResp = await fetch(authCfg.userInfoUrl, {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-    const userInfo = await userInfoResp.json().catch(() => ({}));
-    if (!userInfoResp.ok) {
-      throw new Error(userInfo.error_description || userInfo.error || 'userinfo konnte nicht geladen werden.');
-    }
-
-    const userEmail = String(userInfo.email || '').toLowerCase().trim();
-    const userName = String(userInfo.name || userInfo.preferred_username || userEmail || '').trim();
-    const userSub = String(userInfo.sub || '').trim();
-    const user = await upsertUserFromAuthentik({ email: userEmail, name: userName, sub: userSub });
-    const safeUser = await completeLoginForUser(user);
-
-    const authToken = createOidcSessionToken(safeUser);
-    return res.redirect(`${ALLOWED_ORIGIN}/?auth_token=${encodeURIComponent(authToken)}`);
-  } catch (err) {
-    console.error('GET /api/auth/authentik/callback error:', err);
-    return res.redirect(`${ALLOWED_ORIGIN}/?auth_error=${encodeURIComponent('Authentik-Anmeldung fehlgeschlagen.')}`);
-  }
-});
-
-app.post('/api/auth/authentik/exchange', async (req, res) => {
-  try {
-    const authToken = String(req.body?.authToken || '').trim();
-    if (!authToken) return res.status(400).json({ error: 'authToken ist erforderlich.' });
-
-    const payload = consumeOidcSessionToken(authToken);
-    if (!payload?.user) {
-      return res.status(401).json({ error: 'Authentik-Sitzung ist abgelaufen. Bitte erneut anmelden.' });
-    }
-
-    return res.json({ success: true, user: payload.user });
-  } catch (err) {
-    console.error('POST /api/auth/authentik/exchange error:', err);
-    return res.status(500).json({ error: 'Authentik-Anmeldung konnte nicht abgeschlossen werden.' });
-  }
-});
 
 // ── Public Registration & Login ───────────────────────────────────────────────
 app.post('/api/register', async (req, res) => {
-  if (AUTH_MODE === 'authentik') {
-    return res.status(403).json({ error: 'Lokale Registrierung ist deaktiviert. Bitte über Authentik anmelden.' });
-  }
+
 
   const cfg = await loadSmtpConfig();
   if (!cfg?.registrationEnabled)
@@ -1828,9 +1520,7 @@ app.get('/api/verify/:token', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  if (AUTH_MODE === 'authentik') {
-    return res.status(403).json({ error: 'Lokale Anmeldung ist deaktiviert. Bitte über Authentik anmelden.' });
-  }
+
 
   const { email, password } = req.body || {};
   if (!email || !password)

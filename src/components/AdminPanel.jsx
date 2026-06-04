@@ -12,7 +12,6 @@ import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
   testDiscordWebhook, fetchAiConfig, saveAiConfig, fetchRedisHealth,
-  fetchAuthentikSetupStatus, exportAuthentikConfig, resetAuthentikSetup,
 } from '../services/adminApi';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -102,9 +101,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [redisHealth, setRedisHealth]     = useState(null);
   const [redisChecking, setRedisChecking] = useState(false);
   const [redisError, setRedisError]       = useState(null);
-  const [authSetupStatus, setAuthSetupStatus] = useState(null);
-  const [authSetupLoading, setAuthSetupLoading] = useState(false);
-  const [authSetupActionLoading, setAuthSetupActionLoading] = useState(false);
+
 
   // Load SMTP config when settings tab is opened
   useEffect(() => {
@@ -116,23 +113,12 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         .then((cfg) => { setAiModel(cfg.model || 'google/gemini-2.0-flash-001'); setAiKeyMasked(cfg.apiKeyMasked || ''); setBraveKeyMasked(cfg.braveSearchKeyMasked || ''); })
         .catch(() => {});
       handleRedisCheck();
-      loadAuthentikSetupStatus();
     }
     if (activeTab === 'users') loadRegUsers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  const loadAuthentikSetupStatus = async () => {
-    setAuthSetupLoading(true);
-    try {
-      const data = await fetchAuthentikSetupStatus();
-      setAuthSetupStatus(data);
-    } catch {
-      setAuthSetupStatus(null);
-    } finally {
-      setAuthSetupLoading(false);
-    }
-  };
+
 
   useEffect(() => {
     if (onActiveTabChange) onActiveTabChange(activeTab);
@@ -238,40 +224,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     }
   };
 
-  const handleExportAuthentik = async () => {
-    setAuthSetupActionLoading(true);
-    try {
-      const data = await exportAuthentikConfig();
-      const blob = new Blob([JSON.stringify(data.config || {}, null, 2)], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `authentik-config-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setSmtpMsg({ type: 'success', text: 'Authentik-Konfiguration exportiert.' });
-    } catch (err) {
-      setSmtpMsg({ type: 'error', text: err.message || 'Export fehlgeschlagen.' });
-    } finally {
-      setAuthSetupActionLoading(false);
-    }
-  };
 
-  const handleResetAuthentik = async () => {
-    if (!window.confirm('Authentik-Einrichtung wirklich zurücksetzen? Danach wird die Einrichtungsseite angezeigt.')) return;
-    setAuthSetupActionLoading(true);
-    try {
-      await resetAuthentikSetup();
-      setSmtpMsg({ type: 'success', text: 'Authentik zurückgesetzt. Du wirst zur Einrichtungsseite weitergeleitet.' });
-      setTimeout(() => {
-        handleLogout();
-      }, 250);
-    } catch (err) {
-      setSmtpMsg({ type: 'error', text: err.message || 'Reset fehlgeschlagen.' });
-    } finally {
-      setAuthSetupActionLoading(false);
-    }
-  };
 
   const handleVerifyUser = async (id) => {
     try {
@@ -981,58 +934,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         {activeTab === 'settings' && (
           <div className="animate-fade-in pb-10 space-y-6 max-w-6xl">
 
-            <div className="glass-card rounded-2xl p-4 md:p-6 space-y-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <h3 className="font-semibold text-white flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-blue-400" />
-                    Authentik Setup Verwaltung
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Exportiere die aktuelle Konfiguration oder setze sie zurück, um die Einrichtungsseite erneut anzuzeigen.
-                  </p>
-                </div>
-                <button
-                  onClick={loadAuthentikSetupStatus}
-                  disabled={authSetupLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs
-                    bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-all disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${authSetupLoading ? 'animate-spin' : ''}`} />
-                  Status
-                </button>
-              </div>
 
-              <div className="text-xs text-slate-400">
-                Status: {' '}
-                <span className={`font-semibold ${authSetupStatus?.configured ? 'text-green-400' : 'text-amber-400'}`}>
-                  {authSetupStatus?.configured ? 'Konfiguriert' : 'Setup erforderlich'}
-                </span>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  onClick={handleExportAuthentik}
-                  disabled={authSetupActionLoading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-                    bg-green-600/20 border border-green-500/30 text-green-300
-                    hover:bg-green-600/30 transition-all text-sm disabled:opacity-50"
-                >
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
-                <button
-                  onClick={handleResetAuthentik}
-                  disabled={authSetupActionLoading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-                    bg-red-600/20 border border-red-500/30 text-red-300
-                    hover:bg-red-600/30 transition-all text-sm disabled:opacity-50"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Reset und Einrichtung öffnen
-                </button>
-              </div>
-            </div>
 
             {/* SMTP config card */}
             <div className="glass-card rounded-2xl p-6 space-y-5">
