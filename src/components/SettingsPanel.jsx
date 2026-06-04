@@ -375,8 +375,10 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
                   <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Auch per Discord senden</span>
                 </label>
               )}
+            </div>
           </div>
         </div>
+
 
         {/* Save Button */}
         <button
