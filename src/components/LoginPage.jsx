@@ -415,7 +415,9 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
             </div>
           </div>
           )}
-        <p className="text-center text-xs text-slate-600 mt-8">
+          </>
+          )}
+          <p className="text-center text-xs text-slate-600 mt-8">
           Koffein-Tracker &copy; {new Date().getFullYear()}
         </p>
         </div>
@@ -425,6 +427,8 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 };
 
 export default LoginPage;
+
+
 
 
 
