@@ -1,6 +1,6 @@
 import express from 'express';
-import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import cors from 'cors';
+import { fork } from 'child_process';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -2368,10 +2368,8 @@ app.post('/api/admin/ai', requireAdmin, (req, res) => {
     discordBotStatus: newDiscordBotStatus,
   });
   
-  // Inform discord bot manager to restart/stop if needed
-  if (typeof updateDiscordBotLifecycle === 'function') {
-    updateDiscordBotLifecycle(newDiscordBotToken, newDiscordBotEnabled, newDiscordBotStatus).catch(err => console.error('Bot Lifecycle Error:', err));
-  }
+  // Discord bot manager is now external (discord-bot.js)
+  // It will poll the Redis store for ai_config changes.
 
   res.json({ success: true });
 });
@@ -2545,8 +2543,16 @@ app.get(/.*/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
+let discordBotProcess = null;
+
+process.on('SIGINT', () => {
+  if (discordBotProcess) discordBotProcess.kill('SIGINT');
+  process.exit(0);
+});
+
 // Graceful shutdown — flush state to Redis before container stops
 process.on('SIGTERM', async () => {
+  if (discordBotProcess) discordBotProcess.kill('SIGTERM');
   console.log('[DB] SIGTERM empfangen, schreibe letzten Stand nach Redis...');
   try {
     await redis.mset(
@@ -2567,103 +2573,13 @@ process.on('SIGTERM', async () => {
   await redis.quit();
   process.exit(0);
 });
-// ── Experimental Discord Bot AI ──────────────────────────────────────────────
-let discordBotClient = null;
-
-const updateDiscordBotLifecycle = async (token, enabled, status = 'online') => {
-  try {
-    if (discordBotClient) {
-      discordBotClient.destroy();
-      discordBotClient = null;
-      console.log('[Discord Bot] Gestoppt.');
-    }
-
-    if (enabled && token) {
-      discordBotClient = new Client({
-        intents: [
-          GatewayIntentBits.Guilds,
-          GatewayIntentBits.GuildMessages,
-          GatewayIntentBits.MessageContent,
-          GatewayIntentBits.DirectMessages,
-        ],
-        partials: [Partials.Channel, Partials.Message],
-        presence: {
-          status: status,
-        }
-      });
-
-      discordBotClient.on('ready', () => {
-        console.log(`[Discord Bot] Eingeloggt als ${discordBotClient.user.tag} mit Status ${status}`);
-        discordBotClient.user.setStatus(status);
-      });
-
-      discordBotClient.on('messageCreate', async (message) => {
-        if (message.author.bot) return;
-
-        const isMentioned = message.mentions.has(discordBotClient.user.id);
-        const isDM = message.channel.isDMBased ? message.channel.isDMBased() : (message.channel.type === 1 || message.channel.type === 'DM');
-
-        if (isMentioned || isDM) {
-          try {
-            message.channel.sendTyping();
-            
-            const content = message.content.replace(`<@${discordBotClient.user.id}>`, '').replace(`<@!${discordBotClient.user.id}>`, '').trim();
-
-            if (content.toLowerCase().startsWith('!status ')) {
-              let newStatus = content.toLowerCase().replace('!status ', '').trim();
-              if (newStatus === 'do not disturb') newStatus = 'dnd';
-              
-              const validStatuses = ['online', 'idle', 'dnd', 'invisible'];
-              
-              if (validStatuses.includes(newStatus)) {
-                discordBotClient.user.setStatus(newStatus);
-                
-                // In der Konfiguration speichern
-                const aiCfg = loadAiConfig();
-                aiCfg.discordBotStatus = newStatus;
-                saveAiConfig(aiCfg);
-                
-                await message.reply(`Status erfolgreich auf **${newStatus}** gesetzt.`);
-                return;
-              } else {
-                await message.reply(`Ungültiger Status. Erlaubt sind: online, idle, dnd, invisible`);
-                return;
-              }
-            }
-
-            const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker, der jetzt auch auf Discord agiert. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. Aktuell bist du im experimentellen Modus und hast keinen Zugriff auf die individuellen Tracker-Daten der Discord-User.`;
-
-            const fullMessages = [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content }
-            ];
-
-            const reply = await callOpenRouter(fullMessages);
-            await message.reply(reply);
-          } catch (err) {
-            console.error('[Discord Bot] Fehler beim Verarbeiten:', err);
-            await message.reply('Es gab einen Fehler bei der Kommunikation mit der KI.');
-          }
-        }
-      });
-
-      await discordBotClient.login(token);
-    }
-  } catch (err) {
-    console.error('[Discord Bot] Lifecycle Error:', err);
-  }
-};
-
-// Start updateDiscordBotLifecycle wrapper to export if needed
-global.updateDiscordBotLifecycle = updateDiscordBotLifecycle;
-
 initDb()
   .then(() => {
-    // Starte Discord Bot, falls konfiguriert
-    setTimeout(() => {
-      const aiCfg = loadAiConfig();
-      updateDiscordBotLifecycle(aiCfg.discordBotToken, aiCfg.discordBotEnabled, aiCfg.discordBotStatus);
-    }, 1000);
+    // Starte den separaten Discord Bot Prozess
+    discordBotProcess = fork(path.join(__dirname, 'discord-bot.js'));
+    discordBotProcess.on('exit', (code) => {
+      console.log(`[Discord Bot] Prozess beendet mit Code ${code}`);
+    });
 
     // Check every minute whether a reminder is due.
     setInterval(() => {

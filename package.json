@@ -9,6 +9,7 @@
     "prebuild": "npm run version:auto",
     "dev": "vite",
     "server": "node server.js",
+    "bot": "node discord-bot.js",
     "build": "vite build",
     "preview": "vite preview"
   },
