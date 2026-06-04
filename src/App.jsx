@@ -10,6 +10,7 @@ import AIAssistant from './components/AIAssistant';
 import AIDrinkRecognizer from './components/AIDrinkRecognizer';
 import AIDailySummary from './components/AIDailySummary';
 import LoginPage from './components/LoginPage';
+import BottomNavigation from './components/BottomNavigation';
 
 import AdminPanel from './components/AdminPanel';
 import RegisterPage from './components/RegisterPage';
@@ -160,7 +161,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [latestVersion, setLatestVersion]   = useState(null);
   const [todayStats, setTodayStats] = useState(null);
   const [settings, setSettings] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
+  const [currentTab, setCurrentTab] = useState('home');
   const isFirstCheck = useRef(true);
 
   const getDrinkKey = useCallback((drink) => {
@@ -373,22 +374,15 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     }
   }, [session?.email, session?.id]);
 
-  return (
-    <div className="min-h-screen relative overflow-hidden bg-transparent">
-      {/* Animated Background Orbs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-float-slow pointer-events-none -z-10"></div>
-      <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-amber-500/15 rounded-full blur-[100px] animate-float-delayed pointer-events-none -z-10"></div>
-      <div className="absolute bottom-[-10%] left-[10%] w-[60vw] h-[60vw] bg-purple-600/15 rounded-full blur-[140px] animate-float pointer-events-none -z-10"></div>
       <Header
         isAuthenticated={true}
         isLoading={isOperationLoading}
         session={session}
         onLogout={onLogout}
         onShowAdminPanel={onShowAdminPanel}
-        onToggleSettings={() => setShowSettings((prev) => !prev)}
       />
 
-      <main className="max-w-lg mx-auto px-4 pb-8">
+      <main className="max-w-lg mx-auto px-4 pb-28">
         {/* Update Banner */}
         {latestVersion && latestVersion !== currentVersion && (
           <div className="glass-card border border-blue-500/30 bg-blue-500/10
@@ -412,99 +406,101 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
           </div>
         )}
 
-        {/* Settings Section */}
-        <div className="mb-6">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition flex items-center justify-between"
-          >
-            <span>⚙️ Einstellungen</span>
-            <span>{showSettings ? '▼' : '▶'}</span>
-          </button>
+        {currentTab === 'home' && (
+          <div className="space-y-6 animate-fade-in">
+            <ProgressBar currentCaffeine={totalCaffeineToday} />
+            
+            {todayStats && settings && (
+              <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
+            )}
 
-          {showSettings && (
-            <div className="mt-4 space-y-4">
+            <AIDailySummary logs={logs} totalCaffeine={totalCaffeineToday} />
+
+            <PresetDrinks
+              favorites={favorites}
+              onAddDrink={handleAddDrink}
+              onRemoveFavorite={handleRemoveFavorite}
+              isLoading={isOperationLoading}
+            />
+
+            <ManualCalculator
+              onAddDrink={handleAddDrink}
+              isLoading={isOperationLoading}
+              prefill={manualPrefill}
+              onPrefillApplied={() => setManualPrefill(null)}
+            />
+          </div>
+        )}
+
+        {currentTab === 'search' && (
+          <div className="space-y-6 animate-fade-in">
+            <OnlineSearch
+              onSelect={(item) => {
+                setManualPrefill({
+                  name: item.name,
+                  caffeinePer100ml: item.caffeinePer100ml,
+                  sizeMl: item.sizeMl,
+                });
+                setCurrentTab('home'); // Switch back to home to show the calculator with prefilled values
+              }}
+            />
+
+            <CustomDrinks
+              session={session}
+              isLoading={isOperationLoading}
+              onAddDrink={handleAddDrink}
+              onToggleFavorite={handleToggleFavorite}
+              isFavoriteDrink={isFavoriteLog}
+            />
+
+            <AIDrinkRecognizer
+              onRecognized={(drink) => {
+                setManualPrefill({
+                  name: drink.name,
+                  caffeinePer100ml: drink.caffeinePer100ml,
+                  sizeMl: drink.sizeMl,
+                });
+                setCurrentTab('home');
+              }}
+            />
+          </div>
+        )}
+
+        {currentTab === 'history' && (
+          <div className="space-y-6 animate-fade-in">
+            <StatsPanel session={session} isLoading={isOperationLoading} />
+            <DrinkHistory
+              logs={logs}
+              onDeleteLog={handleDeleteLog}
+              onToggleFavorite={handleToggleFavorite}
+              isFavoriteLog={isFavoriteLog}
+              isLoading={isOperationLoading}
+            />
+          </div>
+        )}
+
+        {currentTab === 'settings' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="glass-card rounded-[2rem] p-6 shadow-glass">
+              <h2 className="text-xl font-bold text-white mb-6">Einstellungen</h2>
               <SettingsPanel
                 session={session}
                 isLoading={isOperationLoading}
                 onSettingsChange={(newSettings) => setSettings(newSettings)}
               />
             </div>
-          )}
-        </div>
-
-        <ProgressBar currentCaffeine={totalCaffeineToday} />
-
-        {/* Warnings */}
-        {todayStats && settings && (
-          <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
+            <ReminderSettings session={session} />
+          </div>
         )}
-
-        {/* Weekly Stats */}
-        <StatsPanel session={session} isLoading={isOperationLoading} />
-
-        <PresetDrinks
-          favorites={favorites}
-          onAddDrink={handleAddDrink}
-          onRemoveFavorite={handleRemoveFavorite}
-          isLoading={isOperationLoading}
-        />
-
-        <CustomDrinks
-          session={session}
-          isLoading={isOperationLoading}
-          onAddDrink={handleAddDrink}
-          onToggleFavorite={handleToggleFavorite}
-          isFavoriteDrink={isFavoriteLog}
-        />
-
-        <OnlineSearch
-          onSelect={(item) =>
-            setManualPrefill({
-              name: item.name,
-              caffeinePer100ml: item.caffeinePer100ml,
-              sizeMl: item.sizeMl,
-            })
-          }
-        />
-
-        <ReminderSettings session={session} />
-
-        <AIDailySummary logs={logs} totalCaffeine={totalCaffeineToday} />
-
-        <AIDrinkRecognizer
-          onRecognized={(drink) =>
-            setManualPrefill({
-              name: drink.name,
-              caffeinePer100ml: drink.caffeinePer100ml,
-              sizeMl: drink.sizeMl,
-            })
-          }
-        />
-
-        <ManualCalculator
-          onAddDrink={handleAddDrink}
-          isLoading={isOperationLoading}
-          prefill={manualPrefill}
-          onPrefillApplied={() => setManualPrefill(null)}
-        />
-
-        <DrinkHistory
-          logs={logs}
-          onDeleteLog={handleDeleteLog}
-          onToggleFavorite={handleToggleFavorite}
-          isFavoriteLog={isFavoriteLog}
-          isLoading={isOperationLoading}
-        />
-
       </main>
 
-      <footer className="text-center py-6 text-slate-600 text-sm">
+      <footer className="text-center py-6 pb-32 text-slate-600 text-sm">
         <p>Koffein-Tracker &copy; {new Date().getFullYear()}</p>
         <p className="text-xs mt-1">Empfohlenes Tageslimit: 400 mg</p>
       </footer>
 
       <AIAssistant totalCaffeineToday={totalCaffeineToday} />
+      <BottomNavigation currentTab={currentTab} onChangeTab={setCurrentTab} />
     </div>
   );
 }
