@@ -25,29 +25,32 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
           {favorites.map((drink) => (
             <div
               key={drink.id}
-              className="bg-gradient-to-br from-pink-600/25 to-blue-500/20
-                text-white rounded-2xl p-4 border border-white/10
-                transition-all duration-200 shadow-card hover:shadow-lg"
+              className="glass-card glass-card-hover rounded-3xl p-4 flex flex-col
+                transition-all duration-300 group cursor-pointer overflow-hidden relative"
+              onClick={() => !isLoading && handleAddFavorite(drink)}
             >
-              <button
-                onClick={() => handleAddFavorite(drink)}
-                disabled={isLoading}
-                className="w-full text-left"
-              >
-                <span className="text-2xl block text-center">{drink.icon || '🥤'}</span>
-                <span className="font-semibold text-sm block text-center mt-1 truncate">{drink.name}</span>
-                <span className="text-xs text-white/70 block text-center mt-1">{drink.size} ml • {drink.caffeine} mg</span>
-              </button>
-              <div className="mt-3 flex justify-end">
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              
+              <div className="flex justify-between items-start w-full relative z-10 mb-2">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform">
+                  {drink.icon || '🥤'}
+                </div>
                 <button
-                  onClick={() => onRemoveFavorite && onRemoveFavorite(drink.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if(onRemoveFavorite) onRemoveFavorite(drink.id);
+                  }}
                   disabled={isLoading}
-                  className="p-1.5 rounded-lg text-pink-300 hover:text-red-300 hover:bg-red-500/15 transition-all"
+                  className="p-1.5 rounded-xl text-pink-400 hover:text-white hover:bg-pink-500/40 transition-all opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0"
                   title="Aus Favoriten entfernen"
-                  aria-label="Aus Favoriten entfernen"
                 >
                   <HeartOff className="w-4 h-4" />
                 </button>
+              </div>
+
+              <div className="relative z-10 text-left mt-1">
+                <span className="font-bold text-sm block truncate text-slate-100">{drink.name}</span>
+                <span className="text-xs text-blue-300 font-medium mt-0.5 block">{drink.size} ml • <span className="text-amber-400">{drink.caffeine} mg</span></span>
               </div>
             </div>
           ))}

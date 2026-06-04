@@ -51,13 +51,16 @@ const ProgressBar = ({ currentCaffeine }) => {
       </div>
 
       {/* Track */}
-      <div className="relative h-5 bg-white/5 rounded-full overflow-hidden border border-white/10 mb-3">
+      <div className="relative h-6 bg-slate-900/50 rounded-full overflow-hidden border border-white/5 mb-3 shadow-inner">
         <div
           className={`absolute inset-y-0 left-0 bg-gradient-to-r ${barGradient}
-            rounded-full transition-all duration-700 ease-out`}
+            rounded-full transition-all duration-[1.5s] ease-out flex justify-end items-center pr-2`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/20 rounded-full" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/30 rounded-full mix-blend-overlay" />
+          {percentage > 5 && (
+             <div className="w-1.5 h-3 bg-white/80 rounded-full animate-glow-pulse shadow-[0_0_10px_white]"></div>
+          )}
         </div>
       </div>
 

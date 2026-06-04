@@ -374,7 +374,11 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   }, [session?.email, session?.id]);
 
   return (
-    <div className="min-h-screen" style={{ background: 'radial-gradient(ellipse at top, #0f172a 0%, #070b14 70%)' }}>
+    <div className="min-h-screen relative overflow-hidden bg-transparent">
+      {/* Animated Background Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-float-slow pointer-events-none -z-10"></div>
+      <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-amber-500/15 rounded-full blur-[100px] animate-float-delayed pointer-events-none -z-10"></div>
+      <div className="absolute bottom-[-10%] left-[10%] w-[60vw] h-[60vw] bg-purple-600/15 rounded-full blur-[140px] animate-float pointer-events-none -z-10"></div>
       <Header
         isAuthenticated={true}
         isLoading={isOperationLoading}

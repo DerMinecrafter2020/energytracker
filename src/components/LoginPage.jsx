@@ -139,6 +139,34 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 
   const BannerIcon = verifiedBanner?.type === 'success' ? CheckCircle
     : verifiedBanner?.type === 'warning' ? Clock : AlertCircle;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-transparent">
+      {/* Animated Background Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-float-slow pointer-events-none -z-10"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] bg-purple-600/15 rounded-full blur-[140px] animate-float pointer-events-none -z-10"></div>
+
+      <div className="glass-card rounded-[2.5rem] p-8 w-full max-w-md relative overflow-hidden shadow-glass animate-slide-in">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 rounded-2xl mx-auto bg-gradient-to-br from-blue-500 via-blue-400 to-amber-400 
+            flex items-center justify-center mb-4 shadow-glow-blue animate-glow-pulse">
+            <Zap className="w-8 h-8 text-white" fill="currentColor" />
+          </div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Koffein-Tracker</h1>
+          <p className="text-slate-400 mt-2">Willkommen zurück</p>
+        </div>
+
+        {verifiedBanner && (
+          <div className={`mb-6 px-4 py-3 rounded-xl border flex gap-3 text-sm animate-fade-in
+            ${verifiedBanner.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-300' :
+              verifiedBanner.type === 'warning' ? 'bg-orange-500/10 border-orange-500/30 text-orange-300' :
+              'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+            <BannerIcon className="w-5 h-5 shrink-0" />
+            <p>{verifiedBanner.text}</p>
+          </div>
+        )}
+
+        {!pending2FA ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-Mail</label>

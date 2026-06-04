@@ -10,18 +10,18 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
   });
 
   return (
-    <header className="glass-card border-b border-white/10 px-4 py-5 mb-6 sticky top-0 z-20">
-      <div className="max-w-lg mx-auto flex items-center gap-3">
+    <header className="glass-card rounded-b-[2rem] sm:rounded-b-[2.5rem] border-x-0 border-t-0 border-white/5 px-4 py-4 sm:py-5 mb-8 sticky top-0 z-30 shadow-glass">
+      <div className="max-w-lg mx-auto flex items-center gap-4">
         {/* Logo */}
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0
-          bg-gradient-to-br from-blue-500 to-amber-400 shadow-glow-blue">
-          <Zap className="w-5 h-5 text-white" fill="white" />
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0
+          bg-gradient-to-br from-blue-500 via-blue-400 to-amber-400 shadow-glow-blue animate-glow-pulse">
+          <Zap className="w-6 h-6 text-white" fill="currentColor" />
         </div>
 
         {/* Title + date */}
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-gradient leading-tight">Koffein-Tracker</h1>
-          <p className="text-xs text-slate-500 truncate">{today}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gradient leading-tight tracking-tight">Koffein-Tracker</h1>
+          <p className="text-xs sm:text-sm text-slate-400 truncate">{today}</p>
         </div>
 
         {/* Spinner */}
