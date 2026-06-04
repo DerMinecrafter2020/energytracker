@@ -19,6 +19,9 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
   const [notifyAtLimit, setNotifyAtLimit] = useState(true);
   const [notifyLate, setNotifyLate] = useState(true);
   const [notifyRapid, setNotifyRapid] = useState(true);
+  const [discordNotifyAtLimit, setDiscordNotifyAtLimit] = useState(false);
+  const [discordNotifyLate, setDiscordNotifyLate] = useState(false);
+  const [discordNotifyRapid, setDiscordNotifyRapid] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [security, setSecurity] = useState({ totpEnabled: false, passkeys: [] });
@@ -54,6 +57,9 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         setNotifyAtLimit(data.notifyAtLimit !== false);
         setNotifyLate(data.notifyLate !== false);
         setNotifyRapid(data.notifyRapid !== false);
+        setDiscordNotifyAtLimit(!!data.discordNotifyAtLimit);
+        setDiscordNotifyLate(!!data.discordNotifyLate);
+        setDiscordNotifyRapid(!!data.discordNotifyRapid);
 
         const sec = await fetchSecurityStatus(userPayload);
         setSecurity(sec);
@@ -79,6 +85,9 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         notifyAtLimit,
         notifyLate,
         notifyRapid,
+        discordNotifyAtLimit,
+        discordNotifyLate,
+        discordNotifyRapid,
       });
 
       setSettings(updatedSettings);
@@ -265,63 +274,107 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
             Benachrichtigungen
           </h4>
 
-          <div className="space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={notifyAtLimit}
-                onChange={(e) => setNotifyAtLimit(e.target.checked)}
-                className="w-4 h-4 rounded border border-white/20 bg-white/5 
-                  checked:bg-red-500 checked:border-red-400 mt-1 cursor-pointer
-                  transition-all duration-200"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white group-hover:text-red-300 transition-colors">
-                  Limit überschritten
-                </p>
-                <p className="text-xs text-slate-500">
-                  Warnung wenn Koffein Limit erreicht wird
-                </p>
-              </div>
-            </label>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={notifyAtLimit}
+                  onChange={(e) => setNotifyAtLimit(e.target.checked)}
+                  className="w-4 h-4 rounded border border-white/20 bg-white/5 
+                    checked:bg-red-500 checked:border-red-400 mt-1 cursor-pointer
+                    transition-all duration-200"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white group-hover:text-red-300 transition-colors">
+                    Limit überschritten
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Warnung wenn Koffein Limit erreicht wird
+                  </p>
+                </div>
+              </label>
+              {notifyAtLimit && (
+                <label className="flex items-center gap-2 pl-7 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={discordNotifyAtLimit}
+                    onChange={(e) => setDiscordNotifyAtLimit(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 
+                      checked:bg-[#5865F2] checked:border-[#5865F2] cursor-pointer
+                      transition-all duration-200"
+                  />
+                  <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Auch per Discord senden</span>
+                </label>
+              )}
+            </div>
 
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={notifyLate}
-                onChange={(e) => setNotifyLate(e.target.checked)}
-                className="w-4 h-4 rounded border border-white/20 bg-white/5 
-                  checked:bg-blue-500 checked:border-blue-400 mt-1 cursor-pointer
-                  transition-all duration-200"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors">
-                  Spätes Koffein
-                </p>
-                <p className="text-xs text-slate-500">
-                  Warnung nach 18:00 Uhr
-                </p>
-              </div>
-            </label>
+            <div className="space-y-2">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={notifyLate}
+                  onChange={(e) => setNotifyLate(e.target.checked)}
+                  className="w-4 h-4 rounded border border-white/20 bg-white/5 
+                    checked:bg-blue-500 checked:border-blue-400 mt-1 cursor-pointer
+                    transition-all duration-200"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors">
+                    Spätes Koffein
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Warnung nach 18:00 Uhr
+                  </p>
+                </div>
+              </label>
+              {notifyLate && (
+                <label className="flex items-center gap-2 pl-7 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={discordNotifyLate}
+                    onChange={(e) => setDiscordNotifyLate(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 
+                      checked:bg-[#5865F2] checked:border-[#5865F2] cursor-pointer
+                      transition-all duration-200"
+                  />
+                  <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Auch per Discord senden</span>
+                </label>
+              )}
+            </div>
 
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={notifyRapid}
-                onChange={(e) => setNotifyRapid(e.target.checked)}
-                className="w-4 h-4 rounded border border-white/20 bg-white/5 
-                  checked:bg-amber-500 checked:border-amber-400 mt-1 cursor-pointer
-                  transition-all duration-200"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white group-hover:text-amber-300 transition-colors">
-                  Schnelle Folge
-                </p>
-                <p className="text-xs text-slate-500">
-                  Warnung bei 3+ Getränken in 2h
-                </p>
-              </div>
-            </label>
+            <div className="space-y-2">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={notifyRapid}
+                  onChange={(e) => setNotifyRapid(e.target.checked)}
+                  className="w-4 h-4 rounded border border-white/20 bg-white/5 
+                    checked:bg-amber-500 checked:border-amber-400 mt-1 cursor-pointer
+                    transition-all duration-200"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white group-hover:text-amber-300 transition-colors">
+                    Schnelle Folge
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Warnung bei 3+ Getränken in 2h
+                  </p>
+                </div>
+              </label>
+              {notifyRapid && (
+                <label className="flex items-center gap-2 pl-7 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={discordNotifyRapid}
+                    onChange={(e) => setDiscordNotifyRapid(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 
+                      checked:bg-[#5865F2] checked:border-[#5865F2] cursor-pointer
+                      transition-all duration-200"
+                  />
+                  <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Auch per Discord senden</span>
+                </label>
+              )}
           </div>
         </div>
 

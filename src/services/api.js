@@ -82,6 +82,32 @@ export const fetchFavorites = async ({ userId, email }) => {
   return data;
 };
 
+export const testDiscordWebhook = async (webhookUrl) => {
+  const response = await fetch(`${API_BASE_URL}/api/admin/test-discord`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ webhookUrl }),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || 'Fehler beim Discord Test');
+  }
+  return response.json();
+};
+
+export const testUserEmail = async (email) => {
+  const response = await fetch(`${API_BASE_URL}/api/user/test-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || 'Fehler beim E-Mail Test');
+  }
+  return response.json();
+};
+
 export const addFavorite = async (payload) => {
   const response = await fetch(`${API_BASE_URL}/api/favorites/me`, {
     method: 'POST',
@@ -129,11 +155,11 @@ export const fetchUserSettings = async ({ userId, email }) => {
   return data;
 };
 
-export const updateUserSettings = async ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid }) => {
-  const response = await fetch(new URL('/api/settings/me', API_BASE_URL).toString(), {
+export const updateUserSettings = async ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid }) => {
+  const response = await fetch(`${API_BASE_URL}/api/settings/me`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid }),
+    body: JSON.stringify({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid }),
   });
 
   const data = await response.json();

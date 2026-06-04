@@ -842,11 +842,14 @@ const getUserSettings = ({ userId, email }) => {
     notifyAtLimit: true,
     notifyLate: true,
     notifyRapid: true,
+    discordNotifyAtLimit: false,
+    discordNotifyLate: false,
+    discordNotifyRapid: false,
     createdAt: new Date().toISOString(),
   };
 };
 
-const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid }) => {
+const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   let settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
   if (!settings) {
@@ -857,6 +860,10 @@ const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLa
   if (notifyAtLimit !== undefined) settings.notifyAtLimit = notifyAtLimit;
   if (notifyLate !== undefined) settings.notifyLate = notifyLate;
   if (notifyRapid !== undefined) settings.notifyRapid = notifyRapid;
+  if (discordNotifyAtLimit !== undefined) settings.discordNotifyAtLimit = discordNotifyAtLimit;
+  if (discordNotifyLate !== undefined) settings.discordNotifyLate = discordNotifyLate;
+  if (discordNotifyRapid !== undefined) settings.discordNotifyRapid = discordNotifyRapid;
+  
   settings.updatedAt = new Date().toISOString();
   persistDbState();
   return settings;
@@ -1123,7 +1130,7 @@ app.get('/api/logs', async (req, res) => {
 
 app.post('/api/logs', async (req, res) => {
   try {
-    const { name, size, caffeine, caffeinePerMl, icon, isPreset, date } = req.body || {};
+    const { name, size, caffeine, caffeinePerMl, icon, isPreset, date, userId, email } = req.body || {};
     if (!name || !size || !caffeine) {
       return res.status(400).json({ error: 'name, size, caffeine are required' });
     }
@@ -1142,8 +1149,57 @@ app.post('/api/logs', async (req, res) => {
       'SELECT * FROM caffeine_logs WHERE id = ?',
       [insertedId]
     );
+    
+    const newLog = rows[0];
 
-    res.status(201).json(rows[0]);
+    // Notification Logic
+    if (email) {
+      const [todayLogs] = await dbPool.execute('SELECT * FROM caffeine_logs WHERE date = ?', [safeDate]);
+      const totalCaffeine = todayLogs.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
+      const settings = getUserSettings({ userId: userId || null, email });
+      const limit = settings.dailyLimit || 400;
+      
+      const now = new Date();
+      const hour = now.getHours();
+      
+      const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+      const recentDrinks = todayLogs.filter(log => new Date(log.createdAt || now) > twoHoursAgo);
+
+      const notifyPromises = [];
+
+      const tryNotify = (condition, title, message) => {
+        if (condition) {
+          // Send Email implicitly if limit warnings are checked (based on existing logic pattern, but we'll focus on Discord as requested)
+          // Actually, let's send Discord if enabled
+          if (settings.discordEnabled && settings.discordWebhook) {
+            notifyPromises.push(
+              sendDiscordReminder({ 
+                webhookUrl: settings.discordWebhook, 
+                email, 
+                customMessage: `**${title}**: ${message}` 
+              }).catch(e => console.error('Discord notify error:', e))
+            );
+          }
+        }
+      };
+
+      if (settings.notifyAtLimit && settings.discordNotifyAtLimit && totalCaffeine > limit) {
+        const excess = totalCaffeine - limit;
+        tryNotify(true, 'Limit überschritten!', `Du hast dein Limit um ${excess}mg überschritten (${totalCaffeine}/${limit}mg)`);
+      }
+
+      if (settings.notifyLate && settings.discordNotifyLate && hour >= 18) {
+        tryNotify(true, 'Spätes Koffein', `${newLog.name} um ${hour}:${String(now.getMinutes()).padStart(2, '0')} Uhr könnte deinen Schlaf beeinflussen`);
+      }
+
+      if (settings.notifyRapid && settings.discordNotifyRapid && recentDrinks.length >= 3) {
+        tryNotify(true, 'Schnelle Folge erkannt', `${recentDrinks.length} Getränke in 2h – versuche langsamer zu trinken!`);
+      }
+
+      await Promise.all(notifyPromises);
+    }
+
+    res.status(201).json(newLog);
   } catch (err) {
     console.error('POST /api/logs error:', err);
     res.status(500).json({ error: 'Database error' });
@@ -1850,7 +1906,7 @@ app.get('/api/settings/me', async (req, res) => {
 
 app.post('/api/settings/me', async (req, res) => {
   try {
-    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid } = req.body || {};
+    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid } = req.body || {};
     const safeEmail = String(email || '').toLowerCase().trim();
     const safeUserId = String(userId || '').trim() || null;
 
@@ -1865,12 +1921,55 @@ app.post('/api/settings/me', async (req, res) => {
       notifyAtLimit,
       notifyLate,
       notifyRapid,
+      discordNotifyAtLimit,
+      discordNotifyLate,
+      discordNotifyRapid
     });
 
     res.json(settings);
   } catch (err) {
     console.error('POST /api/settings/me error:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ── USER TEST ROUTES ────────────────────────────────────────────────────────
+app.post('/api/user/test-email', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ error: 'Email erforderlich' });
+    
+    // Testemail senden (wir nutzen sendReminderEmail mit einem custom subject/text falls möglich, oder rufen direkt sendMail auf)
+    const cfg = await loadSmtpConfig();
+    if (!cfg.host) {
+      return res.status(400).json({ error: 'SMTP ist auf diesem Server noch nicht eingerichtet.' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      auth: { user: cfg.auth.user, pass: cfg.auth.pass },
+    });
+
+    await transporter.sendMail({
+      from: `"${cfg.fromName}" <${cfg.fromEmail || cfg.auth.user}>`,
+      to: email,
+      subject: 'Test-Nachricht: Paulaner & Energy Tracker',
+      text: 'Hallo! Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.',
+      html: `
+        <div style="font-family:sans-serif;color:#333;">
+          <h2>Test erfolgreich! 🎉</h2>
+          <p>Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.</p>
+          <p>Du erhältst ab sofort Benachrichtigungen für deine täglichen Reminder oder Warnungen (falls konfiguriert).</p>
+        </div>
+      `,
+    });
+
+    res.json({ success: true, message: 'Test-E-Mail wurde erfolgreich gesendet!' });
+  } catch (err) {
+    console.error('Test-E-Mail Fehler:', err);
+    res.status(500).json({ error: 'Fehler beim Senden der Test-E-Mail' });
   }
 });
 

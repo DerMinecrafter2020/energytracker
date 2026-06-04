@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, Mail, MessageCircle, Save } from 'lucide-react';
-import { fetchReminderSettings, saveReminderSettings } from '../services/api';
+import { fetchReminderSettings, saveReminderSettings, testUserEmail } from '../services/api';
 
 const ReminderSettings = ({ session }) => {
   const [settings, setSettings] = useState({
@@ -12,6 +12,7 @@ const ReminderSettings = ({ session }) => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
@@ -70,6 +71,20 @@ const ReminderSettings = ({ session }) => {
       setMessage({ type: 'error', text: err.message || 'Fehler beim Speichern.' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!session?.email) return;
+    setIsTestingEmail(true);
+    setMessage(null);
+    try {
+      await testUserEmail(session.email);
+      setMessage({ type: 'success', text: 'Test-E-Mail wurde erfolgreich gesendet!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Fehler beim Senden der Test-E-Mail' });
+    } finally {
+      setIsTestingEmail(false);
     }
   };
 
@@ -174,17 +189,31 @@ const ReminderSettings = ({ session }) => {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving || !settings.time}
-            className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500
-              hover:from-amber-400 hover:to-orange-400 text-white font-semibold
-              disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            {isSaving ? 'Speichern…' : 'Reminder speichern'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleTestEmail}
+              disabled={isTestingEmail || !settings.mailEnabled}
+              className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10
+                hover:bg-white/10 text-white font-semibold
+                disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            >
+              <Mail className="w-4 h-4" />
+              {isTestingEmail ? 'Sende...' : 'E-Mail Test'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving || !settings.time}
+              className="flex-[2] py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500
+                hover:from-amber-400 hover:to-orange-400 text-white font-semibold
+                disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {isSaving ? 'Speichern…' : 'Reminder speichern'}
+            </button>
+          </div>
         </div>
       )}
     </div>

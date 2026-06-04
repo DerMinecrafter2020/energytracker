@@ -288,7 +288,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     setIsOperationLoading(true);
     setError(null);
     try {
-      const payload = { ...drinkData, date: getTodayKey() };
+      const payload = { ...drinkData, date: getTodayKey(), userId: session?.id || null, email: session?.email || null };
       const created = await addLog(payload);
       setLogs((prev) => [created, ...prev]);
 
