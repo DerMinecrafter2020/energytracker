@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 
 import dotenv from 'dotenv';
@@ -1194,18 +1194,6 @@ app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok', db_type: DB_TYPE });
 });
 
-
-
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 app.get('/api/version', async (req, res) => {
   res.json({ version: appVersion });
 });
