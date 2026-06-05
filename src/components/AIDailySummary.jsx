@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext';, { useState } from 'react';
 import { Brain, RefreshCw, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { fetchDailySummary } from '../services/aiApi';
 
 const DAILY_LIMIT = 400;
 
 const AIDailySummary = ({ logs = [], totalCaffeine = 0 }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading]   = useState(false);
   const [result, setResult]     = useState(null);
@@ -99,3 +101,4 @@ const AIDailySummary = ({ logs = [], totalCaffeine = 0 }) => {
 };
 
 export default AIDailySummary;
+

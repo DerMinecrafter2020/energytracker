@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext';, { useState, useEffect } from 'react';
 import { Heart, HeartOff, Plus, Trash2, Wine } from 'lucide-react';
 import { fetchCustomDrinks, addCustomDrink, removeCustomDrink } from '../services/api';
 
@@ -13,7 +14,7 @@ export default function CustomDrinks({
   const [name, setName] = useState('');
   const [size, setSize] = useState('');
   const [caffeine, setCaffeine] = useState('');
-  const [icon, setIcon] = useState('🍷');
+  const [icon, setIcon] = useState('ðŸ·');
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState('');
   const [loadingDrinks, setLoadingDrinks] = useState(false);
@@ -30,7 +31,7 @@ export default function CustomDrinks({
         });
         setCustomDrinks(drinks);
       } catch (err) {
-        console.error('Fehler beim Laden der Getränke:', err);
+        console.error('Fehler beim Laden der GetrÃ¤nke:', err);
       } finally {
         setLoadingDrinks(false);
       }
@@ -56,14 +57,14 @@ export default function CustomDrinks({
         name: name.trim(),
         size: Number(size),
         caffeine: Number(caffeine),
-        icon: icon || '🍷',
+        icon: icon || 'ðŸ·',
       });
 
       setCustomDrinks([...customDrinks, newDrink]);
       setName('');
       setSize('');
       setCaffeine('');
-      setIcon('🍷');
+      setIcon('ðŸ·');
       setMessage('saved');
       setTimeout(() => setMessage(''), 2000);
     } catch (err) {
@@ -91,18 +92,20 @@ export default function CustomDrinks({
   };
 
   const handleQuickAddDrink = (drink) => {
+  const { t } = useTranslation();
     if (!onAddDrink) return;
     onAddDrink({
       name: drink.name,
       size: Number(drink.size),
       caffeine: Number(drink.caffeine),
       caffeinePerMl: drink.size ? Number(drink.caffeine) / Number(drink.size) : null,
-      icon: drink.icon || '🥤',
+      icon: drink.icon || 'ðŸ¥¤',
       isPreset: false,
     });
   };
 
   const handleToggleFavoriteDrink = (drink) => {
+  const { t } = useTranslation();
     if (!onToggleFavorite) return;
     const favorite = !!isFavoriteDrink?.(drink);
     onToggleFavorite({
@@ -110,7 +113,7 @@ export default function CustomDrinks({
       size: Number(drink.size),
       caffeine: Number(drink.caffeine),
       caffeinePerMl: drink.size ? Number(drink.caffeine) / Number(drink.size) : null,
-      icon: drink.icon || '🥤',
+      icon: drink.icon || 'ðŸ¥¤',
     }, favorite);
   };
 
@@ -118,13 +121,13 @@ export default function CustomDrinks({
     <div className="glass-card rounded-3xl p-6 mb-6 animate-fade-in">
       <h3 className="text-base font-bold text-white mb-5 flex items-center gap-2">
         <Wine className="w-5 h-5 text-pink-400" />
-        Eigene Getränke
+        Eigene GetrÃ¤nke
       </h3>
 
       {/* Add Form */}
       <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-5">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-          Neues Getränk
+          Neues GetrÃ¤nk
         </p>
 
         <div className="space-y-3 mb-3">
@@ -140,7 +143,7 @@ export default function CustomDrinks({
             <div className="relative">
               <input
                 type="number"
-                placeholder="Größe"
+                placeholder="GrÃ¶ÃŸe"
                 min="10"
                 value={size}
                 onChange={(e) => setSize(e.target.value)}
@@ -185,7 +188,7 @@ export default function CustomDrinks({
             transition-all duration-200 flex items-center justify-center gap-2 text-sm"
         >
           <Plus className="w-4 h-4" />
-          {adding ? 'Wird hinzugefügt...' : 'Hinzufügen'}
+          {adding ? 'Wird hinzugefÃ¼gt...' : 'HinzufÃ¼gen'}
         </button>
       </div>
 
@@ -193,32 +196,32 @@ export default function CustomDrinks({
       {message === 'saved' && (
         <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
           text-green-300 text-sm font-medium text-center mb-4 animate-fade-in">
-          ✓ Getränk hinzugefügt
+          âœ“ GetrÃ¤nk hinzugefÃ¼gt
         </div>
       )}
       {message === 'deleted' && (
         <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
           text-green-300 text-sm font-medium text-center mb-4 animate-fade-in">
-          ✓ Getränk gelöscht
+          âœ“ GetrÃ¤nk gelÃ¶scht
         </div>
       )}
       {message === 'error' && (
         <div className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/30
           text-red-300 text-sm font-medium text-center mb-4 animate-fade-in">
-          × Fehler
+          Ã— Fehler
         </div>
       )}
 
       {/* Drinks List */}
       {loadingDrinks ? (
         <div className="flex items-center justify-center py-8">
-          <p className="text-slate-400 text-sm">Lädt...</p>
+          <p className="text-slate-400 text-sm">LÃ¤dt...</p>
         </div>
       ) : customDrinks.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-slate-600">
           <Wine className="w-8 h-8 mb-2 opacity-30" />
-          <p className="text-sm text-center">Noch keine eigenen Getränke.</p>
-          <p className="text-xs text-slate-500 mt-1">Füge dein erstes Getränk hinzu!</p>
+          <p className="text-sm text-center">Noch keine eigenen GetrÃ¤nke.</p>
+          <p className="text-xs text-slate-500 mt-1">FÃ¼ge dein erstes GetrÃ¤nk hinzu!</p>
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -235,7 +238,7 @@ export default function CustomDrinks({
                 onClick={() => handleQuickAddDrink(drink)}
                 disabled={isLoading}
                 className="flex items-center gap-3 flex-1 min-w-0 text-left disabled:opacity-60 cursor-pointer"
-                title="Zum heutigen Konsum hinzufügen"
+                title="Zum heutigen Konsum hinzufÃ¼gen"
               >
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center
                   bg-gradient-to-br from-pink-600/30 to-pink-400/10 border border-pink-500/20 shrink-0 text-lg">
@@ -245,14 +248,14 @@ export default function CustomDrinks({
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-white text-sm">{drink.name}</h4>
                   <p className="text-xs text-slate-500">
-                    {drink.size}ml • {drink.caffeine}mg
+                    {drink.size}ml â€¢ {drink.caffeine}mg
                   </p>
                 </div>
 
                 <div className="shrink-0 flex items-center gap-1 rounded-lg px-2 py-1
                   bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
                   <Plus className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-semibold">Hinzufügen</span>
+                  <span className="text-[11px] font-semibold">HinzufÃ¼gen</span>
                 </div>
               </button>
 
@@ -272,7 +275,7 @@ export default function CustomDrinks({
                 className="p-1.5 text-slate-700 hover:text-red-400 hover:bg-red-500/10
                   rounded-xl transition-all duration-200
                   opacity-0 group-hover:opacity-100"
-                aria-label="Löschen"
+                aria-label="LÃ¶schen"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -283,3 +286,4 @@ export default function CustomDrinks({
     </div>
   );
 }
+

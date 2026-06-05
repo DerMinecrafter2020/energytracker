@@ -1,8 +1,10 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext';, { useState, useMemo, useEffect } from 'react';
 import { Calculator, Plus } from 'lucide-react';
 import { DRINK_SIZES, calculateFromPer100ml } from '../utils/caffeineUtils';
 
 const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) => {
+  const { t } = useTranslation();
   const [drinkName, setDrinkName]           = useState('');
   const [caffeinePer100ml, setCaffeinePer100ml] = useState(32);
   const [selectedSize, setSelectedSize]     = useState(250);
@@ -21,6 +23,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
   );
 
   const handleSubmit = (e) => {
+  const { t } = useTranslation();
     e.preventDefault();
     if (!drinkName.trim()) return;
     onAddDrink({
@@ -131,6 +134,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
 };
 
 export default ManualCalculator;
+
 
 
 

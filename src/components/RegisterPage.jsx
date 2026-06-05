@@ -1,9 +1,11 @@
-﻿import React, { useState } from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext';, { useState } from 'react';
 import { Zap, Mail, Lock, Eye, EyeOff, User, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 const RegisterPage = ({ onBack }) => {
+  const { t } = useTranslation();
   const [form, setForm]       = useState({ name: '', email: '', password: '', confirm: '' });
   const [showPw, setShowPw]   = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -12,6 +14,7 @@ const RegisterPage = ({ onBack }) => {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const validate = () => {
+  const { t } = useTranslation();
     if (!form.name.trim())               return 'Bitte gib deinen Namen ein.';
     if (!form.email.trim())              return 'Bitte gib deine E-Mail-Adresse ein.';
     if (form.password.length < 8)        return 'Passwort muss mindestens 8 Zeichen lang sein.';
@@ -70,7 +73,7 @@ const RegisterPage = ({ onBack }) => {
           </div>
           <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
             <div className="mb-8 text-center md:text-left">
-              <h2 className="text-2xl font-bold text-gradient-green">Registrieren</h2>
+              <h2 className="text-2xl font-bold text-gradient-green">{t('register')}</h2>
               <p className="text-slate-400 text-sm mt-1">Erstelle dein Koffein-Tracker-Konto</p>
             </div>
 
@@ -106,7 +109,7 @@ const RegisterPage = ({ onBack }) => {
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input type="text" value={form.name} onChange={set('name')}
-                    placeholder="Max Mustermann" autoComplete="name" className="input-dark pl-12" />
+                    placeholder={t('namePlaceholder')} autoComplete="name" className="input-dark pl-12" />
                 </div>
               </div>
 
@@ -118,7 +121,7 @@ const RegisterPage = ({ onBack }) => {
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input type="email" value={form.email} onChange={set('email')}
-                    placeholder="deine@email.de" autoComplete="email" className="input-dark pl-12" />
+                    placeholder={t('emailPlaceholder')} autoComplete="email" className="input-dark pl-12" />
                 </div>
               </div>
 
@@ -130,7 +133,7 @@ const RegisterPage = ({ onBack }) => {
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input type={showPw ? 'text' : 'password'} value={form.password}
-                    onChange={set('password')} placeholder="••••••••"
+                    onChange={set('password')} placeholder={t('passwordPlaceholder')}
                     autoComplete="new-password" className="input-dark pl-12 pr-12" />
                   <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
@@ -147,7 +150,7 @@ const RegisterPage = ({ onBack }) => {
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input type={showPw ? 'text' : 'password'} value={form.confirm}
-                    onChange={set('confirm')} placeholder="••••••••"
+                    onChange={set('confirm')} placeholder={t('passwordPlaceholder')}
                     autoComplete="new-password" className="input-dark pl-12" />
                 </div>
               </div>
@@ -192,6 +195,9 @@ const RegisterPage = ({ onBack }) => {
 };
 
 export default RegisterPage;
+
+
+
 
 
 

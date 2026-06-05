@@ -2,6 +2,10 @@
 import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCircle, Clock, KeyRound, Shield } from 'lucide-react';
 import {
   isWebAuthnSupported,
+import React, { useState, useEffect } from 'react';
+import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCircle, Clock, KeyRound, Shield } from 'lucide-react';
+import {
+  isWebAuthnSupported,
   login,
   loginRepairAdmin,
   completeLoginWithTotp,
@@ -9,8 +13,10 @@ import {
 
 } from '../services/auth';
 import { fetchPublicSettings } from '../services/adminApi';
+import { useTranslation } from '../context/LanguageContext';
 
 const LoginPage = ({ onLogin, onShowRegister }) => {
+  const { t } = useTranslation();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
@@ -47,9 +53,9 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
       setView('reset');
     }
     const v = params.get('verified');
-    if (v === '1') setVerifiedBanner({ type: 'success', text: 'E-Mail erfolgreich best�tigt! Du kannst dich jetzt anmelden.' });
-    else if (v === 'expired') setVerifiedBanner({ type: 'warning', text: 'Der Best�tigungslink ist abgelaufen. Bitte registriere dich erneut.' });
-    else if (v === 'invalid') setVerifiedBanner({ type: 'error', text: 'Ung�ltiger Best�tigungslink.' });
+    if (v === '1') setVerifiedBanner({ type: 'success', text: 'E-Mail erfolgreich besttigt! Du kannst dich jetzt anmelden.' });
+    else if (v === 'expired') setVerifiedBanner({ type: 'warning', text: 'Der Besttigungslink ist abgelaufen. Bitte registriere dich erneut.' });
+    else if (v === 'invalid') setVerifiedBanner({ type: 'error', text: 'Ungltiger Besttigungslink.' });
     if (v) window.history.replaceState({}, '', window.location.pathname);
   }, []);
 
@@ -75,8 +81,8 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: resetToken, newPassword: password })
       });
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Fehler beim Zur�cksetzen.');
-      setMsg({ type: 'success', text: 'Dein Passwort wurde erfolgreich ge�ndert. Du kannst dich jetzt anmelden.' });
+      if (!resp.ok) throw new Error(data.error || 'Fehler beim Zurcksetzen.');
+      setMsg({ type: 'success', text: 'Dein Passwort wurde erfolgreich gendert. Du kannst dich jetzt anmelden.' });
       setView('login'); setPassword('');
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (err) { setError(err.message); } finally { setIsLoading(false); }
@@ -84,7 +90,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password) { setError('Bitte alle Felder ausf�llen.'); return; }
+    if (!email.trim() || !password) { setError('Bitte alle Felder ausfllen.'); return; }
     setError('');
     setIsLoading(true);
     try {
@@ -189,7 +195,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
         </div>
         <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
           <div className="mb-8 text-center md:text-left">
-            <h2 className="text-2xl font-bold text-white">Willkommen zurück</h2>
+            <h2 className="text-2xl font-bold text-white">Willkommen zurÃ¼ck</h2>
             <p className="text-slate-400 text-sm mt-1">Bitte melde dich an, um fortzufahren.</p>
           </div>
 
@@ -213,11 +219,11 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
         {view === 'forgot' ? (
           <form onSubmit={handleForgot} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-Mail</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="deine@email.de" autoComplete="email" className="input-dark pl-12" />
+                  placeholder={t('emailPlaceholder')} autoComplete="email" className="input-dark pl-12" />
               </div>
             </div>
             {error && (
@@ -227,11 +233,11 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
             )}
             <button type="submit" disabled={isLoading}
               className="w-full py-3.5 rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
-              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort zurücksetzen'}
+              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort zurÃ¼cksetzen'}
             </button>
             <div className="text-center mt-4">
               <button type="button" onClick={() => { setView('login'); setError(''); setMsg(null); }} className="text-sm text-slate-400 hover:text-white transition-colors">
-                Zurück zur Anmeldung
+                ZurÃ¼ck zur Anmeldung
               </button>
             </div>
           </form>
@@ -264,21 +270,21 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
         ) : !pending2FA ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-Mail</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="deine@email.de" autoComplete="email" className="input-dark pl-12" />
+                  placeholder={t('emailPlaceholder')} autoComplete="email" className="input-dark pl-12" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Passwort</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('passwordToken')}</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input type={showPw ? 'text' : 'password'} value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" autoComplete="current-password"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" autoComplete="current-password"
                   className="input-dark pl-12 pr-12" />
                 <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
@@ -290,109 +296,6 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
                   Passwort vergessen?
                 </button>
               </div>
-            </div>
-
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
-                {error}
-              </div>
-            )}
-
-            <button type="submit" disabled={isLoading}
-              className="w-full py-3.5 rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
-              {isLoading
-                ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <><LogIn className="w-4 h-4" />Anmelden</>
-              }
-            </button>
-          </form>
-          ) : (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200">
-              <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" />Zweiter Faktor erforderlich</p>
-              <p className="text-violet-300/90 mt-1">Für {pending2FA.user?.email} muss die Anmeldung bestätigt werden.</p>
-            </div>
-
-            {pending2FA.methods?.totp && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">2FA Code</label>
-                <div className="relative">
-                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    value={totpCode}
-                    onChange={(e) => setTotpCode(e.target.value.replace(/\s+/g, ''))}
-                    placeholder="123456"
-                    className="input-dark pl-12"
-                    maxLength={8}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleTotpVerify}
-                  disabled={isLoading}
-                  className="w-full mt-3 py-3 rounded-xl font-semibold text-white transition-all duration-200
-                    bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500
-                    disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  Code prüfen
-                </button>
-              </div>
-            )}
-
-            {pending2FA.methods?.passkey && (
-              <>
-              {!webauthnSupported && (
-                <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
-                  Passkey-Login wird von diesem Browser nicht unterstützt. Nutze den 2FA-Code.
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={handlePasskeyVerify}
-                disabled={isLoading || !webauthnSupported}
-                className="w-full py-3 rounded-xl font-semibold text-white transition-all duration-200
-                  bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500
-                  disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <KeyRound className="w-4 h-4" /> Mit Sicherheitsschlüssel anmelden
-              </button>
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                setPending2FA(null);
-                setTotpCode('');
-                setPassword('');
-              }}
-              className="w-full py-2 text-sm text-slate-400 hover:text-slate-300 transition-colors"
-            >
-              Zurück zur normalen Anmeldung
-            </button>
-          </div>
-          )}
-
-          {view === 'login' && !pending2FA && ( 
-            <>
-            {/* Register link */}
-          {publicSettings.registrationEnabled && (
-          <div className="mt-5 pt-4 border-t border-white/10 text-center">
-            <p className="text-sm text-slate-500">
-              Noch kein Konto?{' '}
-              <button onClick={onShowRegister}
-                className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
-                Jetzt registrieren
-              </button>
-            </p>
-          </div>
-          )}
-
-          {/* Demo fill */}
-          {publicSettings.demoEnabled && (
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <p className="text-xs text-slate-600 text-center mb-3">Demo-Zugänge</p>
             <div className="flex gap-2">
               <button type="button" onClick={() => fillDemo('admin')}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl
@@ -421,6 +324,8 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 };
 
 export default LoginPage;
+
+
 
 
 

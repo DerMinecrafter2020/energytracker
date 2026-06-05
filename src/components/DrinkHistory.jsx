@@ -1,8 +1,10 @@
-﻿import React from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext'; from 'react';
 import { History, Trash2, Coffee, Heart, HeartOff } from 'lucide-react';
 import { formatTime } from '../utils/caffeineUtils';
 
 const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLoading }) => {
+  const { t } = useTranslation();
   if (logs.length === 0) {
     return (
       <div className="glass-card rounded-3xl p-6 animate-fade-in">
@@ -96,4 +98,5 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
 };
 
 export default DrinkHistory;
+
 

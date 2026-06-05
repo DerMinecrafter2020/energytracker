@@ -220,7 +220,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
 
   const handleRegisterPasskey = async () => {
     if (!webauthnSupported) {
-      setSecurityMessage('WebAuthn wird von diesem Browser nicht unterstützt. Nutze bitte TOTP oder einen aktuellen Browser.');
+      setSecurityMessage('WebAuthn wird von diesem Browser nicht unterstÃ¼tzt. Nutze bitte TOTP oder einen aktuellen Browser.');
       return;
     }
 
@@ -243,7 +243,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
       });
 
       setSecurity(verified.security);
-      setSecurityMessage('Sicherheitsschlüssel erfolgreich registriert.');
+      setSecurityMessage('SicherheitsschlÃ¼ssel erfolgreich registriert.');
     } catch (err) {
       setSecurityMessage(err.message || 'Passkey-Registrierung fehlgeschlagen.');
     } finally {
@@ -261,7 +261,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         credentialId,
       });
       setSecurity(data.security);
-      setSecurityMessage('Sicherheitsschlüssel entfernt.');
+      setSecurityMessage('SicherheitsschlÃ¼ssel entfernt.');
     } catch (err) {
       setSecurityMessage(err.message);
     } finally {
@@ -273,7 +273,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     return (
       <div className="glass-card rounded-3xl p-6 animate-fade-in">
         <div className="flex items-center justify-center py-8">
-          <p className="text-slate-400">Lädt...</p>
+          <p className="text-slate-400">LÃ¤dt...</p>
         </div>
       </div>
     );
@@ -294,14 +294,14 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
           </h4>
           <form onSubmit={handleUpdateProfile} className="space-y-3">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Name</label>
+              <label className="block text-xs text-slate-400 mb-1">{t('name')}</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="input-dark text-sm py-2 pl-9" />
               </div>
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">E-Mail</label>
+              <label className="block text-xs text-slate-400 mb-1">{t('email')}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} className="input-dark text-sm py-2 pl-9" />
@@ -311,7 +311,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
               <label className="block text-xs text-slate-400 mb-1">Neues Passwort (optional)</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-dark text-sm py-2 pl-9" placeholder="Leer lassen um es nicht zu ändern" />
+                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-dark text-sm py-2 pl-9" placeholder="Leer lassen um es nicht zu Ã¤ndern" />
               </div>
             </div>
             <div className="pt-2">
@@ -341,11 +341,33 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
           </h4>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">{t('language')}</label>
-              <select value={settingLanguage} onChange={(e) => setSettingLanguage(e.target.value)} className="input-dark text-sm appearance-none cursor-pointer">
-                <option value="de">Deutsch</option>
-                <option value="en">English</option>
-              </select>
+              <label className="block text-xs text-slate-400 mb-2">{t('language')}</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSettingLanguage('de')}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+                    settingLanguage === 'de'
+                      ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] border border-blue-400/50'
+                      : 'bg-black/20 text-slate-400 hover:bg-white/10 border border-white/5'
+                  }`}
+                >
+                  <span className="text-xl leading-none filter drop-shadow-md">🇩🇪</span>
+                  Deutsch
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingLanguage('en')}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+                    settingLanguage === 'en'
+                      ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] border border-blue-400/50'
+                      : 'bg-black/20 text-slate-400 hover:bg-white/10 border border-white/5'
+                  }`}
+                >
+                  <span className="text-xl leading-none filter drop-shadow-md">🇬🇧</span>
+                  English
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">{t('theme')}</label>
@@ -362,7 +384,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         {/* Daily Limit */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            Tägliches Koffein-Limit
+            TÃ¤gliches Koffein-Limit
           </label>
           <div className="relative">
             <Zap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400/50" />
@@ -402,7 +424,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white group-hover:text-red-300 transition-colors">
-                    Limit überschritten
+                    Limit Ã¼berschritten
                   </p>
                   <p className="text-xs text-slate-500">
                     Warnung wenn Koffein Limit erreicht wird
@@ -436,7 +458,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors">
-                    Spätes Koffein
+                    SpÃ¤tes Koffein
                   </p>
                   <p className="text-xs text-slate-500">
                     Warnung nach 18:00 Uhr
@@ -473,7 +495,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
                     Schnelle Folge
                   </p>
                   <p className="text-xs text-slate-500">
-                    Warnung bei 3+ Getränken in 2h
+                    Warnung bei 3+ GetrÃ¤nken in 2h
                   </p>
                 </div>
               </label>
@@ -520,13 +542,13 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         {message === 'saved' && (
           <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
             text-green-300 text-sm font-medium text-center animate-fade-in">
-            ✓ Einstellungen gespeichert
+            âœ“ Einstellungen gespeichert
           </div>
         )}
         {message === 'error' && (
           <div className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/30
             text-red-300 text-sm font-medium text-center animate-fade-in">
-            × Fehler beim Speichern
+            Ã— Fehler beim Speichern
           </div>
         )}
 
@@ -551,7 +573,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
                   value={totpPassword}
                   onChange={(e) => setTotpPassword(e.target.value)}
                   className="input-dark"
-                  placeholder="Passwort zur Bestätigung"
+                  placeholder="Passwort zur BestÃ¤tigung"
                 />
                 <button
                   onClick={handleStartTotpSetup}
@@ -593,7 +615,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
                   value={totpDisablePassword}
                   onChange={(e) => setTotpDisablePassword(e.target.value)}
                   className="input-dark"
-                  placeholder="Passwort für Deaktivierung"
+                  placeholder="Passwort fÃ¼r Deaktivierung"
                 />
                 <button
                   onClick={handleDisableTotp}
@@ -608,7 +630,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-white font-medium">Sicherheitsschlüssel (YubiKey / Passkey)</p>
+              <p className="text-sm text-white font-medium">SicherheitsschlÃ¼ssel (YubiKey / Passkey)</p>
               <span className="text-xs px-2.5 py-1 rounded-full bg-slate-700/50 text-slate-300 border border-white/10">
                 {Array.isArray(security.passkeys) ? security.passkeys.length : 0} hinterlegt
               </span>
@@ -616,7 +638,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
 
             {!webauthnSupported && (
               <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
-                Dieser Browser unterstützt WebAuthn/Sicherheitsschlüssel nicht.
+                Dieser Browser unterstÃ¼tzt WebAuthn/SicherheitsschlÃ¼ssel nicht.
               </div>
             )}
 
@@ -625,20 +647,20 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
               disabled={securityLoading || !webauthnSupported}
               className="w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              <KeyRound className="w-4 h-4" /> Sicherheitsschlüssel hinzufügen
+              <KeyRound className="w-4 h-4" /> SicherheitsschlÃ¼ssel hinzufÃ¼gen
             </button>
 
             {(security.passkeys || []).map((key) => (
               <div key={key.id} className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm text-slate-100 truncate">{key.name || 'Sicherheitsschlüssel'}</p>
-                  <p className="text-xs text-slate-500 truncate">Hinzugefügt: {new Date(key.createdAt).toLocaleString('de-DE')}</p>
+                  <p className="text-sm text-slate-100 truncate">{key.name || 'SicherheitsschlÃ¼ssel'}</p>
+                  <p className="text-xs text-slate-500 truncate">HinzugefÃ¼gt: {new Date(key.createdAt).toLocaleString('de-DE')}</p>
                 </div>
                 <button
                   onClick={() => handleRemovePasskey(key.id)}
                   disabled={securityLoading}
                   className="p-2 rounded-lg text-red-300 hover:bg-red-500/10 disabled:opacity-50"
-                  title="Schlüssel entfernen"
+                  title="SchlÃ¼ssel entfernen"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -656,3 +678,5 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     </div>
   );
 }
+
+

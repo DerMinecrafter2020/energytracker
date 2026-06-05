@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext';, { useState } from 'react';
 import { Sparkles, Search, CheckCircle, AlertCircle } from 'lucide-react';
 import { recognizeDrink } from '../services/aiApi';
 
@@ -9,6 +10,7 @@ const confidenceColors = {
 };
 
 const AIDrinkRecognizer = ({ onRecognized }) => {
+  const { t } = useTranslation();
   const [description, setDescription] = useState('');
   const [loading, setLoading]         = useState(false);
   const [result, setResult]           = useState(null);
@@ -30,6 +32,7 @@ const AIDrinkRecognizer = ({ onRecognized }) => {
   };
 
   const handleApply = () => {
+  const { t } = useTranslation();
     if (!result) return;
     onRecognized({
       name: result.name,
@@ -44,9 +47,9 @@ const AIDrinkRecognizer = ({ onRecognized }) => {
     <div className="glass-card rounded-3xl p-6 mb-6 animate-fade-in">
       <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2">
         <Sparkles className="w-5 h-5 text-violet-400" />
-        KI-Getränkeerkennung
+        KI-GetrÃ¤nkeerkennung
       </h3>
-      <p className="text-xs text-slate-500 mb-4">Beschreibe dein Getränk, die KI schätzt den Koffeingehalt.</p>
+      <p className="text-xs text-slate-500 mb-4">Beschreibe dein GetrÃ¤nk, die KI schÃ¤tzt den Koffeingehalt.</p>
 
       <div className="flex gap-2 mb-3">
         <input
@@ -54,7 +57,7 @@ const AIDrinkRecognizer = ({ onRecognized }) => {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleRecognize()}
-          placeholder="z.B. großer Espresso doppio, Red Bull 250ml..."
+          placeholder="z.B. groÃŸer Espresso doppio, Red Bull 250ml..."
           className="input-dark flex-1"
           disabled={loading}
         />
@@ -108,7 +111,7 @@ const AIDrinkRecognizer = ({ onRecognized }) => {
             className="w-full py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
           >
             <CheckCircle className="w-4 h-4" />
-            In manuellen Rechner übernehmen
+            In manuellen Rechner Ã¼bernehmen
           </button>
         </div>
       )}
@@ -117,3 +120,4 @@ const AIDrinkRecognizer = ({ onRecognized }) => {
 };
 
 export default AIDrinkRecognizer;
+

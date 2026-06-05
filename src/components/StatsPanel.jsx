@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext';, { useState, useEffect } from 'react';
 import { TrendingUp, Calendar } from 'lucide-react';
 import { fetchTodayStats, fetchWeeklyStats, fetchUserSettings } from '../services/api';
 
@@ -46,7 +47,7 @@ export default function StatsPanel({ session, isLoading }) {
     return (
       <div className="glass-card rounded-3xl p-6 animate-fade-in">
         <div className="flex items-center justify-center py-8">
-          <p className="text-slate-400 text-sm">Lädt...</p>
+          <p className="text-slate-400 text-sm">LÃ¤dt...</p>
         </div>
       </div>
     );
@@ -57,6 +58,7 @@ export default function StatsPanel({ session, isLoading }) {
   const isOver = todayStats.isOverLimit;
 
   const formatDate = (dateStr) => {
+  const { t } = useTranslation();
     const d = new Date(dateStr + 'T00:00:00');
     const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
     return days[d.getDay()] + ' ' + d.getDate();
@@ -87,7 +89,7 @@ export default function StatsPanel({ session, isLoading }) {
             </div>
             <div className="text-right text-xs text-slate-400">
               <p>Limit: {limit}mg</p>
-              <p className="text-blue-300 font-semibold mt-1">{todayStats.logCount} Getränk{todayStats.logCount !== 1 ? 'e' : ''}</p>
+              <p className="text-blue-300 font-semibold mt-1">{todayStats.logCount} GetrÃ¤nk{todayStats.logCount !== 1 ? 'e' : ''}</p>
             </div>
           </div>
 
@@ -104,7 +106,7 @@ export default function StatsPanel({ session, isLoading }) {
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-500">{Math.round(percentage)}%</span>
             <span className={isOver ? 'text-red-400 font-semibold' : 'text-green-400 font-semibold'}>
-              {isOver ? `⚠️ ${todayStats.totalCaffeine - limit}mg über Limit` : `✓ ${todayStats.remainingCaffeine}mg verbleibend`}
+              {isOver ? `âš ï¸ ${todayStats.totalCaffeine - limit}mg Ã¼ber Limit` : `âœ“ ${todayStats.remainingCaffeine}mg verbleibend`}
             </span>
           </div>
         </div>
@@ -152,24 +154,25 @@ export default function StatsPanel({ session, isLoading }) {
             <p className="text-2xl font-bold text-amber-400">
               {Math.round(weeklyStats.reduce((sum, day) => sum + day.totalCaffeine, 0) / Math.max(weeklyStats.length, 1) || 0)}
             </p>
-            <p className="text-xs text-slate-500 mt-1">Ø pro Tag</p>
+            <p className="text-xs text-slate-500 mt-1">Ã˜ pro Tag</p>
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center">
             <p className="text-2xl font-bold text-red-400">
               {weeklyStats.filter((day) => day.totalCaffeine > limit).length}
             </p>
-            <p className="text-xs text-slate-500 mt-1">über Limit</p>
+            <p className="text-xs text-slate-500 mt-1">Ã¼ber Limit</p>
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center">
             <p className="text-2xl font-bold text-blue-400">
               {weeklyStats.reduce((sum, day) => sum + day.count, 0)}
             </p>
-            <p className="text-xs text-slate-500 mt-1">Getränke</p>
+            <p className="text-xs text-slate-500 mt-1">GetrÃ¤nke</p>
           </div>
         </div>
       </div>
     </div>
   );
 }
+

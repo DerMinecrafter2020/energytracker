@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext';, { useEffect, useState } from 'react';
 import { Bell, Mail, MessageCircle, Save } from 'lucide-react';
 import { fetchReminderSettings, saveReminderSettings, testUserEmail } from '../services/api';
 
 const ReminderSettings = ({ session }) => {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState({
     enabled: true,
     time: '18:00',
@@ -50,6 +52,7 @@ const ReminderSettings = ({ session }) => {
   }, [session?.id, session?.email]);
 
   const update = (key, value) => {
+  const { t } = useTranslation();
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -103,7 +106,7 @@ const ReminderSettings = ({ session }) => {
           <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
             <div>
               <p className="text-sm font-semibold text-white">Erinnerungen aktiv</p>
-              <p className="text-xs text-slate-500">Tägliche Erinnerung zum Tracken</p>
+              <p className="text-xs text-slate-500">TÃ¤gliche Erinnerung zum Tracken</p>
             </div>
             <button
               type="button"
@@ -141,7 +144,7 @@ const ReminderSettings = ({ session }) => {
             >
               <div className="flex items-center gap-2 mb-1">
                 <Mail className="w-4 h-4" />
-                <span className="text-sm font-semibold">E-Mail</span>
+                <span className="text-sm font-semibold">{t('email')}</span>
               </div>
               <p className="text-xs opacity-80">Reminder per Mail senden</p>
             </button>
@@ -196,7 +199,7 @@ const ReminderSettings = ({ session }) => {
                 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
             >
               <Save className="w-4 h-4" />
-              {isSaving ? 'Speichern…' : 'Reminder speichern'}
+              {isSaving ? 'Speichernâ€¦' : 'Reminder speichern'}
             </button>
           </div>
         </div>
@@ -206,3 +209,5 @@ const ReminderSettings = ({ session }) => {
 };
 
 export default ReminderSettings;
+
+

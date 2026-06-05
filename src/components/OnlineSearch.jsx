@@ -1,8 +1,10 @@
-﻿import React, { useState } from 'react';
+﻿import React
+import { useTranslation } from '../context/LanguageContext';, { useState } from 'react';
 import { Plus, Search, Loader2 } from 'lucide-react';
 
 
 const OnlineSearch = ({ onSelect }) => {
+  const { t } = useTranslation();
   const [query, setQuery]       = useState('');
   const [results, setResults]   = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -106,6 +108,7 @@ const OnlineSearch = ({ onSelect }) => {
 };
 
 export default OnlineSearch;
+
 
 
 
