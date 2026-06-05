@@ -7,7 +7,6 @@ const DAILY_LIMIT = 400;
 
 // Hilfsfunktion: Markdown ** zu HTML <strong> konvertieren
 const parseMarkdown = (text) => {
-  const { t } = useTranslation();
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/__(.*?)__/g, '<strong>$1</strong>')
@@ -62,7 +61,6 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
     if (!isResizing) return;
 
     const handleMouseMove = (e) => {
-  const { t } = useTranslation();
       if (isResizing === 'se') { // South-East
         const newWidth = Math.max(320, e.clientX - containerRef.current?.getBoundingClientRect().left);
         const newHeight = Math.max(300, e.clientY - containerRef.current?.getBoundingClientRect().top);
@@ -143,7 +141,6 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
   };
 
   const handleKey = (e) => {
-  const { t } = useTranslation();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -279,4 +276,6 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
 };
 
 export default AIAssistant;
+
+
 

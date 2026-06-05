@@ -23,7 +23,6 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
   );
 
   const handleSubmit = (e) => {
-  const { t } = useTranslation();
     e.preventDefault();
     if (!drinkName.trim()) return;
     onAddDrink({
@@ -134,6 +133,8 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
 };
 
 export default ManualCalculator;
+
+
 
 
 

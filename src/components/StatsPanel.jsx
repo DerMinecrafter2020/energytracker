@@ -4,6 +4,7 @@ import { TrendingUp, Calendar } from 'lucide-react';
 import { fetchTodayStats, fetchWeeklyStats, fetchUserSettings } from '../services/api';
 
 export default function StatsPanel({ session, isLoading }) {
+  const { t } = useTranslation();
   const [todayStats, setTodayStats] = useState(null);
   const [weeklyStats, setWeeklyStats] = useState([]);
   const [settings, setSettings] = useState(null);
@@ -58,7 +59,6 @@ export default function StatsPanel({ session, isLoading }) {
   const isOver = todayStats.isOverLimit;
 
   const formatDate = (dateStr) => {
-  const { t } = useTranslation();
     const d = new Date(dateStr + 'T00:00:00');
     const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
     return days[d.getDay()] + ' ' + d.getDate();
@@ -175,4 +175,6 @@ export default function StatsPanel({ session, isLoading }) {
     </div>
   );
 }
+
+
 

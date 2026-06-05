@@ -52,7 +52,6 @@ const ReminderSettings = ({ session }) => {
   }, [session?.id, session?.email]);
 
   const update = (key, value) => {
-  const { t } = useTranslation();
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -209,5 +208,7 @@ const ReminderSettings = ({ session }) => {
 };
 
 export default ReminderSettings;
+
+
 
 

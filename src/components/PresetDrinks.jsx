@@ -5,7 +5,6 @@ import { Heart, HeartOff, Plus } from 'lucide-react';
 const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) => {
   const { t } = useTranslation();
   const handleAddFavorite = (drink) => {
-  const { t } = useTranslation();
     onAddDrink({
       name: drink.name,
       size: drink.size,
@@ -73,5 +72,7 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
 };
 
 export default PresetDrinks;
+
+
 
 

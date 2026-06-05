@@ -32,7 +32,6 @@ const AIDrinkRecognizer = ({ onRecognized }) => {
   };
 
   const handleApply = () => {
-  const { t } = useTranslation();
     if (!result) return;
     onRecognized({
       name: result.name,
@@ -120,4 +119,6 @@ const AIDrinkRecognizer = ({ onRecognized }) => {
 };
 
 export default AIDrinkRecognizer;
+
+
 

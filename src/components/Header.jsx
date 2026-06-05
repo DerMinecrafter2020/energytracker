@@ -3,7 +3,6 @@ import { Zap, Loader2, LogOut, User, ShieldCheck, Settings, ChevronLeft } from '
 import { useTranslation } from '../context/LanguageContext';
 
 const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel, currentTab, onGoHome, onShowSettings }) => {
-  const { t } = useTranslation();
   const { t, language } = useTranslation();
   const today = new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'de-DE', {
     weekday: 'long',
@@ -91,4 +90,7 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
 };
 
 export default Header;
+
+
+
 

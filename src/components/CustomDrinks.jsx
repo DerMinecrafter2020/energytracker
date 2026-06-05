@@ -10,6 +10,7 @@ export default function CustomDrinks({
   onToggleFavorite,
   isFavoriteDrink,
 }) {
+  const { t } = useTranslation();
   const [customDrinks, setCustomDrinks] = useState([]);
   const [name, setName] = useState('');
   const [size, setSize] = useState('');
@@ -92,7 +93,6 @@ export default function CustomDrinks({
   };
 
   const handleQuickAddDrink = (drink) => {
-  const { t } = useTranslation();
     if (!onAddDrink) return;
     onAddDrink({
       name: drink.name,
@@ -105,7 +105,6 @@ export default function CustomDrinks({
   };
 
   const handleToggleFavoriteDrink = (drink) => {
-  const { t } = useTranslation();
     if (!onToggleFavorite) return;
     const favorite = !!isFavoriteDrink?.(drink);
     onToggleFavorite({
@@ -286,4 +285,6 @@ export default function CustomDrinks({
     </div>
   );
 }
+
+
 

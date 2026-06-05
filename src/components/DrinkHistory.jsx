@@ -100,3 +100,5 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
 export default DrinkHistory;
 
 
+
+

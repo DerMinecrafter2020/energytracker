@@ -3,6 +3,7 @@ import { useTranslation } from '../context/LanguageContext';, { useEffect, useSt
 import { AlertCircle, AlertTriangle, Moon, Zap, X } from 'lucide-react';
 
 export default function WarningAlert({ todayStats, settings, onClose }) {
+  const { t } = useTranslation();
   const [warnings, setWarnings] = useState([]);
   const [dismissedWarnings, setDismissedWarnings] = useState(new Set());
 
@@ -74,7 +75,6 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
   }, [todayStats, settings]);
 
   const handleDismiss = (id) => {
-  const { t } = useTranslation();
     setDismissedWarnings((prev) => new Set([...prev, id]));
     setWarnings((prev) => prev.filter((w) => w.id !== id));
   };
@@ -128,4 +128,6 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
     </div>
   );
 }
+
+
 

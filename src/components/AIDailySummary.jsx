@@ -102,3 +102,5 @@ const AIDailySummary = ({ logs = [], totalCaffeine = 0 }) => {
 
 export default AIDailySummary;
 
+
+

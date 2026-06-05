@@ -14,7 +14,6 @@ const RegisterPage = ({ onBack }) => {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const validate = () => {
-  const { t } = useTranslation();
     if (!form.name.trim())               return 'Bitte gib deinen Namen ein.';
     if (!form.email.trim())              return 'Bitte gib deine E-Mail-Adresse ein.';
     if (form.password.length < 8)        return 'Passwort muss mindestens 8 Zeichen lang sein.';
@@ -195,6 +194,8 @@ const RegisterPage = ({ onBack }) => {
 };
 
 export default RegisterPage;
+
+
 
 
 

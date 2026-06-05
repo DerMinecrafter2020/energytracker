@@ -17,7 +17,6 @@ import {
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const formatDate = (isoStr) => {
-  const { t } = useTranslation();
   if (!isoStr) return 'â€“';
   return new Date(isoStr).toLocaleString('de-DE', {
     day: '2-digit', month: '2-digit', year: 'numeric',
@@ -34,7 +33,6 @@ const getLast7Days = () =>
 
 // â”€â”€ Stat Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
-  const { t } = useTranslation();
   const colors = {
     blue:   'from-blue-600/20  to-blue-500/5  border-blue-500/20  text-blue-400',
     amber:  'from-amber-600/20 to-amber-500/5 border-amber-500/20 text-amber-400',
@@ -160,7 +158,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   };
 
   const handleSmtpChange = (path, value) => {
-  const { t } = useTranslation();
     setSmtp((prev) => {
       if (path === 'auth.user') return { ...prev, auth: { ...prev.auth, user: value } };
       if (path === 'auth.pass') return { ...prev, auth: { ...prev.auth, pass: value } };
@@ -376,7 +373,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   }, [allLogs, search, sortField, sortDir]);
 
   const toggleSort = (field) => {
-  const { t } = useTranslation();
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortField(field); setSortDir('desc'); }
   };
@@ -397,7 +393,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
   // â”€â”€ Export CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const exportCSV = () => {
-  const { t } = useTranslation();
     const header = 'ID,Name,Koffein (mg),GrÃ¶ÃŸe (ml),Datum,Erstellt';
     const rows = allLogs.map((l) =>
       [l.id, `"${l.name}"`, l.caffeine, l.size, l.date, formatDate(l.createdAt)].join(',')
@@ -412,7 +407,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   };
 
   const handleLogout = () => {
-  const { t } = useTranslation(); logout(); onLogout(); };
+ logout(); onLogout(); };
 
   // â”€â”€ Sorting icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const SortIcon = ({ field }) =>
@@ -1360,6 +1355,8 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 };
 
 export default AdminPanel;
+
+
 
 
 
