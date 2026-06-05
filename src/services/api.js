@@ -1,4 +1,4 @@
-﻿const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 export const fetchLogs = async (date, { userId, email } = {}) => {
   const url = new URL('/api/logs', API_BASE_URL);
@@ -321,7 +321,7 @@ export const removePasskey = async ({ userId, email, credentialId }) => {
 
 
 export const fetchTranslations = async () => {
-  const resp = await fetch(`${API_BASE}/api/translations`);
+  const resp = await fetch(`${API_BASE_URL}/api/translations`);
   if (!resp.ok) throw new Error("Fehler beim Laden der Übersetzungen");
   return resp.json();
 };
@@ -331,7 +331,7 @@ export const saveTranslations = async (session, translations) => {
   const headers = { "Content-Type": "application/json" };
   if (session.token) headers.Authorization = `Bearer ${session.token}`;
   
-  const resp = await fetch(`${API_BASE}/api/admin/translations`, {
+  const resp = await fetch(`${API_BASE_URL}/api/admin/translations`, {
     method: "POST",
     headers,
     body: JSON.stringify({ translations, email: session.email, userId: session.id })
