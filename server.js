@@ -1311,10 +1311,10 @@ app.get('/api/translations', async (req, res) => {
               { role: 'user', content: JSON.stringify(DEFAULT_DE_DICT) }
             ];
             const responseText = await callOpenRouter(messages);
+            require('fs').writeFileSync('ai_translation_debug.txt', responseText, 'utf8');
             let generatedDicts = null;
             try {
-              // Cleanup markdown if AI accidentally includes it
-              const cleanText = responseText.replace(/^\s*```json\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+              let cleanText = responseText.replace(/^\s*```json\s*/i, '').replace(/\s*```\s*$/i, '').trim();
               generatedDicts = JSON.parse(cleanText);
             } catch(e) {
               console.error('[AI] Translation JSON parse error:', e.message);
