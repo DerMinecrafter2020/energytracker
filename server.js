@@ -611,7 +611,7 @@ const callOpenRouter = async (messages, { model, apiKey } = {}) => {
       'X-Title': 'Koffein-Tracker',
     },
     body: JSON.stringify({ model: mdl, messages }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(120000),
   });
 
   if (!response.ok) {
@@ -1295,7 +1295,7 @@ app.get('/api/translations', async (req, res) => {
           try {
             console.log('[AI] Erster Start erkannt: Generiere fehlende Übersetzungen via KI...');
             const messages = [
-              { role: 'system', content: 'Du bist ein professioneller Übersetzer für eine Koffein-Tracker-Web-App. Der Benutzer gibt dir ein JSON-Objekt mit deutschen Texten. Du sollst dieses JSON-Objekt ins Englische ("en"), Spanische ("es") und Französische ("fr") übersetzen. Antworte AUSSCHLIESSLICH mit einem gültigen JSON-Objekt, das die Sprachen als Top-Level-Keys ("en", "es", "fr") enthält, und darunter die übersetzten Key-Value-Paare. Verwende KEIN Markdown (wie ```json).' },
+              { role: 'system', content: 'Du bist ein professioneller Übersetzer für eine Koffein-Tracker-Web-App. Der Benutzer gibt dir ein JSON-Objekt mit deutschen Texten. Du sollst dieses JSON-Objekt ins Englische ("en") übersetzen. Antworte AUSSCHLIESSLICH mit einem gültigen JSON-Objekt, das die Sprache als Top-Level-Key ("en") enthält, und darunter die übersetzten Key-Value-Paare. Verwende KEIN Markdown (wie ```json).' },
               { role: 'user', content: JSON.stringify(DEFAULT_DE_DICT) }
             ];
             const responseText = await callOpenRouter(messages);
@@ -2999,6 +2999,8 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
+
+
 
 
 
