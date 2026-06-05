@@ -13,10 +13,10 @@ import {
   removePasskey,
   updateUserProfile,
 } from '../services/api';
-import { useTranslation } from '../context/LanguageContext';
+
 
 export default function SettingsPanel({ session, isLoading, onSettingsChange }) {
-  const { t, language } = useTranslation();
+  
   const [settings, setSettings] = useState(null);
   const [localLimit, setLocalLimit] = useState('400');
   const [notifyAtLimit, setNotifyAtLimit] = useState(true);
@@ -294,14 +294,14 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
           </h4>
           <form onSubmit={handleUpdateProfile} className="space-y-3">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">{t('name')}</label>
+              <label className="block text-xs text-slate-400 mb-1">{'Name'}</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="input-dark text-sm py-2 pl-9" />
               </div>
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">{t('email')}</label>
+              <label className="block text-xs text-slate-400 mb-1">{'E-Mail'}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} className="input-dark text-sm py-2 pl-9" />
@@ -337,11 +337,11 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         {/* Theme & Language */}
         <div className="border-b border-white/10 pb-5">
           <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            {t('theme')} & {t('language')}
+            {'Erscheinungsbild'} & {}
           </h4>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-2">{t('language')}</label>
+              <label className="block text-xs text-slate-400 mb-2">{}</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -370,7 +370,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
               </div>
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">{t('theme')}</label>
+              <label className="block text-xs text-slate-400 mb-1">{'Erscheinungsbild'}</label>
               <select value={theme} onChange={(e) => setTheme(e.target.value)} className="input-dark text-sm appearance-none cursor-pointer">
                 <option value="system">Standard Dark</option>
                 <option value="light">Light Mode</option>

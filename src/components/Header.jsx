@@ -1,10 +1,8 @@
 import React from 'react';
 import { Zap, Loader2, LogOut, User, ShieldCheck, Settings, ChevronLeft } from 'lucide-react';
-import { useTranslation } from '../context/LanguageContext';
 
 const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel, currentTab, onGoHome, onShowSettings }) => {
-  const { t, language } = useTranslation();
-  const today = new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'de-DE', {
+    const today = new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'de-DE', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -55,7 +53,7 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
                 title="Zum Admin-Panel"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span className="text-xs hidden sm:inline">{t('adminPanel')}</span>
+                <span className="text-xs hidden sm:inline">{'Admin'}</span>
               </button>
             )}
             <button 
@@ -82,7 +80,7 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
         )}
 
         {!isAuthenticated && (
-          <p className="text-xs text-slate-600">{t('connecting')}</p>
+          <p className="text-xs text-slate-600">{'Verbinde…'}</p>
         )}
       </div>
     </header>

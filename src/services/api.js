@@ -320,23 +320,5 @@ export const removePasskey = async ({ userId, email, credentialId }) => {
 
 
 
-export const fetchTranslations = async () => {
-  const resp = await fetch(`${API_BASE_URL}/api/translations`);
-  if (!resp.ok) throw new Error("Fehler beim Laden der Übersetzungen");
-  return resp.json();
-};
 
-export const saveTranslations = async (session, translations) => {
-  if (!session) throw new Error("Nicht angemeldet");
-  const headers = { "Content-Type": "application/json" };
-  if (session.token) headers.Authorization = `Bearer ${session.token}`;
-  
-  const resp = await fetch(`${API_BASE_URL}/api/admin/translations`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ translations, email: session.email, userId: session.id })
-  });
-  if (!resp.ok) throw new Error("Fehler beim Speichern der Übersetzungen");
-  return resp.json();
-};
 

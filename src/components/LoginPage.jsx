@@ -9,11 +9,9 @@ import {
 
 } from '../services/auth';
 import { fetchPublicSettings } from '../services/adminApi';
-import { useTranslation } from '../context/LanguageContext';
 
 const LoginPage = ({ onLogin, onShowRegister }) => {
-  const { t } = useTranslation();
-  const [email, setEmail]       = useState('');
+    const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
   const [error, setError]       = useState('');
@@ -215,11 +213,11 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
         {view === 'forgot' ? (
           <form onSubmit={handleForgot} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'E-Mail'}</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t('emailPlaceholder')} autoComplete="email" className="input-dark pl-12" />
+                  placeholder={'name@example.com'} autoComplete="email" className="input-dark pl-12" />
               </div>
             </div>
             {error && (
@@ -266,16 +264,16 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
         ) : !pending2FA ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'E-Mail'}</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t('emailPlaceholder')} autoComplete="email" className="input-dark pl-12" />
+                  placeholder={'name@example.com'} autoComplete="email" className="input-dark pl-12" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('passwordToken')}</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'Passwort / App-Token'}</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input type={showPw ? 'text' : 'password'} value={password}
@@ -304,7 +302,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
               className="w-full py-3.5 rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
               {isLoading
                 ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <><LogIn className="w-4 h-4" />{t('loginButton')}</>
+                : <><LogIn className="w-4 h-4" />{'Einloggen'}</>
               }
             </button>
           </form>
@@ -382,10 +380,10 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
           {publicSettings.registrationEnabled && (
           <div className="mt-5 pt-4 border-t border-white/10 text-center">
             <p className="text-sm text-slate-500">
-              {t('noAccount')} 
+              {'Noch keinen Account?'} 
               <button onClick={onShowRegister}
                 className="text-blue-400 hover:text-blue-300 font-medium transition-colors">
-                {t('registerHere')}
+                {'Hier registrieren'}
               </button>
             </p>
           </div>
@@ -394,7 +392,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
           {/* Demo fill */}
           {publicSettings.demoEnabled && (
           <div className="mt-4 pt-4 border-t border-white/10">
-            <p className="text-xs text-slate-600 text-center mb-3">{t('demoLogin')}</p>
+            <p className="text-xs text-slate-600 text-center mb-3">{'Demo Login'}</p>
             <div className="flex gap-2">
               <button type="button" onClick={() => fillDemo('admin')}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl

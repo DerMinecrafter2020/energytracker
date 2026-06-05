@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useTranslation } from '../context/LanguageContext';
 import { Bell, Mail, MessageCircle, Save } from 'lucide-react';
 import { fetchReminderSettings, saveReminderSettings, testUserEmail } from '../services/api';
 
 const ReminderSettings = ({ session }) => {
-  const { t } = useTranslation();
-  const [settings, setSettings] = useState({
+    const [settings, setSettings] = useState({
     enabled: true,
     time: '18:00',
     mailEnabled: true,
@@ -143,7 +141,7 @@ const ReminderSettings = ({ session }) => {
             >
               <div className="flex items-center gap-2 mb-1">
                 <Mail className="w-4 h-4" />
-                <span className="text-sm font-semibold">{t('email')}</span>
+                <span className="text-sm font-semibold">{'E-Mail'}</span>
               </div>
               <p className="text-xs opacity-80">Reminder per Mail senden</p>
             </button>

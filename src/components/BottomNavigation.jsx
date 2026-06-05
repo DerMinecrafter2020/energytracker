@@ -1,13 +1,11 @@
 import React from 'react';
 import { Home, Search, BarChart2 } from 'lucide-react';
-import { useTranslation } from '../context/LanguageContext';
 
 const BottomNavigation = ({ currentTab, onChangeTab }) => {
-  const { t } = useTranslation();
-  const tabs = [
-    { id: 'home', icon: Home, label: t('home') },
-    { id: 'search', icon: Search, label: t('discover') },
-    { id: 'history', icon: BarChart2, label: t('history') },
+    const tabs = [
+    { id: 'home', icon: Home, label: 'Home' },
+    { id: 'search', icon: Search, label: 'Entdecken' },
+    { id: 'history', icon: BarChart2, label: 'Verlauf' },
   ];
 
   return (

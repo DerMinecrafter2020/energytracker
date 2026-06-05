@@ -28,7 +28,7 @@ import {
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
 import { fetchPublicSettings } from './services/adminApi';
-import { LanguageProvider, useTranslation } from './context/LanguageContext';
+
 
 const getTodayKey = () => new Date().toISOString().split('T')[0];
 const VIEW_STATE_KEY = 'et:last-view-state';
@@ -164,7 +164,7 @@ function TrackerApp(props) {
 }
 
 function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, onPersistScrollY }) {
-  const { t, language, setLanguage } = useTranslation();
+  
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [logs, setLogs]           = useState([]);
@@ -541,7 +541,7 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
         {currentTab === 'settings' && (
           <div className="space-y-6 animate-fade-in">
             <div className="glass-card rounded-[2rem] p-6 shadow-glass">
-              <h2 className="text-xl font-bold text-white mb-6">{t('settings')}</h2>
+              <h2 className="text-xl font-bold text-white mb-6">{'Einstellungen'}</h2>
               <SettingsPanel
                 session={session}
                 isLoading={isOperationLoading}
@@ -555,7 +555,7 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
 
       <footer className="text-center py-6 pb-32 text-slate-600 text-sm">
         <p>Koffein-Tracker &copy; {new Date().getFullYear()}</p>
-        <p className="text-xs mt-1 mb-2">{t('whoRecommendation')}</p>
+        <p className="text-xs mt-1 mb-2">{'WHO-Empfehlung: 400mg pro Tag'}</p>
         {(currentVersion || latestVersion) && (
           <p className="text-[10px] text-slate-500 opacity-60 font-mono tracking-wider">
             Version {latestVersion || currentVersion}

@@ -1,5 +1,4 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
-import { useTranslation } from '../context/LanguageContext';
 import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
@@ -8,7 +7,7 @@ import {
   CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash,
 } from 'lucide-react';
 import { logout } from '../services/auth';
-import { fetchLogs, deleteLog as deleteApiLog, fetchTranslations, saveTranslations } from '../services/api';
+import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
@@ -55,8 +54,7 @@ const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
 
 // â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initialActiveTab = 'overview', onActiveTabChange }) => {
-  const { t } = useTranslation();
-  const [allLogs, setAllLogs]     = useState([]);
+    const [allLogs, setAllLogs]     = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState(null);
   const [deleting, setDeleting]   = useState(null);
@@ -65,30 +63,10 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [sortDir, setSortDir]     = useState('desc');
   const [activeTab, setActiveTab] = useState(initialActiveTab);
 
-  const [translationsJson, setTranslationsJson] = useState('');
-  const [loadingTranslations, setLoadingTranslations] = useState(false);
-  const [msg, setMsg] = useState(null);
+    const [msg, setMsg] = useState(null);
 
-  useEffect(() => {
-    if (activeTab === 'translations') {
-      setLoadingTranslations(true);
-      fetchTranslations().then(data => {
-        setTranslationsJson(JSON.stringify(data, null, 2));
-      }).catch(e => setError(e.message))
-      .finally(() => setLoadingTranslations(false));
-    }
-  }, [activeTab]);
-
-  const handleSaveTranslations = async () => {
-    try {
-      const parsed = JSON.parse(translationsJson);
-      await saveTranslations(session, parsed);
-      setMsg({ type: 'success', text: 'Übersetzungen erfolgreich gespeichert' });
-    } catch(e) {
-      setError('Ungültiges JSON oder Speicherfehler: ' + e.message);
-    }
-  };
-
+  
+  
 
   // â”€â”€ SMTP state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const defaultSmtp = { host: '', port: 587, secure: false, auth: { user: '', pass: '' },
@@ -496,7 +474,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             { id: 'logs',      label: 'Alle Logs',  icon: Database   },
             { id: 'users',     label: 'Benutzer',   icon: Users      },
             { id: 'settings',  label: 'Einstellungen', icon: Settings },
-            { id: 'translations', label: 'Sprachen', icon: Globe },
+            
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -764,14 +742,14 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   <form onSubmit={handleCreateUser} className="space-y-4">
                     {/* Name */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('name')}</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'Name'}</label>
                       <input type="text" required value={createForm.name}
                         onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
-                        placeholder={t('namePlaceholder')} className="input-dark" />
+                        placeholder={'Max Mustermann'} className="input-dark" />
                     </div>
                     {/* Email */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'E-Mail'}</label>
                       <div className="relative">
                         <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input type="email" required value={createForm.email}
@@ -781,7 +759,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     </div>
                     {/* Password */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('passwordToken')}</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'Passwort / App-Token'}</label>
                       <div className="relative">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input type={showCreatePw ? 'text' : 'password'} required minLength={8}
@@ -879,7 +857,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   {/* Header */}
                   <div className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_auto] gap-3 px-5 py-3
                     border-b border-white/10 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <span>{t('name')}</span><span>{t('email')}</span><span>Rolle</span><span>Status</span><span>Registriert</span>
+                    <span>{'Name'}</span><span>{'E-Mail'}</span><span>Rolle</span><span>Status</span><span>Registriert</span>
                     <span className="text-right">Aktionen</span>
                   </div>
                   <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto">
