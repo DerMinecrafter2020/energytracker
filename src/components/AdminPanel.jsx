@@ -1,10 +1,10 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
   Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
-  CheckCircle, UserCheck, UserX, Clock, Shield, Bot,
+  CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash,
 } from 'lucide-react';
 import { logout } from '../services/auth';
 import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
@@ -960,16 +960,22 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Server-Host
                   </label>
-                  <input type="text" value={smtp.host} onChange={(e) => handleSmtpChange('host', e.target.value)}
-                    placeholder="smtp.gmail.com" className="input-dark" />
+                  <div className="relative">
+                    <Server className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input type="text" value={smtp.host} onChange={(e) => handleSmtpChange('host', e.target.value)}
+                      placeholder="smtp.gmail.com" className="input-dark pl-9" />
+                  </div>
                 </div>
                 <div className="w-24">
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Port
                   </label>
-                  <input type="number" value={smtp.port} min="1" max="65535"
-                    onChange={(e) => handleSmtpChange('port', Number(e.target.value))}
-                    className="input-dark" />
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input type="number" value={smtp.port} min="1" max="65535"
+                      onChange={(e) => handleSmtpChange('port', Number(e.target.value))}
+                      className="input-dark pl-9" />
+                  </div>
                 </div>
               </div>
 
@@ -1033,17 +1039,23 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Absender-Name
                   </label>
-                  <input type="text" value={smtp.fromName}
-                    onChange={(e) => handleSmtpChange('fromName', e.target.value)}
-                    placeholder="Koffein-Tracker" className="input-dark" />
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input type="text" value={smtp.fromName}
+                      onChange={(e) => handleSmtpChange('fromName', e.target.value)}
+                      placeholder="Koffein-Tracker" className="input-dark pl-9" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Absender-E-Mail
                   </label>
-                  <input type="email" value={smtp.fromEmail}
-                    onChange={(e) => handleSmtpChange('fromEmail', e.target.value)}
-                    placeholder="noreply@deine-domain.de" className="input-dark" />
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input type="email" value={smtp.fromEmail}
+                      onChange={(e) => handleSmtpChange('fromEmail', e.target.value)}
+                      placeholder="noreply@deine-domain.de" className="input-dark pl-9" />
+                  </div>
                 </div>
               </div>
 
@@ -1052,9 +1064,12 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                   App-URL <span className="normal-case font-normal text-slate-600">(für Bestätigungslinks in E-Mails)</span>
                 </label>
-                <input type="url" value={smtp.baseUrl}
-                  onChange={(e) => handleSmtpChange('baseUrl', e.target.value)}
-                  placeholder="https://deine-app.de" className="input-dark" />
+                <div className="relative">
+                  <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input type="url" value={smtp.baseUrl}
+                    onChange={(e) => handleSmtpChange('baseUrl', e.target.value)}
+                    placeholder="https://deine-app.de" className="input-dark pl-9" />
+                </div>
               </div>
 
               {/* Save button */}

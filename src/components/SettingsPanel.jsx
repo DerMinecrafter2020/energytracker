@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Zap, Clock, AlertCircle, Shield, KeyRound, Trash2 } from 'lucide-react';
+import { Settings, Zap, Clock, AlertCircle, Shield, KeyRound, Trash2, User, Mail, Lock } from 'lucide-react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import {
   fetchUserSettings,
@@ -295,19 +295,31 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
           <form onSubmit={handleUpdateProfile} className="space-y-3">
             <div>
               <label className="block text-xs text-slate-400 mb-1">Name</label>
-              <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="input-dark text-sm py-2" />
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="input-dark text-sm py-2 pl-9" />
+              </div>
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">E-Mail</label>
-              <input type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} className="input-dark text-sm py-2" />
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} className="input-dark text-sm py-2 pl-9" />
+              </div>
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Neues Passwort (optional)</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-dark text-sm py-2" placeholder="Leer lassen um es nicht zu ändern" />
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-dark text-sm py-2 pl-9" placeholder="Leer lassen um es nicht zu ändern" />
+              </div>
             </div>
             <div className="pt-2">
               <label className="block text-xs text-amber-400 mb-1">Aktuelles Passwort (erforderlich)</label>
-              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input-dark text-sm py-2 border border-amber-500/30" required />
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/70" />
+                <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input-dark text-sm py-2 pl-9 border border-amber-500/30" required />
+              </div>
             </div>
             
             <button type="submit" disabled={profileSaving} className="w-full px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-colors disabled:opacity-50 mt-2">
