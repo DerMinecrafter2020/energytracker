@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect } from 'react';
 import { fetchTranslations } from '../services/api';
 
 const translations = {
@@ -10,15 +10,15 @@ const translations = {
     settings: 'Einstellungen',
     language: 'Sprache',
     theme: 'Erscheinungsbild',
-    dailyLimit: 'Tägliches Koffein-Limit',
+    dailyLimit: 'TÃ¤gliches Koffein-Limit',
     whoRecommendation: 'WHO-Empfehlung: 400mg pro Tag',
     notifications: 'Benachrichtigungen',
-    limitExceeded: 'Limit überschritten',
+    limitExceeded: 'Limit Ã¼berschritten',
     limitWarningDesc: 'Warnung wenn Koffein Limit erreicht wird',
-    lateCaffeine: 'Spätes Koffein',
+    lateCaffeine: 'SpÃ¤tes Koffein',
     lateWarningDesc: 'Warnung nach 18:00 Uhr',
     rapidSequence: 'Schnelle Folge',
-    rapidWarningDesc: 'Warnung bei 3+ Getränken in 2h',
+    rapidWarningDesc: 'Warnung bei 3+ GetrÃ¤nken in 2h',
     alsoDiscord: 'Auch per Discord senden',
     save: 'Speichern',
     saving: 'Speichern...',
@@ -28,26 +28,26 @@ const translations = {
     name: 'Name',
     email: 'E-Mail',
     newPasswordOptional: 'Neues Passwort (optional)',
-    newPasswordPlaceholder: 'Leer lassen um es nicht zu ändern',
+    newPasswordPlaceholder: 'Leer lassen um es nicht zu Ã¤ndern',
     currentPasswordReq: 'Aktuelles Passwort (erforderlich)',
     updateProfile: 'Profil aktualisieren',
     security: 'Sicherheit (2FA)',
     adminPanel: 'Admin',
     logout: 'Abmelden',
-    connecting: 'Verbinde…',
-    searchDrinkPlaceholder: 'Getränk suchen...',
-    addDrink: 'Hinzufügen',
-    customDrinksTitle: 'Eigene Getränke',
+    connecting: 'Verbindeâ€¦',
+    searchDrinkPlaceholder: 'GetrÃ¤nk suchen...',
+    addDrink: 'HinzufÃ¼gen',
+    customDrinksTitle: 'Eigene GetrÃ¤nke',
     todayCaffeine: 'Heute getrunken',
-    remaining: 'Übrig',
+    remaining: 'Ãœbrig',
     cancel: 'Abbrechen',
-    delete: 'Löschen',
+    delete: 'LÃ¶schen',
     drinkHistory: 'Trinkverlauf',
-    noDrinksToday: 'Noch keine Getränke heute eingetragen.',
+    noDrinksToday: 'Noch keine GetrÃ¤nke heute eingetragen.',
     login: 'Anmelden',
     register: 'Registrieren',
     emailPlaceholder: 'name@example.com',
-    passwordPlaceholder: '••••••••',
+    passwordPlaceholder: 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢',
     loginButton: 'Einloggen',
     noAccount: 'Noch keinen Account?',
     registerHere: 'Hier registrieren',
@@ -66,13 +66,13 @@ const translations = {
     appUrl: 'App-URL',
     saveSettings: 'Einstellungen speichern',
     manualEntry: 'Manueller Eintrag',
-    presetDrinks: 'Standardgetränke',
-    addCustomDrink: 'Neues Getränk erstellen',
-    drinkName: 'Getränkename',
-    sizeMl: 'Größe (ml)',
+    presetDrinks: 'StandardgetrÃ¤nke',
+    addCustomDrink: 'Neues GetrÃ¤nk erstellen',
+    drinkName: 'GetrÃ¤nkename',
+    sizeMl: 'GrÃ¶ÃŸe (ml)',
     caffeineMg: 'Koffein (mg)',
     stats: 'Statistiken',
-    weeklyOverview: 'Wochenübersicht',
+    weeklyOverview: 'WochenÃ¼bersicht',
     dailyAverage: 'Tagesdurchschnitt',
     totalCaffeine: 'Gesamtes Koffein',
     reminders: 'Erinnerungen',
@@ -82,17 +82,17 @@ const translations = {
     aiAssistant: 'KI-Assistent',
     searchOnline: 'Online suchen',
     demoLogin: 'Demo Login',
-    back: 'Zurück',
-    add: 'Hinzufügen',
+    back: 'ZurÃ¼ck',
+    add: 'HinzufÃ¼gen',
     edit: 'Bearbeiten',
     success: 'Erfolgreich',
     error: 'Fehler',
-    size: 'Größe',
+    size: 'GrÃ¶ÃŸe',
     caffeine: 'Koffein',
-    confirmPassword: 'Passwort bestätigen',
+    confirmPassword: 'Passwort bestÃ¤tigen',
     namePlaceholder: 'Max Mustermann',
     welcome: 'Willkommen!',
-    welcomeBack: 'Willkommen zurück',
+    welcomeBack: 'Willkommen zurÃ¼ck',
   },
   en: {
     home: 'Home',
@@ -126,7 +126,7 @@ const translations = {
     security: 'Security (2FA)',
     adminPanel: 'Admin',
     logout: 'Logout',
-    connecting: 'Connecting…',
+    connecting: 'Connectingâ€¦',
     searchDrinkPlaceholder: 'Search drink...',
     addDrink: 'Add',
     customDrinksTitle: 'Custom Drinks',
@@ -139,7 +139,7 @@ const translations = {
     login: 'Login',
     register: 'Register',
     emailPlaceholder: 'name@example.com',
-    passwordPlaceholder: '••••••••',
+    passwordPlaceholder: 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢',
     loginButton: 'Sign In',
     noAccount: 'No account yet?',
     registerHere: 'Register here',
@@ -190,7 +190,8 @@ const translations = {
 
 const LanguageContext = createContext({ language: 'de', customTranslations: null });
 
-export const LanguageProvider = ({ language, children }) => {
+export const LanguageProvider = ({ language: initialLanguage, children }) => {
+  const [language, setLanguage] = useState(initialLanguage || 'de');
   const [customTranslations, setCustomTranslations] = useState(null);
 
   useEffect(() => {
@@ -200,7 +201,7 @@ export const LanguageProvider = ({ language, children }) => {
   }, []);
 
   return (
-    <LanguageContext.Provider value={{ language: language || 'de', customTranslations }}>
+    <LanguageContext.Provider value={{ language, setLanguage, customTranslations }}>
       {children}
     </LanguageContext.Provider>
   );
@@ -213,10 +214,16 @@ export const useTranslation = () => {
   const customTranslations = typeof context === 'string' ? null : context.customTranslations;
   
   const t = (key) => {
-    const activeDict = customTranslations?.[language] || translations[language];
-    const defaultDict = customTranslations?.['de'] || translations['de'];
-    return activeDict?.[key] || defaultDict?.[key] || key;
+    const customActive = customTranslations?.[language];
+    const customDefault = customTranslations?.['de'];
+    const hardcodedActive = translations[language];
+    const hardcodedDefault = translations['de'];
+    
+    return customActive?.[key] || hardcodedActive?.[key] || customDefault?.[key] || hardcodedDefault?.[key] || key;
   };
 
-  return { t, language };
+  const setLanguage = typeof context === 'string' ? () => {} : context.setLanguage;
+  return { t, language, setLanguage };
 };
+
+
