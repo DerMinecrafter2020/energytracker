@@ -157,15 +157,27 @@ export const fetchUserSettings = async ({ userId, email }) => {
   return data;
 };
 
-export const updateUserSettings = async ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid }) => {
+export const updateUserSettings = async ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }) => {
   const response = await fetch(`${API_BASE_URL}/api/settings/me`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid }),
+    body: JSON.stringify({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }),
   });
 
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Fehler beim Speichern der Einstellungen');
+  return data;
+};
+
+export const updateUserProfile = async ({ userId, email, currentPassword, newName, newEmail, newPassword }) => {
+  const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, email, currentPassword, newName, newEmail, newPassword }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Aktualisieren des Profils');
   return data;
 };
 

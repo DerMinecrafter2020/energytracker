@@ -109,3 +109,45 @@ body {
 .animate-fade-in {
   animation: fade-in 0.3s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
+
+/* Themes */
+.theme-light {
+  --md-sys-color-background: #f8f9fa;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-surface-variant: #e9ecef;
+  --md-sys-color-primary: #0b57d0;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-on-surface: #1f1f1f;
+  --md-sys-color-on-surface-variant: #444746;
+  --md-sys-color-outline: #74777f;
+}
+
+.theme-oled {
+  --md-sys-color-background: #000000;
+  --md-sys-color-surface: #0a0a0a;
+  --md-sys-color-surface-variant: #1a1a1a;
+  --md-sys-color-primary: #a8c7fa;
+  --md-sys-color-on-surface: #e2e2e5;
+  --md-sys-color-on-surface-variant: #c4c6d0;
+  --md-sys-color-outline: #8e9099;
+}
+
+.theme-neon {
+  --md-sys-color-background: #090014;
+  --md-sys-color-surface: #13002b;
+  --md-sys-color-surface-variant: #1e0043;
+  --md-sys-color-primary: #d946ef;
+  --md-sys-color-on-surface: #fae8ff;
+  --md-sys-color-on-surface-variant: #f0abfc;
+  --md-sys-color-outline: #a855f7;
+}
+
+.theme-forest {
+  --md-sys-color-background: #04100b;
+  --md-sys-color-surface: #081d14;
+  --md-sys-color-surface-variant: #0c2b1f;
+  --md-sys-color-primary: #34d399;
+  --md-sys-color-on-surface: #ecfdf5;
+  --md-sys-color-on-surface-variant: #6ee7b7;
+  --md-sys-color-outline: #10b981;
+}

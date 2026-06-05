@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 
 import dotenv from 'dotenv';
@@ -387,6 +387,22 @@ class FileDbAdapter {
       user.password_hash = hash;
       user.reset_token = null;
       user.reset_token_expiry = null;
+      persistDbState();
+      return [makeResult(1)];
+    }
+
+    if (q.startsWith('update users set name = ?, email = ?, password_hash = ? where id = ?')) {
+      const name = params[0];
+      const email = params[1];
+      const hash = params[2];
+      const id = params[3];
+      const user = dbState.users.find((u) => u.id === id);
+      if (!user) return [makeResult(0)];
+      user.name = name;
+      user.email = email;
+      if (hash) {
+        user.password_hash = hash;
+      }
       persistDbState();
       return [makeResult(1)];
     }
@@ -885,11 +901,12 @@ const getUserSettings = ({ userId, email }) => {
     discordNotifyAtLimit: false,
     discordNotifyLate: false,
     discordNotifyRapid: false,
+    theme: 'system',
     createdAt: new Date().toISOString(),
   };
 };
 
-const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid }) => {
+const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   let settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
   if (!settings) {
@@ -903,6 +920,7 @@ const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLa
   if (discordNotifyAtLimit !== undefined) settings.discordNotifyAtLimit = discordNotifyAtLimit;
   if (discordNotifyLate !== undefined) settings.discordNotifyLate = discordNotifyLate;
   if (discordNotifyRapid !== undefined) settings.discordNotifyRapid = discordNotifyRapid;
+  if (theme !== undefined) settings.theme = theme;
   
   settings.updatedAt = new Date().toISOString();
   persistDbState();
@@ -2066,7 +2084,7 @@ app.get('/api/settings/me', async (req, res) => {
 
 app.post('/api/settings/me', async (req, res) => {
   try {
-    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid } = req.body || {};
+    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme } = req.body || {};
     const safeEmail = String(email || '').toLowerCase().trim();
     const safeUserId = String(userId || '').trim() || null;
 
@@ -2083,12 +2101,63 @@ app.post('/api/settings/me', async (req, res) => {
       notifyRapid,
       discordNotifyAtLimit,
       discordNotifyLate,
-      discordNotifyRapid
+      discordNotifyRapid,
+      theme
     });
 
     res.json(settings);
   } catch (err) {
     console.error('POST /api/settings/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/user/profile', async (req, res) => {
+  try {
+    const { userId, email, currentPassword, newName, newEmail, newPassword } = req.body || {};
+    const safeUserId = String(userId || '').trim() || null;
+    const safeEmail  = String(email || '').toLowerCase().trim();
+
+    const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
+    if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
+    
+    if (user.password_hash !== hashPassword(currentPassword)) {
+      return res.status(401).json({ error: 'Aktuelles Passwort ist falsch.' });
+    }
+
+    const dbPool = getPool();
+    let finalEmail = user.email;
+    let finalName = user.name;
+    let finalHash = user.password_hash;
+
+    if (newEmail && newEmail.toLowerCase() !== user.email) {
+      const lowerNewEmail = newEmail.toLowerCase();
+      const [existing] = await dbPool.execute('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1', [lowerNewEmail, user.id]);
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Diese E-Mail wird bereits verwendet.' });
+      }
+      finalEmail = lowerNewEmail;
+    }
+    
+    if (newName && newName.trim() !== '') {
+      finalName = newName.trim();
+    }
+
+    if (newPassword) {
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: 'Neues Passwort muss mindestens 8 Zeichen lang sein.' });
+      }
+      finalHash = hashPassword(newPassword);
+    }
+
+    await dbPool.execute(
+      'UPDATE users SET name = ?, email = ?, password_hash = ? WHERE id = ?',
+      [finalName, finalEmail, finalHash, user.id]
+    );
+
+    res.json({ success: true, name: finalName, email: finalEmail });
+  } catch (err) {
+    console.error('POST /api/user/profile error:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });

@@ -11,6 +11,7 @@ import {
   fetchPasskeyRegistrationOptions,
   verifyPasskeyRegistration,
   removePasskey,
+  updateUserProfile,
 } from '../services/api';
 
 export default function SettingsPanel({ session, isLoading, onSettingsChange }) {
@@ -22,8 +23,16 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
   const [discordNotifyAtLimit, setDiscordNotifyAtLimit] = useState(false);
   const [discordNotifyLate, setDiscordNotifyLate] = useState(false);
   const [discordNotifyRapid, setDiscordNotifyRapid] = useState(false);
+  const [theme, setTheme] = useState('system');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  
+  const [profileName, setProfileName] = useState(session?.name || '');
+  const [profileEmail, setProfileEmail] = useState(session?.email || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
   const [security, setSecurity] = useState({ totpEnabled: false, passkeys: [] });
   const [totpPassword, setTotpPassword] = useState('');
   const [totpSecret, setTotpSecret] = useState('');
@@ -60,6 +69,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         setDiscordNotifyAtLimit(!!data.discordNotifyAtLimit);
         setDiscordNotifyLate(!!data.discordNotifyLate);
         setDiscordNotifyRapid(!!data.discordNotifyRapid);
+        setTheme(data.theme || 'system');
 
         const sec = await fetchSecurityStatus(userPayload);
         setSecurity(sec);
@@ -88,6 +98,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         discordNotifyAtLimit,
         discordNotifyLate,
         discordNotifyRapid,
+        theme,
       });
 
       setSettings(updatedSettings);
@@ -100,6 +111,33 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
       console.error(err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!currentPassword) {
+      setProfileMessage('error:Bitte aktuelles Passwort eingeben.');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileMessage('');
+    try {
+      await updateUserProfile({
+        userId: session.userId || null,
+        email: session.email,
+        currentPassword,
+        newName: profileName,
+        newEmail: profileEmail,
+        newPassword: newPassword || undefined
+      });
+      setProfileMessage('success:Profil erfolgreich aktualisiert!');
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err) {
+      setProfileMessage(`error:${err.message}`);
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -244,6 +282,54 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
       </h3>
 
       <div className="space-y-5">
+        {/* Profile */}
+        <div className="border-b border-white/10 pb-5">
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            Profil bearbeiten
+          </h4>
+          <form onSubmit={handleUpdateProfile} className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Name</label>
+              <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="input-dark text-sm py-2" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">E-Mail</label>
+              <input type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} className="input-dark text-sm py-2" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Neues Passwort (optional)</label>
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-dark text-sm py-2" placeholder="Leer lassen um es nicht zu ändern" />
+            </div>
+            <div className="pt-2">
+              <label className="block text-xs text-amber-400 mb-1">Aktuelles Passwort (erforderlich)</label>
+              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input-dark text-sm py-2 border border-amber-500/30" required />
+            </div>
+            
+            <button type="submit" disabled={profileSaving} className="w-full px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-colors disabled:opacity-50 mt-2">
+              {profileSaving ? 'Wird gespeichert...' : 'Profil aktualisieren'}
+            </button>
+
+            {profileMessage && (
+              <div className={`px-3 py-2 rounded-xl text-sm ${profileMessage.startsWith('error') ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-green-500/10 text-green-300 border border-green-500/20'}`}>
+                {profileMessage.split(':')[1]}
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Theme */}
+        <div className="border-b border-white/10 pb-5">
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            Erscheinungsbild
+          </h4>
+          <select value={theme} onChange={(e) => setTheme(e.target.value)} className="input-dark text-sm appearance-none cursor-pointer">
+            <option value="system">Standard Dark</option>
+            <option value="light">Light Mode</option>
+            <option value="oled">True Black (OLED)</option>
+            <option value="neon">Neon Punk</option>
+            <option value="forest">Forest Green</option>
+          </select>
+        </div>
         {/* Daily Limit */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">

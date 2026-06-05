@@ -23,6 +23,7 @@ import {
   addFavorite,
   removeFavorite,
   fetchTodayStats,
+  fetchUserSettings,
 } from './services/api';
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
@@ -177,14 +178,16 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const fetchAllData = useCallback(async () => {
     try {
       const today = getTodayKey();
-      const [todayLogs, favData, statsData] = await Promise.all([
+      const [todayLogs, favData, statsData, userSettings] = await Promise.all([
         fetchTodayLogs(today, { userId: session?.id, email: session?.email }),
         session?.email ? fetchFavorites({ userId: session?.id, email: session?.email }) : Promise.resolve({ items: [] }),
         session?.email ? fetchTodayStats({ userId: session?.id || null, email: session?.email }) : Promise.resolve(null),
+        session?.email ? fetchUserSettings({ userId: session?.id || null, email: session?.email }) : Promise.resolve(null),
       ]);
       setLogs(todayLogs);
       if (favData?.items) setFavorites(favData.items);
       if (statsData) setTodayStats(statsData);
+      if (userSettings) setSettings(userSettings);
     } catch (err) {
       console.error('Fehler beim Laden der Daten:', err);
       setError('Fehler beim Laden der Daten.');
@@ -234,6 +237,13 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       });
     }
   }, [initialScrollY]);
+
+  // Apply theme
+  useEffect(() => {
+    if (settings?.theme) {
+      document.documentElement.className = settings.theme === 'system' ? '' : `theme-${settings.theme}`;
+    }
+  }, [settings?.theme]);
 
   useEffect(() => {
     if (!onPersistScrollY) return undefined;
