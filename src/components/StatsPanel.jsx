@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext';, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { TrendingUp, Calendar } from 'lucide-react';
 import { fetchTodayStats, fetchWeeklyStats, fetchUserSettings } from '../services/api';
 
@@ -175,6 +175,7 @@ export default function StatsPanel({ session, isLoading }) {
     </div>
   );
 }
+
 
 
 

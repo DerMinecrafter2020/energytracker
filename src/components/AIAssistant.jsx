@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext';, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { Bot, Send, X, Minimize2, Maximize2, MessageSquare, GripHorizontal } from 'lucide-react';
 import { sendAiChat } from '../services/aiApi';
 
@@ -276,6 +276,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
 };
 
 export default AIAssistant;
+
 
 
 

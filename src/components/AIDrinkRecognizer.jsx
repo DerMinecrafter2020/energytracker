@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext';, { useState } from 'react';
+﻿import React, { useState } from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { Sparkles, Search, CheckCircle, AlertCircle } from 'lucide-react';
 import { recognizeDrink } from '../services/aiApi';
 
@@ -119,6 +119,7 @@ const AIDrinkRecognizer = ({ onRecognized }) => {
 };
 
 export default AIDrinkRecognizer;
+
 
 
 

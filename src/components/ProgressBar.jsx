@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext'; from 'react';
+﻿import React from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { Zap } from 'lucide-react';
 import {
   calculateProgress,
@@ -69,6 +69,7 @@ const ProgressBar = ({ currentCaffeine }) => {
 };
 
 export default ProgressBar;
+
 
 
 

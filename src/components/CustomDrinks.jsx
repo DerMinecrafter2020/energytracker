@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext';, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { Heart, HeartOff, Plus, Trash2, Wine } from 'lucide-react';
 import { fetchCustomDrinks, addCustomDrink, removeCustomDrink } from '../services/api';
 
@@ -285,6 +285,7 @@ export default function CustomDrinks({
     </div>
   );
 }
+
 
 
 

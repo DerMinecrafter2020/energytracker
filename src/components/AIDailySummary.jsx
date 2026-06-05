@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext';, { useState } from 'react';
+﻿import React, { useState } from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { Brain, RefreshCw, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { fetchDailySummary } from '../services/aiApi';
 
@@ -101,6 +101,7 @@ const AIDailySummary = ({ logs = [], totalCaffeine = 0 }) => {
 };
 
 export default AIDailySummary;
+
 
 
 

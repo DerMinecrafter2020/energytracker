@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext'; from 'react';
+﻿import React from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { Heart, HeartOff, Plus } from 'lucide-react';
 
 const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) => {
@@ -72,6 +72,7 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
 };
 
 export default PresetDrinks;
+
 
 
 

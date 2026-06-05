@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext';, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { AlertCircle, AlertTriangle, Moon, Zap, X } from 'lucide-react';
 
 export default function WarningAlert({ todayStats, settings, onClose }) {
@@ -128,6 +128,7 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
     </div>
   );
 }
+
 
 
 

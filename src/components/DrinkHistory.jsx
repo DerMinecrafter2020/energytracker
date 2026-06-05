@@ -1,5 +1,5 @@
-﻿import React
-import { useTranslation } from '../context/LanguageContext'; from 'react';
+﻿import React from 'react';
+import { useTranslation } from '../context/LanguageContext';
 import { History, Trash2, Coffee, Heart, HeartOff } from 'lucide-react';
 import { formatTime } from '../utils/caffeineUtils';
 
@@ -98,6 +98,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
 };
 
 export default DrinkHistory;
+
 
 
 
