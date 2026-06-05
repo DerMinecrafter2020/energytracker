@@ -1,12 +1,13 @@
-﻿import React from 'react';
-import { Home, Search, BarChart2, Settings } from 'lucide-react';
+import React from 'react';
+import { Home, Search, BarChart2 } from 'lucide-react';
+import { useTranslation } from '../context/LanguageContext';
 
 const BottomNavigation = ({ currentTab, onChangeTab }) => {
+  const { t } = useTranslation();
   const tabs = [
-    { id: 'home', icon: Home, label: 'Home' },
-    { id: 'search', icon: Search, label: 'Entdecken' },
-    { id: 'history', icon: BarChart2, label: 'Verlauf' },
-    { id: 'settings', icon: Settings, label: 'Profil' },
+    { id: 'home', icon: Home, label: t('home') },
+    { id: 'search', icon: Search, label: t('discover') },
+    { id: 'history', icon: BarChart2, label: t('history') },
   ];
 
   return (
@@ -21,7 +22,7 @@ const BottomNavigation = ({ currentTab, onChangeTab }) => {
                 <button
                   key={tab.id}
                   onClick={() => onChangeTab(tab.id)}
-                  className={`flex flex-col items-center justify-center h-full min-w-[64px] transition-all duration-300 ${
+                  className={`flex flex-col items-center justify-center h-full min-w-[80px] transition-all duration-300 ${
                     isActive ? 'text-[#a8c7fa]' : 'text-[#c4c6d0] hover:text-[#e2e2e5]'
                   }`}
                 >

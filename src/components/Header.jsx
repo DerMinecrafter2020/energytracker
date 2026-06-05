@@ -1,8 +1,10 @@
-﻿import React from 'react';
+import React from 'react';
 import { Zap, Loader2, LogOut, User, ShieldCheck, Settings, ChevronLeft } from 'lucide-react';
+import { useTranslation } from '../context/LanguageContext';
 
-const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel, currentTab, onGoHome }) => {
-  const today = new Date().toLocaleDateString('de-DE', {
+const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel, currentTab, onGoHome, onShowSettings }) => {
+  const { t, language } = useTranslation();
+  const today = new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'de-DE', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -53,14 +55,18 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
                 title="Zum Admin-Panel"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span className="text-xs hidden sm:inline">Admin</span>
+                <span className="text-xs hidden sm:inline">{t('adminPanel')}</span>
               </button>
             )}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
-              bg-white/5 border border-white/10">
+            <button 
+              onClick={onShowSettings}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl
+              bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
+              aria-label="Profil Einstellungen"
+            >
               <User className="w-3.5 h-3.5 text-slate-400" />
               <span className="text-xs text-slate-400 hidden sm:inline">{session.name}</span>
-            </div>
+            </button>
 
             {onLogout && (
               <button
@@ -76,7 +82,7 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
         )}
 
         {!isAuthenticated && (
-          <p className="text-xs text-slate-600">Verbinde…</p>
+          <p className="text-xs text-slate-600">{t('connecting')}</p>
         )}
       </div>
     </header>
@@ -84,4 +90,3 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
 };
 
 export default Header;
-

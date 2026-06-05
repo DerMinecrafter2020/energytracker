@@ -157,11 +157,11 @@ export const fetchUserSettings = async ({ userId, email }) => {
   return data;
 };
 
-export const updateUserSettings = async ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }) => {
+export const updateUserSettings = async ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme, language }) => {
   const response = await fetch(`${API_BASE_URL}/api/settings/me`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }),
+    body: JSON.stringify({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme, language }),
   });
 
   const data = await response.json();

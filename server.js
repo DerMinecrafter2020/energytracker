@@ -902,11 +902,12 @@ const getUserSettings = ({ userId, email }) => {
     discordNotifyLate: false,
     discordNotifyRapid: false,
     theme: 'system',
+    language: 'de',
     createdAt: new Date().toISOString(),
   };
 };
 
-const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }) => {
+const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme, language }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   let settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
   if (!settings) {
@@ -921,6 +922,7 @@ const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLa
   if (discordNotifyLate !== undefined) settings.discordNotifyLate = discordNotifyLate;
   if (discordNotifyRapid !== undefined) settings.discordNotifyRapid = discordNotifyRapid;
   if (theme !== undefined) settings.theme = theme;
+  if (language !== undefined) settings.language = language;
   
   settings.updatedAt = new Date().toISOString();
   persistDbState();
@@ -2084,7 +2086,7 @@ app.get('/api/settings/me', async (req, res) => {
 
 app.post('/api/settings/me', async (req, res) => {
   try {
-    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme } = req.body || {};
+    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme, language } = req.body || {};
     const safeEmail = String(email || '').toLowerCase().trim();
     const safeUserId = String(userId || '').trim() || null;
 
@@ -2102,7 +2104,8 @@ app.post('/api/settings/me', async (req, res) => {
       discordNotifyAtLimit,
       discordNotifyLate,
       discordNotifyRapid,
-      theme
+      theme,
+      language
     });
 
     res.json(settings);

@@ -28,6 +28,7 @@ import {
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
 import { fetchPublicSettings } from './services/adminApi';
+import { LanguageProvider, useTranslation } from './context/LanguageContext';
 
 const getTodayKey = () => new Date().toISOString().split('T')[0];
 const VIEW_STATE_KEY = 'et:last-view-state';
@@ -153,6 +154,7 @@ function App() {
 
 // ── Tracker (extracted so hooks are always called in the same order) ────────
 function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPersistScrollY }) {
+  const { t } = useTranslation();
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [isOperationLoading, setIsOperationLoading] = useState(false);
   const [logs, setLogs]           = useState([]);
@@ -407,9 +409,10 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-transparent">
-      {/* Animated Background Orbs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-float-slow pointer-events-none -z-10"></div>
+    <LanguageProvider language={settings?.language}>
+      <div className="min-h-screen relative overflow-hidden bg-transparent">
+        {/* Animated Background Orbs */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-float-slow pointer-events-none -z-10"></div>
       <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-amber-500/15 rounded-full blur-[100px] animate-float-delayed pointer-events-none -z-10"></div>
       <div className="absolute bottom-[-10%] left-[10%] w-[60vw] h-[60vw] bg-purple-600/15 rounded-full blur-[140px] animate-float pointer-events-none -z-10"></div>
       <Header
@@ -420,6 +423,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         onShowAdminPanel={onShowAdminPanel}
         currentTab={currentTab}
         onGoHome={() => setCurrentTab('home')}
+        onShowSettings={() => setCurrentTab('settings')}
       />
 
       <main className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-4 pb-28">
@@ -522,7 +526,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         {currentTab === 'settings' && (
           <div className="space-y-6 animate-fade-in">
             <div className="glass-card rounded-[2rem] p-6 shadow-glass">
-              <h2 className="text-xl font-bold text-white mb-6">Einstellungen</h2>
+              <h2 className="text-xl font-bold text-white mb-6">{t('settings')}</h2>
               <SettingsPanel
                 session={session}
                 isLoading={isOperationLoading}
@@ -536,7 +540,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
       <footer className="text-center py-6 pb-32 text-slate-600 text-sm">
         <p>Koffein-Tracker &copy; {new Date().getFullYear()}</p>
-        <p className="text-xs mt-1 mb-2">Empfohlenes Tageslimit: 400 mg</p>
+        <p className="text-xs mt-1 mb-2">{t('whoRecommendation')}</p>
         {(currentVersion || latestVersion) && (
           <p className="text-[10px] text-slate-500 opacity-60 font-mono tracking-wider">
             Version {latestVersion || currentVersion}
@@ -547,6 +551,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       <AIAssistant totalCaffeineToday={totalCaffeineToday} onAddDrink={handleAddDrink} />
       <BottomNavigation currentTab={currentTab} onChangeTab={setCurrentTab} />
     </div>
+    </LanguageProvider>
   );
 }
 

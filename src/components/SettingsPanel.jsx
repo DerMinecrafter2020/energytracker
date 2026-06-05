@@ -13,8 +13,10 @@ import {
   removePasskey,
   updateUserProfile,
 } from '../services/api';
+import { useTranslation } from '../context/LanguageContext';
 
 export default function SettingsPanel({ session, isLoading, onSettingsChange }) {
+  const { t, language } = useTranslation();
   const [settings, setSettings] = useState(null);
   const [localLimit, setLocalLimit] = useState('400');
   const [notifyAtLimit, setNotifyAtLimit] = useState(true);
@@ -24,6 +26,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
   const [discordNotifyLate, setDiscordNotifyLate] = useState(false);
   const [discordNotifyRapid, setDiscordNotifyRapid] = useState(false);
   const [theme, setTheme] = useState('system');
+  const [settingLanguage, setSettingLanguage] = useState('de');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   
@@ -70,6 +73,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         setDiscordNotifyLate(!!data.discordNotifyLate);
         setDiscordNotifyRapid(!!data.discordNotifyRapid);
         setTheme(data.theme || 'system');
+        setSettingLanguage(data.language || 'de');
 
         const sec = await fetchSecurityStatus(userPayload);
         setSecurity(sec);
@@ -99,6 +103,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         discordNotifyLate,
         discordNotifyRapid,
         theme,
+        language: settingLanguage,
       });
 
       setSettings(updatedSettings);
@@ -317,18 +322,30 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
           </form>
         </div>
 
-        {/* Theme */}
+        {/* Theme & Language */}
         <div className="border-b border-white/10 pb-5">
           <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            Erscheinungsbild
+            {t('theme')} & {t('language')}
           </h4>
-          <select value={theme} onChange={(e) => setTheme(e.target.value)} className="input-dark text-sm appearance-none cursor-pointer">
-            <option value="system">Standard Dark</option>
-            <option value="light">Light Mode</option>
-            <option value="oled">True Black (OLED)</option>
-            <option value="neon">Neon Punk</option>
-            <option value="forest">Forest Green</option>
-          </select>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">{t('language')}</label>
+              <select value={settingLanguage} onChange={(e) => setSettingLanguage(e.target.value)} className="input-dark text-sm appearance-none cursor-pointer">
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">{t('theme')}</label>
+              <select value={theme} onChange={(e) => setTheme(e.target.value)} className="input-dark text-sm appearance-none cursor-pointer">
+                <option value="system">Standard Dark</option>
+                <option value="light">Light Mode</option>
+                <option value="oled">True Black (OLED)</option>
+                <option value="neon">Neon Punk</option>
+                <option value="forest">Forest Green</option>
+              </select>
+            </div>
+          </div>
         </div>
         {/* Daily Limit */}
         <div>
