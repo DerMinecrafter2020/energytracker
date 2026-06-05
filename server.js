@@ -1185,10 +1185,142 @@ app.get('/api/health', async (req, res) => {
 });
 
 
+const DEFAULT_DE_DICT = {
+  "home": "Home",
+  "discover": "Entdecken",
+  "history": "Verlauf",
+  "profile": "Profil",
+  "settings": "Einstellungen",
+  "language": "Sprache",
+  "theme": "Erscheinungsbild",
+  "dailyLimit": "Tägliches Koffein-Limit",
+  "whoRecommendation": "WHO-Empfehlung: 400mg pro Tag",
+  "notifications": "Benachrichtigungen",
+  "limitExceeded": "Limit überschritten",
+  "limitWarningDesc": "Warnung wenn Koffein Limit erreicht wird",
+  "lateCaffeine": "Spätes Koffein",
+  "lateWarningDesc": "Warnung nach 18:00 Uhr",
+  "rapidSequence": "Schnelle Folge",
+  "rapidWarningDesc": "Warnung bei 3+ Getränken in 2h",
+  "alsoDiscord": "Auch per Discord senden",
+  "save": "Speichern",
+  "saving": "Speichern...",
+  "saved": "Einstellungen gespeichert",
+  "saveError": "Fehler beim Speichern",
+  "editProfile": "Profil bearbeiten",
+  "name": "Name",
+  "email": "E-Mail",
+  "newPasswordOptional": "Neues Passwort (optional)",
+  "newPasswordPlaceholder": "Leer lassen um es nicht zu ändern",
+  "currentPasswordReq": "Aktuelles Passwort (erforderlich)",
+  "updateProfile": "Profil aktualisieren",
+  "security": "Sicherheit (2FA)",
+  "adminPanel": "Admin",
+  "logout": "Abmelden",
+  "connecting": "Verbinde…",
+  "searchDrinkPlaceholder": "Getränk suchen...",
+  "addDrink": "Hinzufügen",
+  "customDrinksTitle": "Eigene Getränke",
+  "todayCaffeine": "Heute getrunken",
+  "remaining": "Übrig",
+  "cancel": "Abbrechen",
+  "delete": "Löschen",
+  "drinkHistory": "Trinkverlauf",
+  "noDrinksToday": "Noch keine Getränke heute eingetragen.",
+  "login": "Anmelden",
+  "register": "Registrieren",
+  "emailPlaceholder": "name@example.com",
+  "passwordPlaceholder": "••••••••",
+  "loginButton": "Einloggen",
+  "noAccount": "Noch keinen Account?",
+  "registerHere": "Hier registrieren",
+  "registerButton": "Account erstellen",
+  "alreadyHaveAccount": "Bereits einen Account?",
+  "loginHere": "Hier anmelden",
+  "adminDashboard": "Admin Dashboard",
+  "users": "Benutzer",
+  "systemSettings": "Systemeinstellungen",
+  "serverHost": "Server-Host",
+  "port": "Port",
+  "username": "Benutzername",
+  "passwordToken": "Passwort / App-Token",
+  "senderName": "Absender-Name",
+  "senderEmail": "Absender-E-Mail",
+  "appUrl": "App-URL",
+  "saveSettings": "Einstellungen speichern",
+  "manualEntry": "Manueller Eintrag",
+  "presetDrinks": "Standardgetränke",
+  "addCustomDrink": "Neues Getränk erstellen",
+  "drinkName": "Getränkename",
+  "sizeMl": "Größe (ml)",
+  "caffeineMg": "Koffein (mg)",
+  "stats": "Statistiken",
+  "weeklyOverview": "Wochenübersicht",
+  "dailyAverage": "Tagesdurchschnitt",
+  "totalCaffeine": "Gesamtes Koffein",
+  "reminders": "Erinnerungen",
+  "notificationsEnabled": "Benachrichtigungen aktiviert",
+  "remindAfterTime": "Erinnere nach Zeit",
+  "scanBarcode": "Barcode scannen",
+  "aiAssistant": "KI-Assistent",
+  "searchOnline": "Online suchen",
+  "demoLogin": "Demo Login",
+  "back": "Zurück",
+  "add": "Hinzufügen",
+  "edit": "Bearbeiten",
+  "success": "Erfolgreich",
+  "error": "Fehler",
+  "size": "Größe",
+  "caffeine": "Koffein",
+  "confirmPassword": "Passwort bestätigen",
+  "namePlaceholder": "Max Mustermann",
+  "welcome": "Willkommen!",
+  "welcomeBack": "Willkommen zurück"
+};
+
+let isTranslating = false;
+
 app.get('/api/translations', async (req, res) => {
   try {
     const raw = await redis.get('koffein:translations');
     let translations = raw ? JSON.parse(raw) : null;
+    
+    // Auto-Translate trigger on first load if missing
+    if (!translations || Object.keys(translations).length === 0) {
+      const aiCfg = loadAiConfig();
+      if (aiCfg && aiCfg.apiKey && !isTranslating) {
+        isTranslating = true;
+        // Run translation async in background so we don't block this request
+        (async () => {
+          try {
+            console.log('[AI] Erster Start erkannt: Generiere fehlende Übersetzungen via KI...');
+            const messages = [
+              { role: 'system', content: 'Du bist ein professioneller Übersetzer für eine Koffein-Tracker-Web-App. Der Benutzer gibt dir ein JSON-Objekt mit deutschen Texten. Du sollst dieses JSON-Objekt ins Englische ("en"), Spanische ("es") und Französische ("fr") übersetzen. Antworte AUSSCHLIESSLICH mit einem gültigen JSON-Objekt, das die Sprachen als Top-Level-Keys ("en", "es", "fr") enthält, und darunter die übersetzten Key-Value-Paare. Verwende KEIN Markdown (wie ```json).' },
+              { role: 'user', content: JSON.stringify(DEFAULT_DE_DICT) }
+            ];
+            const responseText = await askAi(messages);
+            let generatedDicts = null;
+            try {
+              // Cleanup markdown if AI accidentally includes it
+              const cleanText = responseText.replace(/^\s*```json\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+              generatedDicts = JSON.parse(cleanText);
+            } catch(e) {
+              console.error('[AI] Translation JSON parse error:', e.message);
+            }
+            if (generatedDicts && generatedDicts.en) {
+              const finalDict = { de: DEFAULT_DE_DICT, ...generatedDicts };
+              await redis.set('koffein:translations', JSON.stringify(finalDict));
+              console.log('[AI] Übersetzungen erfolgreich generiert und in Datenbank gespeichert.');
+            }
+          } catch (e) {
+            console.error('[AI] Fehler bei der automatischen Übersetzung:', e.message);
+          } finally {
+            isTranslating = false;
+          }
+        })();
+      }
+    }
+    
     res.json(translations || {});
   } catch (err) {
     res.status(500).json({ error: err.message });
