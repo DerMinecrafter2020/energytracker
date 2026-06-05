@@ -21,12 +21,12 @@ const BottomNavigation = ({ currentTab, onChangeTab }) => {
                 <button
                   key={tab.id}
                   onClick={() => onChangeTab(tab.id)}
-                  className={lex flex-col items-center justify-center h-full min-w-[64px] transition-all duration-300 "$"{"
+                  className={`flex flex-col items-center justify-center h-full min-w-[64px] transition-all duration-300 ${
                     isActive ? 'text-[#a8c7fa]' : 'text-[#c4c6d0] hover:text-[#e2e2e5]'
-                  }}
+                  }`}
                 >
-                  <div className={lex items-center justify-center w-16 h-8 rounded-full mb-1 transition-all duration-300 "$"{"isActive ? 'bg-[#0842a0]' : 'bg-transparent'}}>
-                    <Icon className={w-5 h-5 "$"{"isActive ? 'text-[#d3e3fd]' : ''}} strokeWidth={isActive ? 2.5 : 2} />
+                  <div className={`flex items-center justify-center w-16 h-8 rounded-full mb-1 transition-all duration-300 ${isActive ? 'bg-[#0842a0]' : 'bg-transparent'}`}>
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-[#d3e3fd]' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
                   </div>
                   <span className="text-[11px] font-medium tracking-wide">
                     {tab.label}

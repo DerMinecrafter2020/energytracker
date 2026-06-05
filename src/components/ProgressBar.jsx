@@ -11,57 +11,44 @@ const ProgressBar = ({ currentCaffeine }) => {
   const percentage    = calculateProgress(currentCaffeine);
   const status        = getStatusMessage(currentCaffeine);
 
-  // Gradient based on level
-  const barGradient =
-    percentage >= 100 ? 'from-red-600 to-red-400' :
-    percentage >= 75  ? 'from-orange-500 to-amber-400' :
-    percentage >= 50  ? 'from-amber-500 to-yellow-400' :
-                        'from-blue-600 to-blue-400';
-
-  const glowClass =
-    percentage >= 100 ? 'shadow-[0_0_20px_rgba(239,68,68,0.5)]' :
-    percentage >= 75  ? 'shadow-[0_0_20px_rgba(249,115,22,0.4)]' :
-    percentage >= 50  ? 'shadow-[0_0_20px_rgba(251,191,36,0.4)]' :
-                        'shadow-glow-blue';
+  // Material 3 Solid colors
+  const barColor =
+    percentage >= 100 ? 'bg-[#ffb4ab] text-[#690005]' :
+    percentage >= 75  ? 'bg-[#ffb77c] text-[#4d2700]' :
+    percentage >= 50  ? 'bg-[#e2c54a] text-[#393000]' :
+                        'bg-[#a8c7fa] text-[#062e6f]';
 
   const statusBg =
     status.type === 'error'   ? 'bg-red-500/10 border-red-500/30 text-red-300' :
     status.type === 'warning' ? 'bg-orange-500/10 border-orange-500/30 text-orange-300' :
     status.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-300' :
-                                'bg-blue-500/10 border-blue-500/30 text-blue-300';
+                                'bg-white/5 border-white/10 text-slate-300';
 
   return (
-    <div className="glass-card rounded-3xl p-6 mb-6 animate-fade-in">
+    <div className="glass-card rounded-[2rem] p-6 mb-6 animate-fade-in">
       {/* Header row */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center
-            bg-gradient-to-br ${barGradient} ${glowClass}`}>
-            <Zap className="w-6 h-6 text-white" fill="white" />
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${barColor}`}>
+            <Zap className="w-6 h-6" fill="currentColor" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white">Koffein heute</h2>
-            <p className="text-xs text-slate-500">Limit: {DAILY_CAFFEINE_LIMIT} mg</p>
+            <h2 className="text-base font-bold text-[#e2e2e5]">Koffein heute</h2>
+            <p className="text-xs text-[#c4c6d0]">Limit: {DAILY_CAFFEINE_LIMIT} mg</p>
           </div>
         </div>
         <div className="text-right">
-          <span className="text-3xl font-bold text-white">{currentCaffeine}</span>
-          <span className="text-lg text-slate-400 ml-1">mg</span>
+          <span className="text-3xl font-bold text-[#e2e2e5]">{currentCaffeine}</span>
+          <span className="text-lg text-[#8e9099] ml-1">mg</span>
         </div>
       </div>
 
       {/* Track */}
-      <div className="relative h-6 bg-slate-900/50 rounded-full overflow-hidden border border-white/5 mb-3 shadow-inner">
+      <div className="relative h-4 bg-[#2c2f38] rounded-full overflow-hidden mb-3">
         <div
-          className={`absolute inset-y-0 left-0 bg-gradient-to-r ${barGradient}
-            rounded-full transition-all duration-[1.5s] ease-out flex justify-end items-center pr-2`}
+          className={`absolute inset-y-0 left-0 ${barColor.split(' ')[0]} rounded-full transition-all duration-700 ease-out`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/30 rounded-full mix-blend-overlay" />
-          {percentage > 5 && (
-             <div className="w-1.5 h-3 bg-white/80 rounded-full animate-glow-pulse shadow-[0_0_10px_white]"></div>
-          )}
-        </div>
+        />
       </div>
 
       {/* Labels */}
@@ -71,7 +58,7 @@ const ProgressBar = ({ currentCaffeine }) => {
         <span>{DAILY_CAFFEINE_LIMIT} mg</span>
       </div>
 
-      {/* Status */}
+      {/* Status Msg */}
       <div className={`px-4 py-3 rounded-2xl border ${statusBg}`}>
         <p className="text-sm font-medium text-center">{status.text}</p>
       </div>
@@ -80,5 +67,3 @@ const ProgressBar = ({ currentCaffeine }) => {
 };
 
 export default ProgressBar;
-
-
