@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { History, Trash2, Coffee, Heart, HeartOff } from 'lucide-react';
 import { formatTime } from '../utils/caffeineUtils';
 
@@ -37,8 +37,8 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
           <div
             key={log.id}
             className="flex items-center gap-3 p-3.5 rounded-2xl
-              bg-white/5 border border-white/8
-              hover:bg-white/10 hover:border-white/15
+              bg-[#252830]
+              hover:bg-[#2c2f38]
               transition-all duration-200 animate-slide-in group"
           >
             {/* Icon */}
@@ -96,3 +96,4 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
 };
 
 export default DrinkHistory;
+

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { Calculator, Plus } from 'lucide-react';
 import { DRINK_SIZES, calculateFromPer100ml } from '../utils/caffeineUtils';
 
@@ -89,11 +89,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
                 key={size.value}
                 type="button"
                 onClick={() => setSelectedSize(size.value)}
-                className={`flex-1 min-w-0 py-2.5 px-3 rounded-xl font-medium transition-all duration-200 text-sm
-                  ${selectedSize === size.value
-                    ? 'bg-blue-600 text-white shadow-glow-blue'
-                    : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/10'
-                  }`}
+                className={`flex-1 min-w-0 py-2.5 px-3 rounded-full font-medium transition-all duration-200 text-sm ${selectedSize === size.value ? 'bg-[#a8c7fa] text-[#062e6f]' : 'bg-transparent text-[#e2e2e5] border border-[#8e9099] hover:bg-[#252830]'}`}
               >
                 {size.label}
               </button>
@@ -108,7 +104,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
 
         {/* Total dose preview */}
         <div className="flex justify-between items-center px-4 py-3.5 rounded-2xl
-          bg-gradient-to-r from-blue-600/10 to-amber-500/10 border border-white/10">
+          bg-[#0842a0] border-none">
           <span className="text-slate-400 font-medium text-sm">Gesamtdosis:</span>
           <div>
             <span className="text-2xl font-bold text-gradient">{totalCaffeine}</span>
@@ -120,9 +116,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
         <button
           type="submit"
           disabled={!drinkName.trim() || isLoading}
-          className="w-full bg-gradient-to-r from-blue-600 to-amber-500
-            text-white font-bold py-3.5 px-6 rounded-2xl
-            hover:from-blue-500 hover:to-amber-400
+          className="w-full bg-[#a8c7fa] text-[#062e6f] font-bold py-3.5 px-6 rounded-full hover:bg-[#d3e3fd]
             disabled:opacity-50 disabled:cursor-not-allowed
             transition-all duration-200
             shadow-glow-blue hover:shadow-glow-amber
@@ -137,4 +131,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
 };
 
 export default ManualCalculator;
+
+
+
 

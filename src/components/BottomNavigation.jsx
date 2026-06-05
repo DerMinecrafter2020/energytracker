@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Home, Search, BarChart2, Settings } from 'lucide-react';
 
 const BottomNavigation = ({ currentTab, onChangeTab }) => {
@@ -10,30 +10,31 @@ const BottomNavigation = ({ currentTab, onChangeTab }) => {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-4 sm:pb-6 pt-2 pointer-events-none">
-      <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto pointer-events-auto">
-        <div className="glass-card rounded-[2rem] p-2 flex items-center justify-between shadow-glass backdrop-blur-2xl">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = currentTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => onChangeTab(tab.id)}
-                className={`flex flex-col items-center justify-center w-16 h-14 rounded-2xl transition-all duration-300 relative ${
-                  isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                {isActive && (
-                  <div className="absolute inset-0 bg-blue-500/10 rounded-2xl shadow-inner animate-fade-in"></div>
-                )}
-                <Icon className={`w-5 h-5 mb-1 ${isActive ? 'animate-glow-pulse drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : ''}`} />
-                <span className={`text-[10px] font-medium ${isActive ? 'opacity-100' : 'opacity-70'}`}>
-                  {tab.label}
-                </span>
-              </button>
-            );
-          })}
+    <div className="fixed bottom-0 inset-x-0 z-40 pointer-events-none">
+      <div className="max-w-4xl mx-auto pointer-events-auto">
+        <div className="bg-[#1a1c22] border-t border-[#252830] pb-[env(safe-area-inset-bottom)] rounded-t-2xl sm:rounded-none">
+          <div className="flex items-center justify-around h-20 px-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = currentTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onChangeTab(tab.id)}
+                  className={lex flex-col items-center justify-center h-full min-w-[64px] transition-all duration-300 "$"{"
+                    isActive ? 'text-[#a8c7fa]' : 'text-[#c4c6d0] hover:text-[#e2e2e5]'
+                  }}
+                >
+                  <div className={lex items-center justify-center w-16 h-8 rounded-full mb-1 transition-all duration-300 "$"{"isActive ? 'bg-[#0842a0]' : 'bg-transparent'}}>
+                    <Icon className={w-5 h-5 "$"{"isActive ? 'text-[#d3e3fd]' : ''}} strokeWidth={isActive ? 2.5 : 2} />
+                  </div>
+                  <span className="text-[11px] font-medium tracking-wide">
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

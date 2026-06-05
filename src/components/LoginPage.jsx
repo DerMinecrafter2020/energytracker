@@ -179,7 +179,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 
       <div className="glass-card rounded-[2.5rem] w-full max-w-4xl relative overflow-hidden shadow-glass animate-slide-in flex flex-col md:flex-row">
         <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center items-center text-center bg-white/5 border-b md:border-b-0 md:border-r border-white/10">
-          <div className="w-20 h-20 rounded-3xl mx-auto bg-gradient-to-br from-blue-500 via-blue-400 to-amber-400 flex items-center justify-center mb-6 shadow-glow-blue animate-glow-pulse">
+          <div className="w-20 h-20 rounded-3xl mx-auto bg-[#0842a0] flex items-center justify-center mb-6">
             <Zap className="w-10 h-10 text-white" fill="currentColor" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">Koffein-Tracker</h1>
@@ -226,10 +226,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
               </div>
             )}
             <button type="submit" disabled={isLoading}
-              className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-200
-                bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
-                disabled:opacity-60 disabled:cursor-not-allowed shadow-glow-blue
-                flex items-center justify-center gap-2 mt-2">
+              className="w-full py-3.5 rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
               {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort zurücksetzen'}
             </button>
             <div className="text-center mt-4">
@@ -302,10 +299,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
             )}
 
             <button type="submit" disabled={isLoading}
-              className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-200
-                bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
-                disabled:opacity-60 disabled:cursor-not-allowed shadow-glow-blue
-                flex items-center justify-center gap-2 mt-2">
+              className="w-full py-3.5 rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
               {isLoading
                 ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 : <><LogIn className="w-4 h-4" />Anmelden</>
@@ -427,6 +421,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 };
 
 export default LoginPage;
+
 
 
 

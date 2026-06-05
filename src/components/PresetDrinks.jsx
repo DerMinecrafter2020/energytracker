@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Heart, HeartOff, Plus } from 'lucide-react';
 
 const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) => {
@@ -15,7 +15,7 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
 
   return (
     <div className="glass-card rounded-3xl p-6 mb-6 animate-fade-in">
-      <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+      <h3 className="text-base font-bold text-[#e2e2e5] mb-4 flex items-center gap-2">
         <Heart className="w-5 h-5 text-pink-400" />
         Favoriten
       </h3>
@@ -32,7 +32,7 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
               <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               
               <div className="flex justify-between items-start w-full relative z-10 mb-2">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-2xl bg-[#2c2f38] rounded-full flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                   {drink.icon || '🥤'}
                 </div>
                 <button
@@ -49,8 +49,8 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
               </div>
 
               <div className="relative z-10 text-left mt-1">
-                <span className="font-bold text-sm block truncate text-slate-100">{drink.name}</span>
-                <span className="text-xs text-blue-300 font-medium mt-0.5 block">{drink.size} ml • <span className="text-amber-400">{drink.caffeine} mg</span></span>
+                <span className="font-bold text-sm block truncate text-[#e2e2e5]">{drink.name}</span>
+                <span className="text-xs text-[#a8c7fa] font-medium mt-0.5 block">{drink.size} ml • <span className="text-amber-400">{drink.caffeine} mg</span></span>
               </div>
             </div>
           ))}
@@ -70,3 +70,4 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
 };
 
 export default PresetDrinks;
+

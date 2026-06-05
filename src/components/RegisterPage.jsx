@@ -60,7 +60,7 @@ const RegisterPage = ({ onBack }) => {
 
       <div className="relative z-10 w-full max-w-4xl animate-fade-in">
         <div className="glass-card rounded-[2.5rem] relative overflow-hidden shadow-glass flex flex-col md:flex-row"><div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center items-center text-center bg-white/5 border-b md:border-b-0 md:border-r border-white/10">
-            <div className="w-20 h-20 rounded-3xl mx-auto bg-gradient-to-br from-green-500 via-teal-400 to-blue-500 flex items-center justify-center mb-6 shadow-glow-green animate-glow-pulse">
+            <div className="w-20 h-20 rounded-3xl mx-auto bg-[#0842a0] flex items-center justify-center mb-6">
               <Zap className="w-10 h-10 text-white" fill="currentColor" />
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">Koffein-Tracker</h1>
@@ -92,8 +92,7 @@ const RegisterPage = ({ onBack }) => {
               )}
               <button onClick={onBack}
                 className="w-full mt-2 py-3 rounded-xl font-semibold text-white
-                  bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
-                  transition-all shadow-glow-blue">
+                  text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all rounded-full">
                 Zur Anmeldung
               </button>
             </div>
@@ -193,5 +192,6 @@ const RegisterPage = ({ onBack }) => {
 };
 
 export default RegisterPage;
+
 
 
