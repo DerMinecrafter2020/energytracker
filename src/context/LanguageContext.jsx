@@ -1,4 +1,5 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { fetchTranslations } from '../services/api';
 
 const translations = {
   de: {
@@ -187,21 +188,34 @@ const translations = {
   }
 };
 
-const LanguageContext = createContext('de');
+const LanguageContext = createContext({ language: 'de', customTranslations: null });
 
 export const LanguageProvider = ({ language, children }) => {
+  const [customTranslations, setCustomTranslations] = useState(null);
+
+  useEffect(() => {
+    fetchTranslations().then(data => {
+      if(data && Object.keys(data).length > 0) setCustomTranslations(data);
+    }).catch(err => console.error("Failed to load translations:", err));
+  }, []);
+
   return (
-    <LanguageContext.Provider value={language || 'de'}>
+    <LanguageContext.Provider value={{ language: language || 'de', customTranslations }}>
       {children}
     </LanguageContext.Provider>
   );
 };
 
 export const useTranslation = () => {
-  const language = useContext(LanguageContext);
+  const context = useContext(LanguageContext);
+  // fallback if context is just a string (should not happen with new provider)
+  const language = typeof context === 'string' ? context : (context.language || 'de');
+  const customTranslations = typeof context === 'string' ? null : context.customTranslations;
   
   const t = (key) => {
-    return translations[language]?.[key] || translations['de'][key] || key;
+    const activeDict = customTranslations?.[language] || translations[language];
+    const defaultDict = customTranslations?.['de'] || translations['de'];
+    return activeDict?.[key] || defaultDict?.[key] || key;
   };
 
   return { t, language };

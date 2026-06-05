@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+﻿const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 export const fetchLogs = async (date, { userId, email } = {}) => {
   const url = new URL('/api/logs', API_BASE_URL);
@@ -35,7 +35,7 @@ export const deleteLog = async (id) => {
   });
 
   if (!response.ok) {
-    throw new Error('Fehler beim Löschen des Logs');
+    throw new Error('Fehler beim LÃ¶schen des Logs');
   }
 
   return response.json();
@@ -145,7 +145,7 @@ export const removeFavorite = async ({ userId, email, favoriteId }) => {
   return data;
 };
 
-// ── USER SETTINGS ────────────────────────────────────────────────────────
+// â”€â”€ USER SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const fetchUserSettings = async ({ userId, email }) => {
   const url = new URL('/api/settings/me', API_BASE_URL);
   if (userId) url.searchParams.set('userId', userId);
@@ -181,7 +181,7 @@ export const updateUserProfile = async ({ userId, email, currentPassword, newNam
   return data;
 };
 
-// ── CUSTOM DRINKS ───────────────────────────────────────────────────────
+// â”€â”€ CUSTOM DRINKS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const fetchCustomDrinks = async ({ userId, email }) => {
   const url = new URL('/api/custom-drinks/me', API_BASE_URL);
   if (userId) url.searchParams.set('userId', userId);
@@ -189,7 +189,7 @@ export const fetchCustomDrinks = async ({ userId, email }) => {
 
   const response = await fetch(url.toString());
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Getränke');
+  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der GetrÃ¤nke');
   return data.items || [];
 };
 
@@ -201,7 +201,7 @@ export const addCustomDrink = async ({ userId, email, name, size, caffeine, icon
   });
 
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Hinzufügen des Getränks');
+  if (!response.ok) throw new Error(data.error || 'Fehler beim HinzufÃ¼gen des GetrÃ¤nks');
   return data.item;
 };
 
@@ -213,11 +213,11 @@ export const removeCustomDrink = async ({ userId, email, drinkId }) => {
 
   const response = await fetch(url.toString(), { method: 'DELETE' });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Löschen des Getränks');
+  if (!response.ok) throw new Error(data.error || 'Fehler beim LÃ¶schen des GetrÃ¤nks');
   return data;
 };
 
-// ── STATISTICS ──────────────────────────────────────────────────────────
+// â”€â”€ STATISTICS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const fetchTodayStats = async ({ userId, email }) => {
   const url = new URL('/api/stats/today', API_BASE_URL);
   if (userId) url.searchParams.set('userId', userId);
@@ -240,7 +240,7 @@ export const fetchWeeklyStats = async ({ userId, email }) => {
   return data.items || [];
 };
 
-// ── SECURITY (2FA / PASSKEYS) ──────────────────────────────────────────
+// â”€â”€ SECURITY (2FA / PASSKEYS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const fetchSecurityStatus = async ({ userId, email }) => {
   const url = new URL('/api/security/me', API_BASE_URL);
   if (userId) url.searchParams.set('userId', userId);
@@ -314,6 +314,29 @@ export const removePasskey = async ({ userId, email, credentialId }) => {
 
   const response = await fetch(url.toString(), { method: 'DELETE' });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Sicherheitsschlüssel konnte nicht gelöscht werden');
+  if (!response.ok) throw new Error(data.error || 'SicherheitsschlÃ¼ssel konnte nicht gelÃ¶scht werden');
   return data;
 };
+
+
+
+export const fetchTranslations = async () => {
+  const resp = await fetch(`${API_BASE}/api/translations`);
+  if (!resp.ok) throw new Error("Fehler beim Laden der Übersetzungen");
+  return resp.json();
+};
+
+export const saveTranslations = async (session, translations) => {
+  if (!session) throw new Error("Nicht angemeldet");
+  const headers = { "Content-Type": "application/json" };
+  if (session.token) headers.Authorization = `Bearer ${session.token}`;
+  
+  const resp = await fetch(`${API_BASE}/api/admin/translations`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ translations, email: session.email, userId: session.id })
+  });
+  if (!resp.ok) throw new Error("Fehler beim Speichern der Übersetzungen");
+  return resp.json();
+};
+

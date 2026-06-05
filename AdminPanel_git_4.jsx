@@ -1,14 +1,14 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
-  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle, Globe,
+  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
   CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash,
 } from 'lucide-react';
 import { logout } from '../services/auth';
-import { fetchLogs, deleteLog as deleteApiLog, fetchTranslations, saveTranslations } from '../services/api';
+import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
@@ -64,31 +64,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [sortField, setSortField] = useState('createdAt');
   const [sortDir, setSortDir]     = useState('desc');
   const [activeTab, setActiveTab] = useState(initialActiveTab);
-
-  const [translationsJson, setTranslationsJson] = useState('');
-  const [loadingTranslations, setLoadingTranslations] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  useEffect(() => {
-    if (activeTab === 'translations') {
-      setLoadingTranslations(true);
-      fetchTranslations().then(data => {
-        setTranslationsJson(JSON.stringify(data, null, 2));
-      }).catch(e => setError(e.message))
-      .finally(() => setLoadingTranslations(false));
-    }
-  }, [activeTab]);
-
-  const handleSaveTranslations = async () => {
-    try {
-      const parsed = JSON.parse(translationsJson);
-      await saveTranslations(session, parsed);
-      setMsg({ type: 'success', text: 'Übersetzungen erfolgreich gespeichert' });
-    } catch(e) {
-      setError('Ungültiges JSON oder Speicherfehler: ' + e.message);
-    }
-  };
-
 
   // â”€â”€ SMTP state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const defaultSmtp = { host: '', port: 587, secure: false, auth: { user: '', pass: '' },
@@ -496,7 +471,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             { id: 'logs',      label: 'Alle Logs',  icon: Database   },
             { id: 'users',     label: 'Benutzer',   icon: Users      },
             { id: 'settings',  label: 'Einstellungen', icon: Settings },
-            { id: 'translations', label: 'Sprachen', icon: Globe },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -536,7 +510,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               <StatCard icon={Calendar}   label="Logs heute"      value={stats.todayLogs}   color="green"  />
               <StatCard icon={Zap}        label="Koffein heute"   value={`${stats.todayCaff} mg`} color="amber" />
               <StatCard icon={TrendingUp} label="Koffein gesamt"  value={`${stats.totalCaff} mg`} color="purple"/>
-              <StatCard icon={Coffee}     label="Ø pro Getränk"   value={`${stats.avgPerDrink} mg`} color="red" />
+              <StatCard icon={Coffee}     label="Ã˜ pro Getränk"   value={`${stats.avgPerDrink} mg`} color="red" />
             </div>
 
             {/* Chart – last 7 days */}
@@ -604,7 +578,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                           style={{ width: `${(count / allLogs.length) * 100}%` }}
                         />
                       </div>
-                      <span className="text-xs text-slate-400 w-12 text-right">{count}×</span>
+                      <span className="text-xs text-slate-400 w-12 text-right">{count}Ã—</span>
                     </div>
                   ));
               })()}
@@ -693,7 +667,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                         className="grid grid-cols-[2fr_1fr_1fr_1fr_2fr_auto] gap-4 px-5 py-3.5
                           hover:bg-white/5 transition-colors items-center text-sm">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-lg shrink-0">{log.icon || '🥤'}</span>
+                          <span className="text-lg shrink-0">{log.icon || 'ðŸ¥¤'}</span>
                           <span className="text-white font-medium truncate">{log.name}</span>
                         </div>
                         <span className="text-blue-400 font-semibold">{log.caffeine} mg</span>
@@ -1272,7 +1246,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   ${aiMsg.type === 'success' ? 'bg-green-500/10 border border-green-500/30 text-green-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}>
                   {aiMsg.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
                   {aiMsg.text}
-                  <button onClick={() => setAiMsg(null)} className="ml-auto text-xs opacity-60 hover:opacity-100">×</button>
+                  <button onClick={() => setAiMsg(null)} className="ml-auto text-xs opacity-60 hover:opacity-100">Ã—</button>
                 </div>
               )}
             </div>
@@ -1368,7 +1342,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   : <AlertTriangle className="w-5 h-5 shrink-0" />}
                 <span className="text-sm">{smtpMsg.text}</span>
                 <button onClick={() => setSmtpMsg(null)} className="ml-auto text-xs underline opacity-60 hover:opacity-100">
-                  ×
+                  Ã—
                 </button>
               </div>
             )}

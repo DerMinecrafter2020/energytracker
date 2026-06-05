@@ -1,14 +1,14 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
-  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle, Globe,
+  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
   CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash,
 } from 'lucide-react';
 import { logout } from '../services/auth';
-import { fetchLogs, deleteLog as deleteApiLog, fetchTranslations, saveTranslations } from '../services/api';
+import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
@@ -64,31 +64,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [sortField, setSortField] = useState('createdAt');
   const [sortDir, setSortDir]     = useState('desc');
   const [activeTab, setActiveTab] = useState(initialActiveTab);
-
-  const [translationsJson, setTranslationsJson] = useState('');
-  const [loadingTranslations, setLoadingTranslations] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  useEffect(() => {
-    if (activeTab === 'translations') {
-      setLoadingTranslations(true);
-      fetchTranslations().then(data => {
-        setTranslationsJson(JSON.stringify(data, null, 2));
-      }).catch(e => setError(e.message))
-      .finally(() => setLoadingTranslations(false));
-    }
-  }, [activeTab]);
-
-  const handleSaveTranslations = async () => {
-    try {
-      const parsed = JSON.parse(translationsJson);
-      await saveTranslations(session, parsed);
-      setMsg({ type: 'success', text: 'Übersetzungen erfolgreich gespeichert' });
-    } catch(e) {
-      setError('Ungültiges JSON oder Speicherfehler: ' + e.message);
-    }
-  };
-
 
   // â”€â”€ SMTP state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const defaultSmtp = { host: '', port: 587, secure: false, auth: { user: '', pass: '' },
@@ -496,7 +471,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             { id: 'logs',      label: 'Alle Logs',  icon: Database   },
             { id: 'users',     label: 'Benutzer',   icon: Users      },
             { id: 'settings',  label: 'Einstellungen', icon: Settings },
-            { id: 'translations', label: 'Sprachen', icon: Globe },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}

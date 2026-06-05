@@ -1,21 +1,20 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
-import { useTranslation } from '../context/LanguageContext';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
-  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle, Globe,
-  CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash,
+  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
+  CheckCircle, UserCheck, UserX, Clock, Shield, Bot,
 } from 'lucide-react';
 import { logout } from '../services/auth';
-import { fetchLogs, deleteLog as deleteApiLog, fetchTranslations, saveTranslations } from '../services/api';
+import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
   testDiscordWebhook, fetchAiConfig, saveAiConfig, fetchRedisHealth,
 } from '../services/adminApi';
 
-// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── helpers ────────────────────────────────────────────────────────────────
 const formatDate = (isoStr) => {
   if (!isoStr) return '–';
   return new Date(isoStr).toLocaleString('de-DE', {
@@ -31,7 +30,7 @@ const getLast7Days = () =>
     return d.toISOString().split('T')[0];
   });
 
-// â”€â”€ Stat Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Stat Card ──────────────────────────────────────────────────────────────
 const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
   const colors = {
     blue:   'from-blue-600/20  to-blue-500/5  border-blue-500/20  text-blue-400',
@@ -53,9 +52,8 @@ const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
   );
 };
 
-// â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main ────────────────────────────────────────────────────────────────────
 const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initialActiveTab = 'overview', onActiveTabChange }) => {
-  const { t } = useTranslation();
   const [allLogs, setAllLogs]     = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState(null);
@@ -65,32 +63,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [sortDir, setSortDir]     = useState('desc');
   const [activeTab, setActiveTab] = useState(initialActiveTab);
 
-  const [translationsJson, setTranslationsJson] = useState('');
-  const [loadingTranslations, setLoadingTranslations] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  useEffect(() => {
-    if (activeTab === 'translations') {
-      setLoadingTranslations(true);
-      fetchTranslations().then(data => {
-        setTranslationsJson(JSON.stringify(data, null, 2));
-      }).catch(e => setError(e.message))
-      .finally(() => setLoadingTranslations(false));
-    }
-  }, [activeTab]);
-
-  const handleSaveTranslations = async () => {
-    try {
-      const parsed = JSON.parse(translationsJson);
-      await saveTranslations(session, parsed);
-      setMsg({ type: 'success', text: 'Übersetzungen erfolgreich gespeichert' });
-    } catch(e) {
-      setError('Ungültiges JSON oder Speicherfehler: ' + e.message);
-    }
-  };
-
-
-  // â”€â”€ SMTP state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── SMTP state ─────────────────────────────────────────────────────────
   const defaultSmtp = { host: '', port: 587, secure: false, auth: { user: '', pass: '' },
     fromName: 'Koffein-Tracker', fromEmail: '', baseUrl: '', registrationEnabled: true, demoEnabled: true };
   const [smtp, setSmtp]           = useState(defaultSmtp);
@@ -102,7 +75,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [discordTesting, setDiscordTesting] = useState(false);
   const [smtpMsg, setSmtpMsg]     = useState(null);
 
-  // â”€â”€ AI Config state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── AI Config state ────────────────────────────────────────────────────
   const [aiApiKey, setAiApiKey]   = useState('');
   const [aiModel, setAiModel]     = useState('deepseek/deepseek-v3');
   const [aiKeyMasked, setAiKeyMasked] = useState('');
@@ -112,19 +85,19 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [aiSaving, setAiSaving]   = useState(false);
   const [aiMsg, setAiMsg]         = useState(null);
 
-  // â”€â”€ Users state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Users state ────────────────────────────────────────────────────────
   const [regUsers, setRegUsers]   = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersMsg, setUsersMsg]   = useState(null);
 
-  // â”€â”€ Create User modal state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Create User modal state ───────────────────────────────────────────
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', role: 'user', verified: true });
   const [createUserLoading, setCreateUserLoading] = useState(false);
   const [showCreatePw, setShowCreatePw] = useState(false);
   const [impersonatingId, setImpersonatingId] = useState(null);
 
-  // â”€â”€ Redis health state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Redis health state ─────────────────────────────────────────
   const [redisHealth, setRedisHealth]     = useState(null);
   const [redisChecking, setRedisChecking] = useState(false);
   const [redisError, setRedisError]       = useState(null);
@@ -355,7 +328,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
   useEffect(() => { loadAllLogs(); }, []);
 
-  // â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Stats ──────────────────────────────────────────────────────────────
   const today = new Date().toISOString().split('T')[0];
 
   const stats = useMemo(() => {
@@ -368,7 +341,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     return { totalLogs: allLogs.length, todayLogs: todayLogs.length, totalCaff, todayCaff, avgPerDrink };
   }, [allLogs, today]);
 
-  // â”€â”€ Chart data (last 7 days) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Chart data (last 7 days) ───────────────────────────────────────────
   const chartData = useMemo(() => {
     const days = getLast7Days();
     return days.map((day) => {
@@ -380,7 +353,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
   const chartMax = Math.max(...chartData.map((d) => d.total), 400);
 
-  // â”€â”€ Sorted & filtered logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Sorted & filtered logs ─────────────────────────────────────────────
   const filteredLogs = useMemo(() => {
     const q = search.toLowerCase();
     return [...allLogs]
@@ -402,7 +375,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     else { setSortField(field); setSortDir('desc'); }
   };
 
-  // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Delete ─────────────────────────────────────────────────────────────
   const handleDelete = async (id) => {
     if (!window.confirm('Diesen Eintrag wirklich löschen?')) return;
     setDeleting(id);
@@ -416,7 +389,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     }
   };
 
-  // â”€â”€ Export CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Export CSV ─────────────────────────────────────────────────────────
   const exportCSV = () => {
     const header = 'ID,Name,Koffein (mg),Größe (ml),Datum,Erstellt';
     const rows = allLogs.map((l) =>
@@ -431,10 +404,9 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     URL.revokeObjectURL(url);
   };
 
-  const handleLogout = () => {
- logout(); onLogout(); };
+  const handleLogout = () => { logout(); onLogout(); };
 
-  // â”€â”€ Sorting icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Sorting icon ───────────────────────────────────────────────────────
   const SortIcon = ({ field }) =>
     sortField === field
       ? sortDir === 'asc'
@@ -442,11 +414,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         : <ChevronDown className="w-3 h-3 inline ml-1 text-blue-400" />
       : null;
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen" style={{ background: 'radial-gradient(ellipse at top, #0f172a 0%, #070b14 70%)' }}>
 
-      {/* â”€â”€ Top nav â”€â”€ */}
+      {/* ── Top nav ── */}
       <header className="glass-card border-b border-white/10 px-4 py-4 sticky top-0 z-30">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -487,7 +459,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         </div>
       </header>
 
-      {/* â”€â”€ Tabs â”€â”€ */}
+      {/* ── Tabs ── */}
       <div className="max-w-6xl mx-auto px-4 pt-6">
         <div className="glass-card rounded-2xl p-1 mb-6 w-full overflow-x-auto">
           <div className="flex gap-1 min-w-max">
@@ -496,7 +468,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             { id: 'logs',      label: 'Alle Logs',  icon: Database   },
             { id: 'users',     label: 'Benutzer',   icon: Users      },
             { id: 'settings',  label: 'Einstellungen', icon: Settings },
-            { id: 'translations', label: 'Sprachen', icon: Globe },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -514,7 +485,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           </div>
         </div>
 
-        {/* â”€â”€ Error â”€â”€ */}
+        {/* ── Error ── */}
         {error && (
           <div className="glass-card rounded-2xl p-4 mb-6 border border-red-500/30
             bg-red-500/10 flex items-center gap-3 animate-slide-in">
@@ -526,7 +497,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           </div>
         )}
 
-        {/* â•â•â•â•â•â•â•â•â•â• OVERVIEW TAB â•â•â•â•â•â•â•â•â•â• */}
+        {/* ══════════ OVERVIEW TAB ══════════ */}
         {activeTab === 'overview' && (
           <div className="animate-fade-in space-y-6 pb-10">
 
@@ -612,7 +583,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           </div>
         )}
 
-        {/* â•â•â•â•â•â•â•â•â•â• LOGS TAB â•â•â•â•â•â•â•â•â•â• */}
+        {/* ══════════ LOGS TAB ══════════ */}
         {activeTab === 'logs' && (
           <div className="animate-fade-in pb-10 space-y-4">
 
@@ -725,7 +696,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           </div>
         )}
 
-        {/* â•â•â•â•â•â•â•â•â•â• USERS TAB â•â•â•â•â•â•â•â•â•â• */}
+        {/* ══════════ USERS TAB ══════════ */}
         {activeTab === 'users' && (
           <div className="animate-fade-in pb-10 space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -751,7 +722,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               </div>
             </div>
 
-            {/* â”€â”€ Create User Modal â”€â”€ */}
+            {/* ── Create User Modal ── */}
             {showCreateUser && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
                 style={{ background: 'rgba(0,0,0,0.7)' }}
@@ -764,14 +735,14 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   <form onSubmit={handleCreateUser} className="space-y-4">
                     {/* Name */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('name')}</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Name</label>
                       <input type="text" required value={createForm.name}
                         onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
-                        placeholder={t('namePlaceholder')} className="input-dark" />
+                        placeholder="Max Mustermann" className="input-dark" />
                     </div>
                     {/* Email */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('email')}</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">E-Mail</label>
                       <div className="relative">
                         <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input type="email" required value={createForm.email}
@@ -781,7 +752,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     </div>
                     {/* Password */}
                     <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('passwordToken')}</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Passwort</label>
                       <div className="relative">
                         <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                         <input type={showCreatePw ? 'text' : 'password'} required minLength={8}
@@ -879,7 +850,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   {/* Header */}
                   <div className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_auto] gap-3 px-5 py-3
                     border-b border-white/10 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <span>{t('name')}</span><span>{t('email')}</span><span>Rolle</span><span>Status</span><span>Registriert</span>
+                    <span>Name</span><span>E-Mail</span><span>Rolle</span><span>Status</span><span>Registriert</span>
                     <span className="text-right">Aktionen</span>
                   </div>
                   <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto">
@@ -970,7 +941,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           </div>
         )}
 
-        {/* â•â•â•â•â•â•â•â•â•â• SETTINGS TAB â•â•â•â•â•â•â•â•â•â• */}
+        {/* ══════════ SETTINGS TAB ══════════ */}
         {activeTab === 'settings' && (
           <div className="animate-fade-in pb-10 space-y-6 max-w-6xl">
 
@@ -989,22 +960,16 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Server-Host
                   </label>
-                  <div className="relative">
-                    <Server className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="text" value={smtp.host} onChange={(e) => handleSmtpChange('host', e.target.value)}
-                      placeholder="smtp.gmail.com" className="input-dark pl-9" />
-                  </div>
+                  <input type="text" value={smtp.host} onChange={(e) => handleSmtpChange('host', e.target.value)}
+                    placeholder="smtp.gmail.com" className="input-dark" />
                 </div>
                 <div className="w-24">
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Port
                   </label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="number" value={smtp.port} min="1" max="65535"
-                      onChange={(e) => handleSmtpChange('port', Number(e.target.value))}
-                      className="input-dark pl-9" />
-                  </div>
+                  <input type="number" value={smtp.port} min="1" max="65535"
+                    onChange={(e) => handleSmtpChange('port', Number(e.target.value))}
+                    className="input-dark" />
                 </div>
               </div>
 
@@ -1068,23 +1033,17 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Absender-Name
                   </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="text" value={smtp.fromName}
-                      onChange={(e) => handleSmtpChange('fromName', e.target.value)}
-                      placeholder="Koffein-Tracker" className="input-dark pl-9" />
-                  </div>
+                  <input type="text" value={smtp.fromName}
+                    onChange={(e) => handleSmtpChange('fromName', e.target.value)}
+                    placeholder="Koffein-Tracker" className="input-dark" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Absender-E-Mail
                   </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="email" value={smtp.fromEmail}
-                      onChange={(e) => handleSmtpChange('fromEmail', e.target.value)}
-                      placeholder="noreply@deine-domain.de" className="input-dark pl-9" />
-                  </div>
+                  <input type="email" value={smtp.fromEmail}
+                    onChange={(e) => handleSmtpChange('fromEmail', e.target.value)}
+                    placeholder="noreply@deine-domain.de" className="input-dark" />
                 </div>
               </div>
 
@@ -1093,12 +1052,9 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                   App-URL <span className="normal-case font-normal text-slate-600">(für Bestätigungslinks in E-Mails)</span>
                 </label>
-                <div className="relative">
-                  <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input type="url" value={smtp.baseUrl}
-                    onChange={(e) => handleSmtpChange('baseUrl', e.target.value)}
-                    placeholder="https://deine-app.de" className="input-dark pl-9" />
-                </div>
+                <input type="url" value={smtp.baseUrl}
+                  onChange={(e) => handleSmtpChange('baseUrl', e.target.value)}
+                  placeholder="https://deine-app.de" className="input-dark" />
               </div>
 
               {/* Save button */}
@@ -1115,7 +1071,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
             {/* Registration toggle card */}
             <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-white flex items-center gap-2">
                     <Users className="w-4 h-4 text-green-400" />
@@ -1137,7 +1093,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
             {/* Demo access toggle card */}
             <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-white flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-amber-400" />
@@ -1279,7 +1235,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
             {/* Redis Health card */}
             <div className="glass-card rounded-2xl p-6 space-y-4">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-white flex items-center gap-2">
                   <Database className="w-4 h-4 text-green-400" />
                   Redis Datenpersistenz
@@ -1381,12 +1337,4 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 };
 
 export default AdminPanel;
-
-
-
-
-
-
-
-
 
