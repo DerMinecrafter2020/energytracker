@@ -1131,12 +1131,22 @@ const sendReminderEmail = async ({ to }) => {
   });
 };
 
-const sendDiscordReminder = async ({ webhookUrl, email, customMessage }) => {
+const sendDiscordReminder = async ({ webhookUrl, email, title, message }) => {
+  const randomColor = Math.floor(Math.random() * 16777215);
+  const embedTitle = title || '⏰ Erinnerung';
+  const embedDesc = message || `Hallo **${email}**!\nBitte denke daran, deinen heutigen Koffein-Bedarf im Tracker einzutragen.`;
+  
   const response = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      content: customMessage || `🔔 Erinnerung für ${email}: Bitte heute deinen Energy-/Koffein-Bedarf im Tracker eintragen.`,
+      embeds: [{
+        title: embedTitle,
+        description: embedDesc,
+        color: randomColor,
+        timestamp: new Date().toISOString(),
+        footer: { text: 'Koffein-Tracker' }
+      }]
     }),
   });
   if (!response.ok) {
@@ -1286,7 +1296,9 @@ app.get('/api/translations', async (req, res) => {
     let translations = raw ? JSON.parse(raw) : null;
     
     // Auto-Translate trigger on first load if missing
-    if (!translations || Object.keys(translations).length === 0) {
+    const isMissing = !translations || Object.keys(translations).length === 0;
+    const isBroken = translations && translations.en && translations.en.discover === 'Entdecken';
+    if (isMissing || isBroken) {
       const aiCfg = loadAiConfig();
       if (aiCfg && aiCfg.apiKey && !isTranslating) {
         isTranslating = true;
@@ -1426,7 +1438,7 @@ app.post('/api/logs', async (req, res) => {
               sendDiscordReminder({ 
                 webhookUrl: cfg.discordWebhook, 
                 email: targetEmail, 
-                customMessage: `**${title}**: ${message}` 
+                title, message 
               }).catch(e => console.error('Discord notify error:', e))
             );
           }
