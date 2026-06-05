@@ -27,10 +27,10 @@ const DB_TYPE = 'redis';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Admin secret â€“ set ADMIN_SECRET in your .env
+// Admin secret – set ADMIN_SECRET in your .env
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'et-admin-2024';
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Helpers ──────────────────────────────────────────────────────────────────
 const hashPassword = (pw) => {
   const salt = process.env.PASSWORD_SALT || 'et-caffeine-salt-2024';
   return crypto.pbkdf2Sync(pw, salt, 100000, 64, 'sha512').toString('hex');
@@ -53,7 +53,7 @@ const createTransporter = (cfg) => {
   return nodemailer.createTransport(transport);
 };
 
-// â”€â”€ Admin middleware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Admin middleware ──────────────────────────────────────────────────────────
 const requireAdmin = (req, res, next) => {
   if (req.headers['x-admin-secret'] !== ADMIN_SECRET)
     return res.status(401).json({ error: 'Nicht autorisiert.' });
@@ -124,7 +124,7 @@ app.use(express.json());
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 
-// â”€â”€ Redis DB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Redis DB ──────────────────────────────────────────────────────────────────
 const isDockerRuntime = fs.existsSync('/.dockerenv');
 const cleanEnvValue = (value) => String(value || '').trim().replace(/^['\"]|['\"]$/g, '');
 
@@ -175,7 +175,7 @@ redis.on('error', (err) => {
     localRedisHintShown = true;
   }
 });
-redis.on('connect', () => console.log('[Redis] âœ“ Verbunden'));
+redis.on('connect', () => console.log('[Redis] ✓ Verbunden'));
 
 const REDIS_KEYS = {
   caffeine_logs: 'koffein:caffeine_logs',
@@ -508,7 +508,7 @@ const mapSmtpRowToConfig = (row) => {
     fromName: 'Koffein-Tracker',
     fromEmail: 'admin@fra03.de',
     baseUrl: '',
-    registrationEnabled: true, // âœ“ Default: Registrierung ENABLED
+    registrationEnabled: true, // ✓ Default: Registrierung ENABLED
     demoEnabled: true,
   };
   
@@ -578,10 +578,10 @@ const initDb = async () => {
   console.log('[DB] ðŸ—„ï¸  Starte Redis-Datenbank...');
   getPool();
   await loadDbState();
-  console.log(`[DB] âœ“ Redis bereit: ${redisUrl}`);
+  console.log(`[DB] ✓ Redis bereit: ${redisUrl}`);
 };
 
-// â”€â”€ AI / OpenRouter helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AI / OpenRouter helpers ───────────────────────────────────────────────────
 const loadAiConfig = () => {
   return dbState.ai_config || { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '' };
 };
@@ -627,7 +627,7 @@ const OFF_SEARCH_URL     = 'https://world.openfoodfacts.org/cgi/search.pl';
 const BRAVE_SEARCH_URL   = 'https://api.search.brave.com/res/v1/web/search';
 
 const fetchDrinkWebContextBrave = async (description, apiKey) => {
-  const query = `${String(description || '').trim()} Koffeingehalt mg GetrÃ¤nk NÃ¤hrwerte`;
+  const query = `${String(description || '').trim()} Koffeingehalt mg Getränk Nährwerte`;
   try {
     const url = new URL(BRAVE_SEARCH_URL);
     url.searchParams.set('q', query);
@@ -844,7 +844,7 @@ const upsertFavoriteForUser = ({ userId, email, drink }) => {
     caffeinePerMl: drink.caffeinePerMl !== undefined && drink.caffeinePerMl !== null
       ? Number(drink.caffeinePerMl)
       : null,
-    icon: String(drink.icon || 'ðŸ¥¤'),
+    icon: String(drink.icon || '🥤'),
     updatedAt: new Date().toISOString(),
     createdAt: existingIdx >= 0 ? items[existingIdx].createdAt : new Date().toISOString(),
   };
@@ -882,7 +882,7 @@ const removeFavoriteForUser = ({ userId, email, favoriteId }) => {
   return removed;
 };
 
-// â”€â”€ USER SETTINGS HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── USER SETTINGS HELPERS ────────────────────────────────────────────────────
 const getSettingsOwnerKey = ({ userId, email }) => {
   if (userId) return `user:${userId}`;
   if (email) return `email:${email}`;
@@ -929,7 +929,7 @@ const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLa
   return settings;
 };
 
-// â”€â”€ CUSTOM DRINKS HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CUSTOM DRINKS HELPERS ────────────────────────────────────────────────────
 const getCustomDrinksForUser = ({ userId, email }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   return dbState.custom_drinks.filter((d) => d.ownerKey === ownerKey);
@@ -938,7 +938,7 @@ const getCustomDrinksForUser = ({ userId, email }) => {
 const addCustomDrink = ({ userId, email, name, size, caffeine, icon }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   const id = crypto.randomBytes(8).toString('hex');
-  const drink = { id, ownerKey, name, size, caffeine: Number(caffeine) || 0, icon: icon || 'ðŸ¥¤', createdAt: new Date().toISOString() };
+  const drink = { id, ownerKey, name, size, caffeine: Number(caffeine) || 0, icon: icon || '🥤', createdAt: new Date().toISOString() };
   dbState.custom_drinks.push(drink);
   persistDbState();
   return drink;
@@ -1017,7 +1017,7 @@ const completeLoginForUser = async (user) => {
 };
 
 
-// â”€â”€ STATISTICS HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── STATISTICS HELPERS ───────────────────────────────────────────────────────
 const getWeeklyStats = ({ userId, email }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   const today = new Date();
@@ -1042,7 +1042,7 @@ const getWeeklyStats = ({ userId, email }) => {
 };
 
 const getDailyStats = (date) => {
-  // Aggregiert statistiken fÃ¼r einen Tag (fÃ¼r Admin-Ãœbersicht)
+  // Aggregiert statistiken für einen Tag (für Admin-Übersicht)
   const logsForDay = dbState.caffeine_logs.filter((log) => log.date === date);
   const users = new Set();
   let totalCaffeine = 0;
@@ -1086,7 +1086,7 @@ const buildModernEmail = ({ icon, headerText, contentHtml, footerText }) => `
   <div style="font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #02040A; color: #f1f5f9; padding: 40px 20px; text-align: center;">
     <div style="max-width: 500px; margin: 0 auto; background-color: #0d1117; border: 1px solid #1f2937; border-radius: 24px; padding: 40px 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
       <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #3b82f6, #60a5fa, #fbbf24); margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(96,165,250,0.4);">
-        <span style="font-size: 28px; line-height: 56px; color: white;">${icon || 'âš¡'}</span>
+        <span style="font-size: 28px; line-height: 56px; color: white;">${icon || '⚡'}</span>
       </div>
       <h1 style="margin: 0 0 15px 0; font-size: 24px; font-weight: 800; color: #60a5fa;">${headerText || 'Koffein-Tracker'}</h1>
       <div style="font-size: 16px; color: #94a3b8; line-height: 1.6; margin-bottom: 35px; text-align: left;">
@@ -1103,12 +1103,12 @@ const buildModernEmail = ({ icon, headerText, contentHtml, footerText }) => `
 const sendReminderEmail = async ({ to }) => {
   const cfg = await loadSmtpConfig();
   if (!cfg?.host || !cfg?.auth?.user) {
-    throw new Error('SMTP ist nicht vollstÃ¤ndig konfiguriert.');
+    throw new Error('SMTP ist nicht vollständig konfiguriert.');
   }
 
   const appUrl = process.env.WEBAUTHN_ORIGIN || 'http://localhost:8080';
   const htmlContent = buildModernEmail({
-    icon: 'âš¡',
+    icon: '⚡',
     headerText: 'Koffein-Tracker',
     contentHtml: `
       <p style="text-align: center; margin-top: 0;">Hey! Kurze Erinnerung: Hast du heute schon deinen Energy-Drink oder Kaffee getrackt?</p>
@@ -1119,14 +1119,14 @@ const sendReminderEmail = async ({ to }) => {
         </a>
       </div>
     `,
-    footerText: 'Du erhÃ¤ltst diese E-Mail aufgrund deiner Profil-Einstellungen.',
+    footerText: 'Du erhältst diese E-Mail aufgrund deiner Profil-Einstellungen.',
   });
 
   const transporter = createTransporter(cfg);
   await transporter.sendMail({
     from: `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
     to,
-    subject: 'âš¡ Dein tÃ¤glicher Reminder - Koffein-Tracker',
+    subject: '⚡ Dein täglicher Reminder - Koffein-Tracker',
     html: htmlContent,
   });
 };
@@ -1136,7 +1136,7 @@ const sendDiscordReminder = async ({ webhookUrl, email, customMessage }) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      content: customMessage || `ðŸ”” Erinnerung fÃ¼r ${email}: Bitte heute deinen Energy-/Koffein-Bedarf im Tracker eintragen.`,
+      content: customMessage || `🔔 Erinnerung für ${email}: Bitte heute deinen Energy-/Koffein-Bedarf im Tracker eintragen.`,
     }),
   });
   if (!response.ok) {
@@ -1175,7 +1175,7 @@ const processRemindersTick = async () => {
       persistDbState();
       console.log(`[Reminder] Gesendet an ${reminder.email} (${normalized.time})`);
     } catch (err) {
-      console.error(`[Reminder] Fehler fÃ¼r ${reminder.email}:`, err.message);
+      console.error(`[Reminder] Fehler für ${reminder.email}:`, err.message);
     }
   }
 };
@@ -1208,7 +1208,7 @@ app.get('/api/version', async (req, res) => {
   res.json({ version: appVersion });
 });
 
-// â”€â”€ Docker Hub update check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Docker Hub update check ───────────────────────────────────────────────
 app.get('/api/logs', async (req, res) => {
   try {
     const date = req.query.date;
@@ -1303,15 +1303,15 @@ app.post('/api/logs', async (req, res) => {
 
       if (settings.notifyAtLimit && settings.discordNotifyAtLimit && totalCaffeine > limit) {
         const excess = totalCaffeine - limit;
-        await tryNotify(true, 'Limit Ã¼berschritten!', `Du hast dein Limit um ${excess}mg Ã¼berschritten (${totalCaffeine}/${limit}mg)`);
+        await tryNotify(true, 'Limit überschritten!', `Du hast dein Limit um ${excess}mg überschritten (${totalCaffeine}/${limit}mg)`);
       }
 
       if (settings.notifyLate && settings.discordNotifyLate && hour >= 18) {
-        await tryNotify(true, 'SpÃ¤tes Koffein', `${newLog.name} um ${hour}:${String(now.getMinutes()).padStart(2, '0')} Uhr kÃ¶nnte deinen Schlaf beeinflussen`);
+        await tryNotify(true, 'Spätes Koffein', `${newLog.name} um ${hour}:${String(now.getMinutes()).padStart(2, '0')} Uhr könnte deinen Schlaf beeinflussen`);
       }
 
       if (settings.notifyRapid && settings.discordNotifyRapid && recentDrinks.length >= 3) {
-        await tryNotify(true, 'Schnelle Folge erkannt', `${recentDrinks.length} GetrÃ¤nke in 2h â€“ versuche langsamer zu trinken!`);
+        await tryNotify(true, 'Schnelle Folge erkannt', `${recentDrinks.length} Getränke in 2h – versuche langsamer zu trinken!`);
       }
 
       await Promise.all(notifyPromises);
@@ -1338,7 +1338,7 @@ app.delete('/api/logs/:id', async (req, res) => {
   }
 });
 
-// â”€â”€ SMTP Admin Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SMTP Admin Routes ─────────────────────────────────────────────────────────
 app.get('/api/admin/smtp', requireAdmin, async (req, res) => {
   try {
     const cfg = await loadSmtpConfig();
@@ -1395,7 +1395,7 @@ app.post('/api/admin/smtp/test', requireAdmin, async (req, res) => {
       html:    buildModernEmail({
         icon: 'âœ‰ï¸',
         headerText: 'SMTP Test Erfolgreich',
-        contentHtml: '<p style="text-align: center; margin: 0;">Der SMTP-Server ist korrekt konfiguriert. Diese E-Mail bestÃ¤tigt die erfolgreiche Verbindung.</p>',
+        contentHtml: '<p style="text-align: center; margin: 0;">Der SMTP-Server ist korrekt konfiguriert. Diese E-Mail bestätigt die erfolgreiche Verbindung.</p>',
       }),
     });
     res.json({ success: true, message: `Test-E-Mail an ${testEmail} gesendet.` });
@@ -1412,7 +1412,7 @@ app.post('/api/admin/discord/test', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Discord Webhook URL fehlt.' });
   }
   if (!/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/.+/i.test(safeWebhook)) {
-    return res.status(400).json({ error: 'UngÃ¼ltige Discord Webhook URL.' });
+    return res.status(400).json({ error: 'Ungültige Discord Webhook URL.' });
   }
 
   try {
@@ -1426,7 +1426,7 @@ app.post('/api/admin/discord/test', requireAdmin, async (req, res) => {
   }
 });
 
-// â”€â”€ Redis Health Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Redis Health Check ────────────────────────────────────────────────────────
 app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
   try {
     // Ping Redis
@@ -1473,7 +1473,7 @@ app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
   }
 });
 
-// â”€â”€ User Management Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── User Management Routes ────────────────────────────────────────────────────
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const dbPool = getPool();
@@ -1606,7 +1606,7 @@ app.post('/api/admin/users/:id/impersonate', requireAdmin, (req, res) => {
   });
 });
 
-// â”€â”€ Public settings (no auth required) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Public settings (no auth required) ────────────────────────────────────────
 app.get('/api/settings/public', async (req, res) => {
   try {
     const cfg = await loadSmtpConfig();
@@ -1625,7 +1625,7 @@ app.get('/api/settings/public', async (req, res) => {
 
 
 
-// â”€â”€ Public Registration & Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Public Registration & Login ───────────────────────────────────────────────
 app.post('/api/register', async (req, res) => {
 
 
@@ -1672,18 +1672,18 @@ app.post('/api/register', async (req, res) => {
     await t.sendMail({
       from:    `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
       to:      email,
-      subject: 'Koffein-Tracker \u2013 E-Mail-Adresse bestÃ¤tigen',
+      subject: 'Koffein-Tracker \u2013 E-Mail-Adresse bestätigen',
       html: buildModernEmail({
-        icon: 'ðŸ‘‹',
+        icon: '👋',
         headerText: `Willkommen, ${name}!`,
         contentHtml: `
-          <p style="text-align: center; margin-top: 0;">Bitte bestÃ¤tige deine E-Mail-Adresse, um dein Konto zu aktivieren:</p>
+          <p style="text-align: center; margin-top: 0;">Bitte bestätige deine E-Mail-Adresse, um dein Konto zu aktivieren:</p>
           <div style="text-align: center; margin: 25px 0;">
             <a href="${link}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #60a5fa); color: white; text-decoration: none; padding: 14px 32px; border-radius: 16px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 14px rgba(59,130,246,0.4);">
-              E-Mail bestÃ¤tigen
+              E-Mail bestätigen
             </a>
           </div>
-          <p style="text-align: center; color: #64748b; font-size: 13px; margin: 0;">Dieser Link ist 24 Stunden gÃ¼ltig.<br>Falls du dich nicht registriert hast, ignoriere diese E-Mail.</p>
+          <p style="text-align: center; color: #64748b; font-size: 13px; margin: 0;">Dieser Link ist 24 Stunden gültig.<br>Falls du dich nicht registriert hast, ignoriere diese E-Mail.</p>
         `,
       }),
     });
@@ -1720,7 +1720,7 @@ app.get('/api/verify/:token', async (req, res) => {
   }
 });
 
-// â”€â”€ Password Reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Password Reset ────────────────────────────────────────────────────────────
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'E-Mail erforderlich.' });
@@ -1867,11 +1867,11 @@ app.post('/api/login/2fa/totp', async (req, res) => {
     const user = getUserByIdentity({ userId: pending.userId, email: pending.email });
     ensureUserSecurityFields(user);
     if (!user || !user.totp_enabled || !user.totp_secret) {
-      return res.status(400).json({ error: 'TOTP ist fÃ¼r dieses Konto nicht aktiv.' });
+      return res.status(400).json({ error: 'TOTP ist für dieses Konto nicht aktiv.' });
     }
 
     const ok = (await authenticator.verify({ token: String(code).replace(/\s+/g, ''), secret: user.totp_secret })).valid;
-    if (!ok) return res.status(401).json({ error: 'UngÃ¼ltiger 2FA-Code.' });
+    if (!ok) return res.status(401).json({ error: 'Ungültiger 2FA-Code.' });
 
     consumeSecondFactorToken(loginToken);
     const safeUser = await completeLoginForUser(user);
@@ -1893,7 +1893,7 @@ app.post('/api/login/2fa/passkey/options', async (req, res) => {
     const user = getUserByIdentity({ userId: pending.userId, email: pending.email });
     ensureUserSecurityFields(user);
     if (!user || user.passkeys.length === 0) {
-      return res.status(400).json({ error: 'Kein SicherheitsschlÃ¼ssel hinterlegt.' });
+      return res.status(400).json({ error: 'Kein Sicherheitsschlüssel hinterlegt.' });
     }
 
     const { rpID } = getWebAuthnConfig(req);
@@ -1940,7 +1940,7 @@ app.post('/api/login/2fa/passkey/verify', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
 
     const passkey = user.passkeys.find((k) => k.id === response.id);
-    if (!passkey) return res.status(401).json({ error: 'Unbekannter SicherheitsschlÃ¼ssel.' });
+    if (!passkey) return res.status(401).json({ error: 'Unbekannter Sicherheitsschlüssel.' });
 
     const verification = await verifyAuthenticationResponse({
       response,
@@ -1956,7 +1956,7 @@ app.post('/api/login/2fa/passkey/verify', async (req, res) => {
       requireUserVerification: false,
     });
 
-    if (!verification.verified) return res.status(401).json({ error: 'Passkey-ÃœberprÃ¼fung fehlgeschlagen.' });
+    if (!verification.verified) return res.status(401).json({ error: 'Passkey-Überprüfung fehlgeschlagen.' });
 
     if (verification.authenticationInfo) {
       passkey.counter = verification.authenticationInfo.newCounter;
@@ -1975,7 +1975,7 @@ app.post('/api/login/2fa/passkey/verify', async (req, res) => {
   }
 });
 
-// â”€â”€ User Reminder Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── User Reminder Settings ───────────────────────────────────────────────────
 app.get('/api/reminders/me', async (req, res) => {
   try {
     const userId = String(req.query.userId || '').trim() || null;
@@ -2019,7 +2019,7 @@ app.post('/api/reminders/me', async (req, res) => {
   }
 });
 
-// â”€â”€ User Favorites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── User Favorites ───────────────────────────────────────────────────────────
 app.get('/api/favorites/me', async (req, res) => {
   try {
     const userId = String(req.query.userId || '').trim() || null;
@@ -2048,8 +2048,8 @@ app.post('/api/favorites/me', async (req, res) => {
     const caffeine = Number(drink.caffeine);
 
     if (!name) return res.status(400).json({ error: 'drink.name ist erforderlich.' });
-    if (!Number.isFinite(size) || size <= 0) return res.status(400).json({ error: 'drink.size ist ungÃ¼ltig.' });
-    if (!Number.isFinite(caffeine) || caffeine < 0) return res.status(400).json({ error: 'drink.caffeine ist ungÃ¼ltig.' });
+    if (!Number.isFinite(size) || size <= 0) return res.status(400).json({ error: 'drink.size ist ungültig.' });
+    if (!Number.isFinite(caffeine) || caffeine < 0) return res.status(400).json({ error: 'drink.caffeine ist ungültig.' });
 
     const item = upsertFavoriteForUser({
       userId: safeUserId,
@@ -2059,7 +2059,7 @@ app.post('/api/favorites/me', async (req, res) => {
         size: Math.round(size),
         caffeine: Math.round(caffeine),
         caffeinePerMl: drink.caffeinePerMl,
-        icon: drink.icon || 'ðŸ¥¤',
+        icon: drink.icon || '🥤',
       },
     });
 
@@ -2089,7 +2089,7 @@ app.delete('/api/favorites/me', async (req, res) => {
   }
 });
 
-// â”€â”€ USER SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── USER SETTINGS ────────────────────────────────────────────────────────────
 app.get('/api/settings/me', async (req, res) => {
   try {
     const userId = String(req.query.userId || '').trim() || null;
@@ -2185,7 +2185,7 @@ app.post('/api/user/profile', async (req, res) => {
   }
 });
 
-// â”€â”€ USER TEST ROUTES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── USER TEST ROUTES ────────────────────────────────────────────────────────
 app.post('/api/user/test-email', async (req, res) => {
   try {
     const { userId, email } = req.body || {};
@@ -2215,13 +2215,13 @@ app.post('/api/user/test-email', async (req, res) => {
       from: `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
       to: targetEmail,
       subject: 'Test-Nachricht: Paulaner & Energy Tracker',
-      text: 'Hallo! Deine E-Mail-Benachrichtigungen fÃ¼r den Paulaner & Energy Tracker funktionieren einwandfrei.',
+      text: 'Hallo! Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.',
       html: buildModernEmail({
-        icon: 'ðŸŽ‰',
+        icon: '🎉',
         headerText: 'Test erfolgreich!',
         contentHtml: `
-          <p style="text-align: center; margin-top: 0;">Deine E-Mail-Benachrichtigungen fÃ¼r den Paulaner & Energy Tracker funktionieren einwandfrei.</p>
-          <p style="text-align: center; margin-bottom: 0;">Du erhÃ¤ltst ab sofort Benachrichtigungen fÃ¼r deine tÃ¤glichen Reminder oder Warnungen (falls konfiguriert).</p>
+          <p style="text-align: center; margin-top: 0;">Deine E-Mail-Benachrichtigungen für den Paulaner & Energy Tracker funktionieren einwandfrei.</p>
+          <p style="text-align: center; margin-bottom: 0;">Du erhältst ab sofort Benachrichtigungen für deine täglichen Reminder oder Warnungen (falls konfiguriert).</p>
         `,
       }),
     });
@@ -2233,7 +2233,7 @@ app.post('/api/user/test-email', async (req, res) => {
   }
 });
 
-// â”€â”€ USER SECURITY (2FA + PASSKEYS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── USER SECURITY (2FA + PASSKEYS) ─────────────────────────────────────────
 app.get('/api/security/me', async (req, res) => {
   try {
     const userId = String(req.query.userId || '').trim() || null;
@@ -2288,7 +2288,7 @@ app.post('/api/security/totp/enable', async (req, res) => {
     if (!user.totp_temp_secret) return res.status(400).json({ error: 'Bitte zuerst TOTP-Setup starten.' });
 
     const ok = (await authenticator.verify({ token: String(code).replace(/\s+/g, ''), secret: user.totp_temp_secret })).valid;
-    if (!ok) return res.status(401).json({ error: 'UngÃ¼ltiger Verifizierungscode.' });
+    if (!ok) return res.status(401).json({ error: 'Ungültiger Verifizierungscode.' });
 
     user.totp_secret = user.totp_temp_secret;
     user.totp_temp_secret = null;
@@ -2403,14 +2403,14 @@ app.post('/api/security/passkeys/register/verify', async (req, res) => {
     });
 
     if (!verification.verified || !verification.registrationInfo) {
-      return res.status(401).json({ error: 'SicherheitsschlÃ¼ssel konnte nicht verifiziert werden.' });
+      return res.status(401).json({ error: 'Sicherheitsschlüssel konnte nicht verifiziert werden.' });
     }
 
     const credential = verification.registrationInfo.credential;
     const credentialId = credential.id;
     if (user.passkeys.some((k) => k.id === credentialId)) {
       pendingWebAuthn.delete(`register:${challengeToken}`);
-      return res.status(409).json({ error: 'Dieser SchlÃ¼ssel ist bereits registriert.' });
+      return res.status(409).json({ error: 'Dieser Schlüssel ist bereits registriert.' });
     }
 
     user.passkeys.push({
@@ -2418,7 +2418,7 @@ app.post('/api/security/passkeys/register/verify', async (req, res) => {
       publicKey: toBase64Url(credential.publicKey),
       counter: Number(credential.counter || 0),
       transports: Array.isArray(response.response?.transports) ? response.response.transports : [],
-      name: String(name || 'SicherheitsschlÃ¼ssel').trim() || 'SicherheitsschlÃ¼ssel',
+      name: String(name || 'Sicherheitsschlüssel').trim() || 'Sicherheitsschlüssel',
       createdAt: new Date().toISOString(),
       lastUsedAt: null,
     });
@@ -2446,7 +2446,7 @@ app.delete('/api/security/passkeys/:credentialId', async (req, res) => {
     const before = user.passkeys.length;
     user.passkeys = user.passkeys.filter((k) => k.id !== credentialId);
     if (user.passkeys.length === before) {
-      return res.status(404).json({ error: 'SicherheitsschlÃ¼ssel nicht gefunden.' });
+      return res.status(404).json({ error: 'Sicherheitsschlüssel nicht gefunden.' });
     }
 
     persistDbState();
@@ -2457,7 +2457,7 @@ app.delete('/api/security/passkeys/:credentialId', async (req, res) => {
   }
 });
 
-// â”€â”€ CUSTOM DRINKS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CUSTOM DRINKS ───────────────────────────────────────────────────────────
 app.get('/api/custom-drinks/me', async (req, res) => {
   try {
     const userId = String(req.query.userId || '').trim() || null;
@@ -2489,7 +2489,7 @@ app.post('/api/custom-drinks/me', async (req, res) => {
       name: String(name).trim(),
       size: Math.round(size),
       caffeine: Math.round(caffeine),
-      icon: icon || 'ðŸ¥¤',
+      icon: icon || '🥤',
     });
 
     res.json({ success: true, item: drink });
@@ -2509,7 +2509,7 @@ app.delete('/api/custom-drinks/me', async (req, res) => {
     if (!drinkId) return res.status(400).json({ error: 'drinkId ist erforderlich.' });
 
     const removed = removeCustomDrink({ userId, email, drinkId });
-    if (!removed) return res.status(404).json({ error: 'GetrÃ¤nk nicht gefunden.' });
+    if (!removed) return res.status(404).json({ error: 'Getränk nicht gefunden.' });
 
     res.json({ success: true });
   } catch (err) {
@@ -2518,7 +2518,7 @@ app.delete('/api/custom-drinks/me', async (req, res) => {
   }
 });
 
-// â”€â”€ STATISTICS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── STATISTICS ───────────────────────────────────────────────────────────────
 app.get('/api/stats/today', async (req, res) => {
   try {
     const userId = String(req.query.userId || '').trim() || null;
@@ -2551,7 +2551,7 @@ app.get('/api/admin/ai', requireAdmin, (req, res) => {
   const cfg = loadAiConfig();
   const maskedKey = cfg.apiKey ? cfg.apiKey.slice(0, 8) + '********' + cfg.apiKey.slice(-4) : '';
   const maskedBraveKey = cfg.braveSearchKey
-    ? cfg.braveSearchKey.slice(0, 4) + 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢' + cfg.braveSearchKey.slice(-4)
+    ? cfg.braveSearchKey.slice(0, 4) + '••••••••' + cfg.braveSearchKey.slice(-4)
     : '';
   res.json({
     apiKeySet: !!cfg.apiKey,
@@ -2580,7 +2580,7 @@ app.post('/api/admin/ai', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
-// â”€â”€ AI Chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AI Chat ──────────────────────────────────────────────────────────────────
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { messages, totalCaffeineToday, dailyLimit, clientTime } = req.body || {};
@@ -2592,7 +2592,7 @@ app.post('/api/ai/chat', async (req, res) => {
     // Validate message structure
     for (const m of messages) {
       if (!['user', 'assistant', 'system'].includes(m?.role) || typeof m?.content !== 'string')
-        return res.status(400).json({ error: 'UngÃ¼ltiges Nachrichtenformat.' });
+        return res.status(400).json({ error: 'Ungültiges Nachrichtenformat.' });
       if (m.content.length > 2000)
         return res.status(400).json({ error: 'Nachricht zu lang (max. 2000 Zeichen).' });
     }
@@ -2601,19 +2601,19 @@ app.post('/api/ai/chat', async (req, res) => {
       ? `Aktuelle Koffein-Einnahme heute: ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
       : '';
 
-    const timeInfo = clientTime ? `Die aktuelle Uhrzeit beim Nutzer ist ${clientTime}. BerÃ¼cksichtige diese Uhrzeit unbedingt bei deinen Empfehlungen (z.B. warne vor spÃ¤tem Koffeinkonsum am Abend, oder gib morgens einen Energiekick-Tipp). ` : '';
+    const timeInfo = clientTime ? `Die aktuelle Uhrzeit beim Nutzer ist ${clientTime}. Berücksichtige diese Uhrzeit unbedingt bei deinen Empfehlungen (z.B. warne vor spätem Koffeinkonsum am Abend, oder gib morgens einen Energiekick-Tipp). ` : '';
 
-    const systemPrompt = `Du bist ein hilfreicher Assistent fÃ¼r den Koffein-Tracker. Du beantwortest Fragen zu Koffein, Schlaf, Energie und GetrÃ¤nken auf Deutsch. Sei prÃ¤zise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo}
-Wenn der Nutzer dich bittet, ein GetrÃ¤nk hinzuzufÃ¼gen (z.B. 'FÃ¼ge einen halben Liter Red Bull hinzu'), antworte ganz normal auf seine Anfrage und hÃ¤nge GANZ AM ENDE deiner Antwort einen exakten JSON-Block in folgendem Format an:
+    const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo}
+Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen (z.B. 'Füge einen halben Liter Red Bull hinzu'), antworte ganz normal auf seine Anfrage und hänge GANZ AM ENDE deiner Antwort einen exakten JSON-Block in folgendem Format an:
 \`\`\`json
 {
   "action": "ADD_DRINK",
-  "name": "Name des GetrÃ¤nks",
+  "name": "Name des Getränks",
   "size": 500,
   "caffeine": 160
 }
 \`\`\`
-Berechne das gesamte Koffein ('caffeine') basierend auf der ml-Menge ('size') und dem typischen Koffeingehalt des GetrÃ¤nks (z.B. Red Bull hat 32mg/100ml, also 160mg fÃ¼r 500ml). Lass das JSON-Feld weg, wenn kein GetrÃ¤nk hinzugefÃ¼gt werden soll.`.trim();
+Berechne das gesamte Koffein ('caffeine') basierend auf der ml-Menge ('size') und dem typischen Koffeingehalt des Getränks (z.B. Red Bull hat 32mg/100ml, also 160mg für 500ml). Lass das JSON-Feld weg, wenn kein Getränk hinzugefügt werden soll.`.trim();
 
     const fullMessages = [
       { role: 'system', content: systemPrompt },
@@ -2628,7 +2628,7 @@ Berechne das gesamte Koffein ('caffeine') basierend auf der ml-Menge ('size') un
   }
 });
 
-// â”€â”€ AI Drink Recognition â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AI Drink Recognition ─────────────────────────────────────────────────────
 app.post('/api/ai/recognize-drink', async (req, res) => {
   try {
     const { description } = req.body || {};
@@ -2659,13 +2659,13 @@ app.post('/api/ai/recognize-drink', async (req, res) => {
     const messages = [
       {
         role: 'system',
-        content: `Du bist ein Experte fÃ¼r GetrÃ¤nke und Koffeingehalt. Nutze die bereitgestellten Online-Treffer als primÃ¤re Datenquelle und antworte AUSSCHLIESSLICH mit einem JSON-Objekt ohne Markdown-Formatierung. Format:
-{"name":"GetrÃ¤nkename","caffeinePer100ml":Zahl,"sizeMl":Zahl,"confidence":"hoch|mittel|niedrig","hint":"optionaler Hinweis auf Deutsch"}
-Wichtig: caffeinePer100ml und sizeMl mÃ¼ssen Ganzzahlen sein. Bei widersprÃ¼chlichen Quellen nimm den konservativeren Wert und setze confidence auf "mittel" oder "niedrig".`,
+        content: `Du bist ein Experte für Getränke und Koffeingehalt. Nutze die bereitgestellten Online-Treffer als primäre Datenquelle und antworte AUSSCHLIESSLICH mit einem JSON-Objekt ohne Markdown-Formatierung. Format:
+{"name":"Getränkename","caffeinePer100ml":Zahl,"sizeMl":Zahl,"confidence":"hoch|mittel|niedrig","hint":"optionaler Hinweis auf Deutsch"}
+Wichtig: caffeinePer100ml und sizeMl müssen Ganzzahlen sein. Bei widersprüchlichen Quellen nimm den konservativeren Wert und setze confidence auf "mittel" oder "niedrig".`,
       },
       {
         role: 'user',
-        content: `GetrÃ¤nkeangabe des Nutzers:\n${cleanedDescription}\n\nOnline-Treffer:\n${webContext}`,
+        content: `Getränkeangabe des Nutzers:\n${cleanedDescription}\n\nOnline-Treffer:\n${webContext}`,
       },
     ];
 
@@ -2673,17 +2673,17 @@ Wichtig: caffeinePer100ml und sizeMl mÃ¼ssen Ganzzahlen sein. Bei widersprÃ¼
 
     // Extract JSON from response (strip markdown if present)
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Keine gÃ¼ltige Antwort vom AI-Modell.');
+    if (!jsonMatch) throw new Error('Keine gültige Antwort vom AI-Modell.');
 
     const parsed = JSON.parse(jsonMatch[0]);
     if (!parsed.name || typeof parsed.caffeinePer100ml !== 'number')
-      throw new Error('UnvollstÃ¤ndige AI-Antwort.');
+      throw new Error('Unvollständige AI-Antwort.');
 
     const defaultHint = searchSource === 'brave'
       ? 'Mit Brave Search abgeglichen.'
       : searchSource === 'openfoodfacts'
         ? 'Mit Online-Treffern abgeglichen (OpenFoodFacts).'
-        : 'Keine passenden Online-Treffer gefunden, SchÃ¤tzung basiert auf Standards.';
+        : 'Keine passenden Online-Treffer gefunden, Schätzung basiert auf Standards.';
 
     res.json({
       name: String(parsed.name),
@@ -2698,8 +2698,8 @@ Wichtig: caffeinePer100ml und sizeMl mÃ¼ssen Ganzzahlen sein. Bei widersprÃ¼
   }
 });
 
-// â”€â”€ AI Daily Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€ AI Drink Search (Brave API) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── AI Daily Summary ─────────────────────────────────────────────────────────
+// ── AI Drink Search (Brave API) ─────────────────────────────────────────────
 app.get('/api/ai/search-drink', async (req, res) => {
   try {
     const query = req.query.q;
@@ -2733,13 +2733,13 @@ app.get('/api/ai/search-drink', async (req, res) => {
     const messages = [
       {
         role: 'system',
-        content: `Du bist eine Suchmaschine fÃ¼r GetrÃ¤nke und ihren Koffeingehalt. 
-Suche nach dem GetrÃ¤nk: "${query}".
+        content: `Du bist eine Suchmaschine für Getränke und ihren Koffeingehalt. 
+Suche nach dem Getränk: "${query}".
 ${webContext ? `Nutze diese aktuellen Suchergebnisse zur Verifizierung:\n${webContext}` : 'Es konnten keine Live-Suchdaten abgerufen werden, nutze dein Wissen.'}
-Antworte AUSSCHLIESSLICH mit einem JSON-Array von bis zu 3 gefundenen GetrÃ¤nken. 
+Antworte AUSSCHLIESSLICH mit einem JSON-Array von bis zu 3 gefundenen Getränken. 
 Formatiere JEDES Objekt im Array exakt so:
-{"name":"GetrÃ¤nkename", "brand":"Markenname", "caffeinePer100ml":Zahl, "sizeMl":Zahl}
-Wichtig: caffeinePer100ml und sizeMl mÃ¼ssen Ganzzahlen sein. Wenn keine GrÃ¶ÃŸe bekannt ist, nimm 330 oder 500.
+{"name":"Getränkename", "brand":"Markenname", "caffeinePer100ml":Zahl, "sizeMl":Zahl}
+Wichtig: caffeinePer100ml und sizeMl müssen Ganzzahlen sein. Wenn keine Größe bekannt ist, nimm 330 oder 500.
 Kein Markdown, nur das pure JSON-Array!`
       },
       { role: 'user', content: query }
@@ -2780,21 +2780,21 @@ app.post('/api/ai/daily-summary', async (req, res) => {
 
     const logList = logs.slice(0, 30).map((l) =>
       `- ${l.name} (${l.caffeine}mg, ${l.sizeMl || l.size || '?'}ml)`
-    ).join('\n') || 'Keine EintrÃ¤ge heute.';
+    ).join('\n') || 'Keine Einträge heute.';
 
     const messages = [
       {
         role: 'system',
-        content: `Du bist ein Gesundheitsassistent fÃ¼r einen Koffein-Tracker. Antworte auf Deutsch, freundlich und prÃ¤zise. Maximal 200 WÃ¶rter.`,
+        content: `Du bist ein Gesundheitsassistent für einen Koffein-Tracker. Antworte auf Deutsch, freundlich und präzise. Maximal 200 Wörter.`,
       },
       {
         role: 'user',
-        content: `Analysiere meine heutige Koffein-Aufnahme und gib mir eine persÃ¶nliche Auswertung und Empfehlung.
+        content: `Analysiere meine heutige Koffein-Aufnahme und gib mir eine persönliche Auswertung und Empfehlung.
 
 ${clientTime ? `Aktuelle Uhrzeit: ${clientTime}\n  ` : ''}Heutiger Verbrauch: ${total}mg von ${limit}mg Tageslimit (${percent}%)
-Noch verfÃ¼gbar: ${remaining}mg
+Noch verfügbar: ${remaining}mg
 
-EintrÃ¤ge heute:
+Einträge heute:
 ${logList}
 
 Bitte: 1) kurze Bewertung, 2) ob ich noch Koffein trinken sollte, 3) ein praktischer Tipp.`,
@@ -2823,7 +2823,7 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Graceful shutdown â€” flush state to Redis before container stops
+// Graceful shutdown — flush state to Redis before container stops
 process.on('SIGTERM', async () => {
   console.log('[DB] SIGTERM empfangen, schreibe letzten Stand nach Redis...');
   try {
@@ -2838,7 +2838,7 @@ process.on('SIGTERM', async () => {
       REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
       REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
     );
-    console.log('[DB] âœ“ Letzter Stand gespeichert.');
+    console.log('[DB] ✓ Letzter Stand gespeichert.');
   } catch (err) {
     console.error('[DB] Fehler beim Flush:', err.message);
   }
@@ -2859,14 +2859,15 @@ initDb()
     }, 60 * 1000);
 
     app.listen(PORT, () => {
-      console.log(`ðŸš€ API server running on http://localhost:${PORT}`);
-      console.log(`ðŸ“¦ DB Type: ${DB_TYPE}`);
+      console.log(`🚀 API server running on http://localhost:${PORT}`);
+      console.log(`📦 DB Type: ${DB_TYPE}`);
     });
   })
   .catch((err) => {
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
+
 
 
 

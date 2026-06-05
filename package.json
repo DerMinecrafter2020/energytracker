@@ -1,7 +1,7 @@
 {
   "name": "energy-drink-caffeine-tracker",
   "private": true,
-  "version": "1.7.2",
+  "version": "1.7.5",
   "type": "module",
   "scripts": {
     "version:auto": "node scripts/bump-version.mjs",
@@ -15,10 +15,14 @@
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.1",
+    "compression": "^1.8.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "firebase": "^12.14.0",
+    "helmet": "^8.2.0",
+    "hpp": "^0.2.3",
     "ioredis": "^5.11.1",
     "lucide-react": "^1.17.0",
     "nodemailer": "^8.0.10",
