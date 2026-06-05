@@ -2654,8 +2654,9 @@ Kein Markdown, nur das pure JSON-Array!`
     ];
 
     const resultText = await callOpenRouter(messages);
-    const cleaned = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+      const arrayMatch = resultText.match(/\[\s*\{[\s\S]*\}\s*\]/);
+      if (!arrayMatch) throw new Error('Kein JSON Array in der Antwort gefunden: ' + resultText);
+      const parsed = JSON.parse(arrayMatch[0]);
 
     const results = Array.isArray(parsed) ? parsed : [parsed];
     const mapped = results.map((item, i) => ({
@@ -2774,6 +2775,8 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
+
+
 
 
 

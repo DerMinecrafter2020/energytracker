@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
@@ -1071,7 +1071,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
             {/* Registration toggle card */}
             <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="font-semibold text-white flex items-center gap-2">
                     <Users className="w-4 h-4 text-green-400" />
@@ -1093,7 +1093,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
             {/* Demo access toggle card */}
             <div className="glass-card rounded-2xl p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="font-semibold text-white flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-amber-400" />
@@ -1235,7 +1235,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
             {/* Redis Health card */}
             <div className="glass-card rounded-2xl p-6 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <h3 className="font-semibold text-white flex items-center gap-2">
                   <Database className="w-4 h-4 text-green-400" />
                   Redis Datenpersistenz
@@ -1337,4 +1337,5 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 };
 
 export default AdminPanel;
+
 
