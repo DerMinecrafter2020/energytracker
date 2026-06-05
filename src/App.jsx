@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Header from './components/Header';
 import ProgressBar from './components/ProgressBar';
 import PresetDrinks from './components/PresetDrinks';
@@ -28,7 +28,6 @@ import {
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
 import { fetchPublicSettings } from './services/adminApi';
-
 
 const getTodayKey = () => new Date().toISOString().split('T')[0];
 const VIEW_STATE_KEY = 'et:last-view-state';
@@ -98,9 +97,6 @@ function App() {
     if (session?.role !== 'admin') setAdminView('admin');
   }, [session]);
 
-
-
-  // Ã¢â€â‚¬Ã¢â€â‚¬ If not logged in, show Login / Register Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   if (!session && authView === 'register') {
     return <RegisterPage onBack={() => setAuthView('login')} />;
   }
@@ -108,36 +104,32 @@ function App() {
     return <LoginPage onLogin={(s) => setSession(s)} onShowRegister={() => setAuthView('register')} />;
   }
 
-  // â€”â€”â€” If admin, show Admin Panel â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
   if (session.role === 'admin' && adminView === 'admin') {
     return (
-      <LanguageProvider language="de">
-        <AdminPanel
-          session={session}
-          onLogout={() => setSession(null)}
-          onShowUserPanel={() => setAdminView('user')}
-          onImpersonate={handleImpersonate}
-          initialActiveTab={adminTab}
-          onActiveTabChange={setAdminTab}
-        />
-      </LanguageProvider>
+      <AdminPanel
+        session={session}
+        onLogout={() => setSession(null)}
+        onShowUserPanel={() => setAdminView('user')}
+        onImpersonate={handleImpersonate}
+        initialActiveTab={adminTab}
+        onActiveTabChange={setAdminTab}
+      />
     );
   }
 
-  // â€”â€”â€” Regular user tracker â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
   return (
     <>
       {impersonator && (
         <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-3
           px-4 py-2 bg-amber-500 text-amber-950 text-sm font-medium shadow-lg">
           <span>
-            Ã°Å¸â€˜ÂÃ¯Â¸Â Du siehst die App als <strong>{session.name}</strong> ({session.email})
+            👉 Du siehst die App als <strong>{session.name}</strong> ({session.email})
           </span>
           <button
             onClick={handleStopImpersonation}
             className="px-3 py-1 rounded-lg bg-amber-950/20 hover:bg-amber-950/30
               text-amber-950 font-semibold transition-all text-xs shrink-0">
-            Ã¢â€ Â ZurÃ¼ck zum Admin-Panel
+            ← Zurück zum Admin-Panel
           </button>
         </div>
       )}
@@ -154,16 +146,7 @@ function App() {
   );
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Tracker (extracted so hooks are always called in the same order) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-function TrackerApp(props) {
-  return (
-    <LanguageProvider>
-      <TrackerAppInner {...props} />
-    </LanguageProvider>
-  );
-}
-
-function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, onPersistScrollY }) {
+function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPersistScrollY }) {
   
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [isOperationLoading, setIsOperationLoading] = useState(false);
@@ -186,7 +169,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
     return `${name}|${size}|${caffeine}|${icon}`;
   }, []);
 
-  // Unified data fetch function
   const fetchAllData = useCallback(async () => {
     try {
       const today = getTodayKey();
@@ -201,9 +183,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
       if (statsData) setTodayStats(statsData);
       if (userSettings) {
         setSettings(userSettings);
-        if (userSettings.language && typeof setLanguage === 'function') {
-          setLanguage(userSettings.language);
-        }
       }
     } catch (err) {
       console.error('Fehler beim Laden der Daten:', err);
@@ -211,7 +190,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
     }
   }, [session?.id, session?.email, getTodayKey]);
 
-  // Initial load and visibility events
   useEffect(() => {
     let isMounted = true;
     
@@ -229,7 +207,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleVisibilityChange);
 
-    // Refresh stats every minute
     const interval = setInterval(() => {
       if (session?.email) {
         fetchTodayStats({ userId: session?.id || null, email: session?.email })
@@ -246,7 +223,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
     };
   }, [fetchAllData, session?.id, session?.email]);
 
-
   useEffect(() => {
     if (typeof initialScrollY === 'number' && initialScrollY > 0) {
       window.requestAnimationFrame(() => {
@@ -255,7 +231,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
     }
   }, [initialScrollY]);
 
-  // Apply theme
   useEffect(() => {
     if (settings?.theme) {
       document.documentElement.className = settings.theme === 'system' ? '' : `theme-${settings.theme}`;
@@ -281,7 +256,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
     };
   }, [onPersistScrollY]);
 
-  // Update-Check
   useEffect(() => {
     let isMounted = true;
     const checkVersion = async () => {
@@ -319,7 +293,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
       const created = await addLog(payload);
       setLogs((prev) => [created, ...prev]);
 
-      // Refresh stats
       if (session?.email) {
         const stats = await fetchTodayStats({
           userId: session?.id || null,
@@ -328,7 +301,7 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
         setTodayStats(stats);
       }
     } catch (err) {
-      setError('Fehler beim HinzufÃ¼gen. Bitte versuche es erneut.');
+      setError('Fehler beim Hinzufügen. Bitte versuche es erneut.');
       console.error(err);
     } finally {
       setIsOperationLoading(false);
@@ -342,7 +315,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
       await removeLog(logId);
       setLogs((prev) => prev.filter((log) => log.id !== logId));
 
-      // Refresh stats
       if (session?.email) {
         const stats = await fetchTodayStats({
           userId: session?.id || null,
@@ -351,7 +323,7 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
         setTodayStats(stats);
       }
     } catch (err) {
-      setError('Fehler beim LÃ¶schen. Bitte versuche es erneut.');
+      setError('Fehler beim Löschen. Bitte versuche es erneut.');
       console.error(err);
     } finally {
       setIsOperationLoading(false);
@@ -383,7 +355,7 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
           size: Number(log.size),
           caffeine: Number(log.caffeine),
           caffeinePerMl: log.caffeinePerMl ?? null,
-          icon: log.icon || 'ðŸ¥¤',
+          icon: log.icon || '🥤',
         },
       });
 
@@ -426,7 +398,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
   return (
     <>
       <div className="min-h-screen relative overflow-hidden bg-transparent">
-        {/* Animated Background Orbs */}
         <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-float-slow pointer-events-none -z-10"></div>
       <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-amber-500/15 rounded-full blur-[100px] animate-float-delayed pointer-events-none -z-10"></div>
       <div className="absolute bottom-[-10%] left-[10%] w-[60vw] h-[60vw] bg-purple-600/15 rounded-full blur-[140px] animate-float pointer-events-none -z-10"></div>
@@ -442,11 +413,10 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
       />
 
       <main className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-4 pb-28">
-        {/* Update Banner */}
         {latestVersion && latestVersion !== currentVersion && (
           <div className="glass-card border border-blue-500/30 bg-blue-500/10
             px-4 py-3 rounded-2xl mb-6 animate-fade-in">
-            <p className="text-sm font-medium text-blue-300">Update verfÃ¼gbar: {latestVersion}</p>
+            <p className="text-sm font-medium text-blue-300">Update verfügbar: {latestVersion}</p>
             <button onClick={() => window.location.reload()}
               className="text-xs underline mt-1 text-blue-400">
               Neu laden
@@ -454,7 +424,6 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div className="glass-card border border-red-500/30 bg-red-500/10
             px-4 py-3 rounded-2xl mb-6 animate-fade-in">
@@ -500,7 +469,7 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
                   caffeinePer100ml: item.caffeinePer100ml,
                   sizeMl: item.sizeMl,
                 });
-                setCurrentTab('home'); // Switch back to home to show the calculator with prefilled values
+                setCurrentTab('home');
               }}
             />
 
@@ -571,5 +540,3 @@ function TrackerAppInner({ session, onLogout, onShowAdminPanel, initialScrollY, 
 };
 
 export default App;
-
-
