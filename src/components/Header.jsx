@@ -2,7 +2,7 @@ import React from 'react';
 import { Zap, Loader2, LogOut, User, ShieldCheck, Settings, ChevronLeft } from 'lucide-react';
 
 const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPanel, currentTab, onGoHome, onShowSettings }) => {
-    const today = new Date().toLocaleDateString(language === 'en' ? 'en-US' : 'de-DE', {
+    const today = new Date().toLocaleDateString('de-DE', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
