@@ -50,20 +50,20 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
 
               <div className="relative z-10 text-left mt-1">
                 <span className="font-bold text-sm block truncate text-[#e2e2e5]">{drink.name}</span>
-                <span className="text-xs text-[#a8c7fa] font-medium mt-0.5 block">{drink.size} ml â€¢ <span className="text-amber-400">{drink.caffeine} mg</span></span>
+                <span className="text-xs text-[#a8c7fa] font-medium mt-0.5 block">{drink.size} ml • <span className="text-amber-400">{drink.caffeine} mg</span></span>
               </div>
             </div>
           ))}
         </div>
       ) : (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">
-          Noch keine Favoriten gespeichert. Markiere ein GetrÃ¤nk im Verlauf mit dem Herz-Symbol, um es hier schnell wiederzuverwenden.
+          Noch keine Favoriten gespeichert. Markiere ein Getränk im Verlauf mit dem Herz-Symbol, um es hier schnell wiederzuverwenden.
         </div>
       )}
 
       <p className="text-xs text-slate-600 mt-3 flex items-center gap-1.5">
         <Plus className="w-3.5 h-3.5" />
-        Klick auf einen Favoriten fÃ¼gt ihn direkt erneut hinzu.
+        Klick auf einen Favoriten fügt ihn direkt erneut hinzu.
       </p>
     </div>
   );

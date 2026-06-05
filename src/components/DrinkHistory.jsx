@@ -12,8 +12,8 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
         </h3>
         <div className="flex flex-col items-center justify-center py-10 text-slate-600">
           <Coffee className="w-10 h-10 mb-3 opacity-30" />
-          <p className="text-sm text-center">Noch keine GetrÃ¤nke heute protokolliert.</p>
-          <p className="text-xs text-center mt-1 text-slate-700">FÃ¼ge dein erstes GetrÃ¤nk hinzu!</p>
+          <p className="text-sm text-center">Noch keine Getränke heute protokolliert.</p>
+          <p className="text-xs text-center mt-1 text-slate-700">Füge dein erstes Getränk hinzu!</p>
         </div>
       </div>
     );
@@ -25,7 +25,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
         <History className="w-5 h-5 text-blue-400" />
         Heutiger Verlauf
         <span className="ml-auto text-xs font-normal text-slate-500">
-          {logs.length} {logs.length === 1 ? 'Eintrag' : 'EintrÃ¤ge'}
+          {logs.length} {logs.length === 1 ? 'Eintrag' : 'Einträge'}
         </span>
       </h3>
 
@@ -51,7 +51,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-white text-sm truncate">{log.name}</h4>
               <p className="text-xs text-slate-500">
-                {log.size}Â ml â€¢ {formatTime(log.createdAt)}
+                {log.size}Â ml • {formatTime(log.createdAt)}
               </p>
             </div>
 
@@ -82,7 +82,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
               className="p-1.5 text-slate-700 hover:text-red-400 hover:bg-red-500/10
                 rounded-xl transition-all duration-200 disabled:opacity-50
                 opacity-0 group-hover:opacity-100"
-              aria-label="Eintrag lÃ¶schen"
+              aria-label="Eintrag löschen"
             >
               <Trash2 className="w-4 h-4" />
             </button>

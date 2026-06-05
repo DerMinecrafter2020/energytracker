@@ -352,7 +352,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
                       : 'bg-black/20 text-slate-400 hover:bg-white/10 border border-white/5'
                   }`}
                 >
-                  <span className="text-xl leading-none filter drop-shadow-md">ðŸ‡©ðŸ‡ª</span>
+                  <span className="text-xl leading-none filter drop-shadow-md">🇩🇪</span>
                   Deutsch
                 </button>
                 <button
@@ -364,7 +364,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
                       : 'bg-black/20 text-slate-400 hover:bg-white/10 border border-white/5'
                   }`}
                 >
-                  <span className="text-xl leading-none filter drop-shadow-md">ðŸ‡¬ðŸ‡§</span>
+                  <span className="text-xl leading-none filter drop-shadow-md">🇬🇧</span>
                   English
                 </button>
               </div>
@@ -542,13 +542,13 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         {message === 'saved' && (
           <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
             text-green-300 text-sm font-medium text-center animate-fade-in">
-            Ã¢Å“â€œ Einstellungen gespeichert
+            Ã¢Å““ Einstellungen gespeichert
           </div>
         )}
         {message === 'error' && (
           <div className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/30
             text-red-300 text-sm font-medium text-center animate-fade-in">
-            Ãƒâ€” Fehler beim Speichern
+            Ãƒ— Fehler beim Speichern
           </div>
         )}
 

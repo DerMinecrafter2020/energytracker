@@ -47,7 +47,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
         {/* Name */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            GetrÃ¤nkename
+            Getränkename
           </label>
           <input
             type="text"
@@ -81,7 +81,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
         {/* Size buttons */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            DosengrÃ¶ÃŸe
+            Dosengröße
           </label>
           <div className="flex gap-2 flex-wrap">
             {DRINK_SIZES.map((size) => (
@@ -123,7 +123,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
             flex items-center justify-center gap-2"
         >
           <Plus className="w-5 h-5" />
-          HinzufÃ¼gen
+          Hinzufügen
         </button>
       </form>
     </div>

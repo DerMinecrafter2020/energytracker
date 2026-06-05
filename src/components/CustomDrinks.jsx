@@ -193,19 +193,19 @@ export default function CustomDrinks({
       {message === 'saved' && (
         <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
           text-green-300 text-sm font-medium text-center mb-4 animate-fade-in">
-          Ã¢Å“â€œ GetrÃƒÂ¤nk hinzugefÃƒÂ¼gt
+          Ã¢Å““ GetrÃƒÂ¤nk hinzugefÃƒÂ¼gt
         </div>
       )}
       {message === 'deleted' && (
         <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
           text-green-300 text-sm font-medium text-center mb-4 animate-fade-in">
-          Ã¢Å“â€œ GetrÃƒÂ¤nk gelÃƒÂ¶scht
+          Ã¢Å““ GetrÃƒÂ¤nk gelÃƒÂ¶scht
         </div>
       )}
       {message === 'error' && (
         <div className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/30
           text-red-300 text-sm font-medium text-center mb-4 animate-fade-in">
-          Ãƒâ€” Fehler
+          Ãƒ— Fehler
         </div>
       )}
 

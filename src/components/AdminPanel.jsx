@@ -17,7 +17,7 @@ import {
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const formatDate = (isoStr) => {
-  if (!isoStr) return 'â€“';
+  if (!isoStr) return '–';
   return new Date(isoStr).toLocaleString('de-DE', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
@@ -222,11 +222,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       });
       setAiMsg({ type: 'success', text: 'AI-Einstellungen gespeichert.' });
       if (aiApiKey.trim()) {
-        setAiKeyMasked(aiApiKey.slice(0, 8) + 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢' + aiApiKey.slice(-4));
+        setAiKeyMasked(aiApiKey.slice(0, 8) + '••••••••' + aiApiKey.slice(-4));
         setAiApiKey('');
       }
       if (braveSearchKey.trim()) {
-        setBraveKeyMasked(braveSearchKey.slice(0, 4) + 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢' + braveSearchKey.slice(-4));
+        setBraveKeyMasked(braveSearchKey.slice(0, 4) + '••••••••' + braveSearchKey.slice(-4));
         setBraveSearchKey('');
       }
 
@@ -250,7 +250,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   };
 
   const handleDeleteUser = async (id) => {
-    if (!window.confirm('Diesen Benutzer wirklich lÃ¶schen?')) return;
+    if (!window.confirm('Diesen Benutzer wirklich löschen?')) return;
     try {
       await deleteAdminUser(id);
       setRegUsers((prev) => prev.filter((u) => u.id !== id));
@@ -299,7 +299,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     try {
       await setUserRole(id, newRole);
       setRegUsers((prev) => prev.map((u) => u.id === id ? { ...u, role: newRole } : u));
-      setUsersMsg({ type: 'success', text: `Rolle auf "${newRole === 'admin' ? 'Admin' : 'Benutzer'}" geÃ¤ndert.` });
+      setUsersMsg({ type: 'success', text: `Rolle auf "${newRole === 'admin' ? 'Admin' : 'Benutzer'}" geändert.` });
     } catch (err) {
       setUsersMsg({ type: 'error', text: err.message });
     }
@@ -379,13 +379,13 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
   // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleDelete = async (id) => {
-    if (!window.confirm('Diesen Eintrag wirklich lÃ¶schen?')) return;
+    if (!window.confirm('Diesen Eintrag wirklich löschen?')) return;
     setDeleting(id);
     try {
       await deleteApiLog(id);
       setAllLogs((prev) => prev.filter((l) => l.id !== id));
     } catch (err) {
-      alert('Fehler beim LÃ¶schen: ' + err.message);
+      alert('Fehler beim Löschen: ' + err.message);
     } finally {
       setDeleting(null);
     }
@@ -393,7 +393,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
   // â”€â”€ Export CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const exportCSV = () => {
-    const header = 'ID,Name,Koffein (mg),GrÃ¶ÃŸe (ml),Datum,Erstellt';
+    const header = 'ID,Name,Koffein (mg),Größe (ml),Datum,Erstellt';
     const rows = allLogs.map((l) =>
       [l.id, `"${l.name}"`, l.caffeine, l.size, l.date, formatDate(l.createdAt)].join(',')
     );
@@ -467,7 +467,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         <div className="glass-card rounded-2xl p-1 mb-6 w-full overflow-x-auto">
           <div className="flex gap-1 min-w-max">
           {[
-            { id: 'overview',  label: 'Ãœbersicht',  icon: BarChart2  },
+            { id: 'overview',  label: 'Übersicht',  icon: BarChart2  },
             { id: 'logs',      label: 'Alle Logs',  icon: Database   },
             { id: 'users',     label: 'Benutzer',   icon: Users      },
             { id: 'settings',  label: 'Einstellungen', icon: Settings },
@@ -510,10 +510,10 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               <StatCard icon={Calendar}   label="Logs heute"      value={stats.todayLogs}   color="green"  />
               <StatCard icon={Zap}        label="Koffein heute"   value={`${stats.todayCaff} mg`} color="amber" />
               <StatCard icon={TrendingUp} label="Koffein gesamt"  value={`${stats.totalCaff} mg`} color="purple"/>
-              <StatCard icon={Coffee}     label="Ã˜ pro GetrÃ¤nk"   value={`${stats.avgPerDrink} mg`} color="red" />
+              <StatCard icon={Coffee}     label="Ã˜ pro Getränk"   value={`${stats.avgPerDrink} mg`} color="red" />
             </div>
 
-            {/* Chart â€“ last 7 days */}
+            {/* Chart – last 7 days */}
             <div className="glass-card rounded-2xl p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="font-semibold text-white flex items-center gap-2">
@@ -550,11 +550,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               </div>
             </div>
 
-            {/* Quick stats table â€“ top drinks */}
+            {/* Quick stats table – top drinks */}
             <div className="glass-card rounded-2xl p-6">
               <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-amber-400" />
-                Top-GetrÃ¤nke gesamt
+                Top-Getränke gesamt
               </h2>
               {isLoading ? (
                 <div className="space-y-3">
@@ -598,7 +598,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Suche nach Name oder Datumâ€¦"
+                  placeholder="Suche nach Name oder Datum…"
                   className="input-dark pl-10"
                 />
               </div>
@@ -637,7 +637,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               ) : filteredLogs.length === 0 ? (
                 <div className="py-16 text-center text-slate-500">
                   <Database className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p>Keine EintrÃ¤ge gefunden.</p>
+                  <p>Keine Einträge gefunden.</p>
                 </div>
               ) : (
                 <>
@@ -650,7 +650,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     <button onClick={() => toggleSort('caffeine')} className="text-left hover:text-slate-300 transition-colors">
                       Koffein <SortIcon field="caffeine" />
                     </button>
-                    <span>GrÃ¶ÃŸe</span>
+                    <span>Größe</span>
                     <button onClick={() => toggleSort('date')} className="text-left hover:text-slate-300 transition-colors">
                       Datum <SortIcon field="date" />
                     </button>
@@ -672,14 +672,14 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                         </div>
                         <span className="text-blue-400 font-semibold">{log.caffeine} mg</span>
                         <span className="text-slate-400">{log.size} ml</span>
-                        <span className="text-slate-400">{log.date || 'â€“'}</span>
+                        <span className="text-slate-400">{log.date || '–'}</span>
                         <span className="text-slate-500 text-xs">{formatDate(log.createdAt)}</span>
                         <button
                           onClick={() => handleDelete(log.id)}
                           disabled={deleting === log.id}
                           className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10
                             transition-all disabled:opacity-50 ml-auto"
-                          aria-label="LÃ¶schen"
+                          aria-label="Löschen"
                         >
                           {deleting === log.id
                             ? <span className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin block" />
@@ -691,7 +691,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   </div>
 
                   <div className="px-5 py-3 border-t border-white/10 text-xs text-slate-600">
-                    {filteredLogs.length} von {allLogs.length} EintrÃ¤gen
+                    {filteredLogs.length} von {allLogs.length} Einträgen
                   </div>
                 </>
               )}
@@ -900,7 +900,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                             }`}
                             title={isSelfAdminDemotionBlocked
                               ? 'Eigenen Admin nicht herabstufen'
-                              : u.role === 'admin' ? 'Zum Benutzer herabstufen' : 'Zum Admin befÃ¶rdern'}>
+                              : u.role === 'admin' ? 'Zum Benutzer herabstufen' : 'Zum Admin befördern'}>
                             <Shield className="w-4 h-4" />
                           </button>
                           {!u.verified && (
@@ -926,7 +926,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                           <button onClick={() => handleDeleteUser(u.id)}
                             className="p-1.5 rounded-lg text-slate-600 hover:text-red-400
                               hover:bg-red-500/10 transition-all"
-                            title="Benutzer lÃ¶schen">
+                            title="Benutzer löschen">
                             <UserX className="w-4 h-4" />
                           </button>
                         </div>
@@ -989,7 +989,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                 </label>
                 <div className="flex gap-2 flex-wrap">
                   {[
-                    { label: 'UnverschlÃ¼sselt', secure: false, port: 25  },
+                    { label: 'Unverschlüsselt', secure: false, port: 25  },
                     { label: 'STARTTLS',         secure: false, port: 587 },
                     { label: 'SSL/TLS',          secure: true,  port: 465 },
                   ].map((opt) => (
@@ -1027,7 +1027,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input type={showSmtpPw ? 'text' : 'password'} value={smtp.auth.pass}
                       onChange={(e) => handleSmtpChange('auth.pass', e.target.value)}
-                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" className="input-dark pl-10 pr-10" />
+                      placeholder="••••••••" className="input-dark pl-10 pr-10" />
                     <button type="button" onClick={() => setShowSmtpPw(v => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
                       {showSmtpPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1065,7 +1065,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               {/* Base URL */}
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  App-URL <span className="normal-case font-normal text-slate-600">(fÃ¼r BestÃ¤tigungslinks in E-Mails)</span>
+                  App-URL <span className="normal-case font-normal text-slate-600">(für Bestätigungslinks in E-Mails)</span>
                 </label>
                 <div className="relative">
                   <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -1138,7 +1138,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                 SMTP-Verbindung testen
               </h3>
               <p className="text-xs text-slate-500">
-                Sendet eine Test-E-Mail um die Konfiguration zu prÃ¼fen. Speichere zuerst deine Einstellungen.
+                Sendet eine Test-E-Mail um die Konfiguration zu prüfen. Speichere zuerst deine Einstellungen.
               </p>
               <div className="flex gap-2">
                 <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)}
@@ -1196,7 +1196,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     type="password"
                     value={aiApiKey}
                     onChange={(e) => setAiApiKey(e.target.value)}
-                    placeholder={aiKeyMasked ? 'Neuen Key eingeben zum Ãœberschreibenâ€¦' : 'sk-or-v1-â€¦'}
+                    placeholder={aiKeyMasked ? 'Neuen Key eingeben zum Überschreiben…' : 'sk-or-v1-…'}
                     className="input-dark"
                   />
                 </div>
@@ -1219,7 +1219,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     type="password"
                     value={braveSearchKey}
                     onChange={(e) => setBraveSearchKey(e.target.value)}
-                    placeholder={braveKeyMasked ? 'Neuen Token eingeben zum Ãœberschreibenâ€¦' : 'BSAâ€¦'}
+                    placeholder={braveKeyMasked ? 'Neuen Token eingeben zum Überschreiben…' : 'BSA…'}
                     className="input-dark"
                   />
                   {braveKeyMasked && (
@@ -1228,7 +1228,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     </p>
                   )}
                   <p className="text-xs text-slate-600 mt-1">
-                    Optionaler <a href="https://brave.com/search/api/" target="_blank" rel="noreferrer" className="text-orange-400 underline">Brave Search API</a>-Token. Wenn gesetzt, wird Brave Search statt OpenFoodFacts fÃ¼r die KI-GetrÃ¤nkeerkennung verwendet.
+                    Optionaler <a href="https://brave.com/search/api/" target="_blank" rel="noreferrer" className="text-orange-400 underline">Brave Search API</a>-Token. Wenn gesetzt, wird Brave Search statt OpenFoodFacts für die KI-Getränkeerkennung verwendet.
                   </p>
                 </div>
               </div>
@@ -1267,11 +1267,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   {redisChecking
                     ? <span className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
                     : <RefreshCw className="w-3 h-3" />}
-                  PrÃ¼fen
+                  Prüfen
                 </button>
               </div>
               <p className="text-xs text-slate-500">
-                PrÃ¼ft ob Redis erreichbar ist, wie viele EintrÃ¤ge pro DatenschlÃ¼ssel gespeichert sind
+                Prüft ob Redis erreichbar ist, wie viele Einträge pro Datenschlüssel gespeichert sind
                 und wann zuletzt ein Snapshot gesichert wurde.
               </p>
               {redisError && (
@@ -1303,7 +1303,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                       <p className="text-white">
                         {redisHealth.lastSave
                           ? new Date(redisHealth.lastSave).toLocaleString('de-DE')
-                          : 'â€“'}
+                          : '–'}
                       </p>
                     </div>
                   </div>
@@ -1312,8 +1312,8 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     <div className="rounded-xl border border-white/8 overflow-hidden text-xs">
                       <div className="grid grid-cols-[1fr_auto] px-3 py-2 bg-white/5
                         text-slate-500 font-semibold uppercase tracking-wider">
-                        <span>SchlÃ¼ssel</span>
-                        <span className="text-right">EintrÃ¤ge</span>
+                        <span>Schlüssel</span>
+                        <span className="text-right">Einträge</span>
                       </div>
                       {Object.entries(redisHealth.keys).map(([key, info]) => (
                         <div key={key} className="grid grid-cols-[1fr_auto] px-3 py-2.5

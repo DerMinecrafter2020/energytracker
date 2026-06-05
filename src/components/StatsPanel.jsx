@@ -104,7 +104,7 @@ export default function StatsPanel({ session, isLoading }) {
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-500">{Math.round(percentage)}%</span>
             <span className={isOver ? 'text-red-400 font-semibold' : 'text-green-400 font-semibold'}>
-              {isOver ? `Ã¢Å¡Â Ã¯Â¸Â ${todayStats.totalCaffeine - limit}mg ÃƒÂ¼ber Limit` : `Ã¢Å“â€œ ${todayStats.remainingCaffeine}mg verbleibend`}
+              {isOver ? `Ã¢Å¡Â Ã¯Â¸Â ${todayStats.totalCaffeine - limit}mg ÃƒÂ¼ber Limit` : `Ã¢Å““ ${todayStats.remainingCaffeine}mg verbleibend`}
             </span>
           </div>
         </div>

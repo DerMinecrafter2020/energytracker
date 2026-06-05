@@ -105,7 +105,7 @@ const ReminderSettings = ({ session }) => {
           <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
             <div>
               <p className="text-sm font-semibold text-white">Erinnerungen aktiv</p>
-              <p className="text-xs text-slate-500">TÃ¤gliche Erinnerung zum Tracken</p>
+              <p className="text-xs text-slate-500">Tägliche Erinnerung zum Tracken</p>
             </div>
             <button
               type="button"
@@ -198,7 +198,7 @@ const ReminderSettings = ({ session }) => {
                 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
             >
               <Save className="w-4 h-4" />
-              {isSaving ? 'Speichernâ€¦' : 'Reminder speichern'}
+              {isSaving ? 'Speichern…' : 'Reminder speichern'}
             </button>
           </div>
         </div>

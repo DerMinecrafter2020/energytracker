@@ -27,7 +27,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
       console.error('Error loading chat messages:', e);
     }
     return [
-      { role: 'assistant', content: 'Hallo! Ich bin dein Koffein-Assistent. Stell mir Fragen zu Koffein, Schlaf oder Energie Ã¢â‚¬â€œ oder frag mich, wie viel du heute noch trinken kannst.' },
+      { role: 'assistant', content: 'Hallo! Ich bin dein Koffein-Assistent. Stell mir Fragen zu Koffein, Schlaf oder Energie Ã¢â‚¬“ oder frag mich, wie viel du heute noch trinken kannst.' },
     ];
   });
   const [input, setInput]     = useState('');
@@ -128,7 +128,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
           name: drinkToAdd.name || 'AI Drink',
           size: Number(drinkToAdd.size) || 0,
           caffeine: Number(drinkToAdd.caffeine) || 0,
-          icon: 'Ã°Å¸Â¤â€“'
+          icon: 'Ã°Å¸Â¤–'
         });
       }
     } catch (err) {

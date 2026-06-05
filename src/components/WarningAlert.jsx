@@ -63,7 +63,7 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
           type: 'info',
           icon: Zap,
           title: 'Schnelle Folge erkannt',
-          message: `${recentDrinks.length} GetrÃƒÂ¤nke in 2h Ã¢â‚¬â€œ versuche langsamer zu trinken!`,
+          message: `${recentDrinks.length} GetrÃƒÂ¤nke in 2h Ã¢â‚¬“ versuche langsamer zu trinken!`,
           color: 'amber',
         });
       }

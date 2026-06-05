@@ -135,7 +135,7 @@ function App() {
             onClick={handleStopImpersonation}
             className="px-3 py-1 rounded-lg bg-amber-950/20 hover:bg-amber-950/30
               text-amber-950 font-semibold transition-all text-xs shrink-0">
-            â† ZurÃ¼ck zum Admin-Panel
+            â† Zurück zum Admin-Panel
           </button>
         </div>
       )}
@@ -313,7 +313,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         setTodayStats(stats);
       }
     } catch (err) {
-      setError('Fehler beim HinzufÃ¼gen. Bitte versuche es erneut.');
+      setError('Fehler beim Hinzufügen. Bitte versuche es erneut.');
       console.error(err);
     } finally {
       setIsOperationLoading(false);
@@ -336,7 +336,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         setTodayStats(stats);
       }
     } catch (err) {
-      setError('Fehler beim LÃ¶schen. Bitte versuche es erneut.');
+      setError('Fehler beim Löschen. Bitte versuche es erneut.');
       console.error(err);
     } finally {
       setIsOperationLoading(false);
@@ -431,7 +431,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         {latestVersion && latestVersion !== currentVersion && (
           <div className="glass-card border border-blue-500/30 bg-blue-500/10
             px-4 py-3 rounded-2xl mb-6 animate-fade-in">
-            <p className="text-sm font-medium text-blue-300">Update verfÃ¼gbar: {latestVersion}</p>
+            <p className="text-sm font-medium text-blue-300">Update verfügbar: {latestVersion}</p>
             <button onClick={() => window.location.reload()}
               className="text-xs underline mt-1 text-blue-400">
               Neu laden

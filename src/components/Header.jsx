@@ -19,7 +19,7 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
           <button
             onClick={onGoHome}
             className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-[#252830] hover:bg-[#2c2f38] transition-all active:scale-95 text-[#e2e2e5]"
-            aria-label="ZurÃ¼ck zum Home"
+            aria-label="Zurück zum Home"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>

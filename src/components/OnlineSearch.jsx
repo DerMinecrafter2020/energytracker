@@ -30,7 +30,7 @@ const OnlineSearch = ({ onSelect }) => {
     <div className="glass-card rounded-3xl p-6 mb-6 animate-fade-in">
       <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
         <Search className="w-5 h-5 text-blue-400" />
-        KI GetrÃ¤nke-Suche
+        KI Getränke-Suche
         <span className="text-xs font-normal text-slate-600">Powered by Brave & AI</span>
       </h3>
 
@@ -74,7 +74,7 @@ const OnlineSearch = ({ onSelect }) => {
               <h4 className="font-semibold text-white text-sm truncate">{item.name}</h4>
               <p className="text-xs text-slate-500 truncate">
                 {item.brand || 'Unbekannte Marke'}
-                {item.quantity ? ` â€¢ ${item.quantity}` : ''}
+                {item.quantity ? ` • ${item.quantity}` : ''}
               </p>
               <p className="text-xs text-slate-600 mt-0.5">
                 Koffein/100ml:{' '}
@@ -82,7 +82,7 @@ const OnlineSearch = ({ onSelect }) => {
                   <>
                     {item.caffeinePer100ml} mg
                     {item.isCaffeineEstimated && (
-                      <span className="text-slate-500 ml-1">(SchÃ¤tzwert)</span>
+                      <span className="text-slate-500 ml-1">(Schätzwert)</span>
                     )}
                   </>
                 ) : (
@@ -94,7 +94,7 @@ const OnlineSearch = ({ onSelect }) => {
               onClick={() => onSelect(item)}
               className="p-2 rounded-xl bg-blue-600/20 border border-blue-500/30
                 hover:bg-blue-600/40 transition-all"
-              aria-label="In den Rechner Ã¼bernehmen"
+              aria-label="In den Rechner übernehmen"
             >
               <Plus className="w-4 h-4 text-blue-400" />
             </button>
