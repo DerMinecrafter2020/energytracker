@@ -1,5 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
-import { useTranslation } from '../context/LanguageContext';
+import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, X, Minimize2, Maximize2, MessageSquare, GripHorizontal } from 'lucide-react';
 import { sendAiChat } from '../services/aiApi';
 
@@ -15,7 +14,6 @@ const parseMarkdown = (text) => {
 };
 
 const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
-  const { t } = useTranslation();
   const [open, setOpen]       = useState(false);
   const [minimized, setMin]   = useState(false);
   const [messages, setMessages] = useState(() => {
@@ -29,7 +27,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
       console.error('Error loading chat messages:', e);
     }
     return [
-      { role: 'assistant', content: 'Hallo! Ich bin dein Koffein-Assistent. Stell mir Fragen zu Koffein, Schlaf oder Energie â€“ oder frag mich, wie viel du heute noch trinken kannst.' },
+      { role: 'assistant', content: 'Hallo! Ich bin dein Koffein-Assistent. Stell mir Fragen zu Koffein, Schlaf oder Energie Ã¢â‚¬â€œ oder frag mich, wie viel du heute noch trinken kannst.' },
     ];
   });
   const [input, setInput]     = useState('');
@@ -130,7 +128,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
           name: drinkToAdd.name || 'AI Drink',
           size: Number(drinkToAdd.size) || 0,
           caffeine: Number(drinkToAdd.caffeine) || 0,
-          icon: 'ðŸ¤–'
+          icon: 'Ã°Å¸Â¤â€“'
         });
       }
     } catch (err) {
@@ -152,7 +150,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
       <button
         onClick={() => setOpen(true)}
         className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
-        title="AI-Assistent Ã¶ffnen"
+        title="AI-Assistent ÃƒÂ¶ffnen"
       >
         <Bot className="w-7 h-7 text-white" />
       </button>
@@ -276,6 +274,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
 };
 
 export default AIAssistant;
+
 
 
 

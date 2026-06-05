@@ -1,10 +1,8 @@
-﻿import React from 'react';
-import { useTranslation } from '../context/LanguageContext';
+import React from 'react';
 import { History, Trash2, Coffee, Heart, HeartOff } from 'lucide-react';
 import { formatTime } from '../utils/caffeineUtils';
 
 const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLoading }) => {
-  const { t } = useTranslation();
   if (logs.length === 0) {
     return (
       <div className="glass-card rounded-3xl p-6 animate-fade-in">
@@ -14,8 +12,8 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
         </h3>
         <div className="flex flex-col items-center justify-center py-10 text-slate-600">
           <Coffee className="w-10 h-10 mb-3 opacity-30" />
-          <p className="text-sm text-center">Noch keine Getränke heute protokolliert.</p>
-          <p className="text-xs text-center mt-1 text-slate-700">Füge dein erstes Getränk hinzu!</p>
+          <p className="text-sm text-center">Noch keine GetrÃ¤nke heute protokolliert.</p>
+          <p className="text-xs text-center mt-1 text-slate-700">FÃ¼ge dein erstes GetrÃ¤nk hinzu!</p>
         </div>
       </div>
     );
@@ -27,7 +25,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
         <History className="w-5 h-5 text-blue-400" />
         Heutiger Verlauf
         <span className="ml-auto text-xs font-normal text-slate-500">
-          {logs.length} {logs.length === 1 ? 'Eintrag' : 'Einträge'}
+          {logs.length} {logs.length === 1 ? 'Eintrag' : 'EintrÃ¤ge'}
         </span>
       </h3>
 
@@ -46,14 +44,14 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
             {/* Icon */}
             <div className="w-9 h-9 rounded-xl flex items-center justify-center
               bg-gradient-to-br from-blue-600/30 to-blue-400/10 border border-blue-500/20 shrink-0 text-lg">
-              {log.icon || '🥤'}
+              {log.icon || 'ðŸ¥¤'}
             </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-white text-sm truncate">{log.name}</h4>
               <p className="text-xs text-slate-500">
-                {log.size} ml • {formatTime(log.createdAt)}
+                {log.size}Â ml â€¢ {formatTime(log.createdAt)}
               </p>
             </div>
 
@@ -84,7 +82,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
               className="p-1.5 text-slate-700 hover:text-red-400 hover:bg-red-500/10
                 rounded-xl transition-all duration-200 disabled:opacity-50
                 opacity-0 group-hover:opacity-100"
-              aria-label="Eintrag löschen"
+              aria-label="Eintrag lÃ¶schen"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -98,6 +96,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
 };
 
 export default DrinkHistory;
+
 
 
 

@@ -1,9 +1,7 @@
-﻿import React, { useEffect, useState } from 'react';
-import { useTranslation } from '../context/LanguageContext';
+import React, { useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, Moon, Zap, X } from 'lucide-react';
 
 export default function WarningAlert({ todayStats, settings, onClose }) {
-  const { t } = useTranslation();
   const [warnings, setWarnings] = useState([]);
   const [dismissedWarnings, setDismissedWarnings] = useState(new Set());
 
@@ -23,8 +21,8 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
         id: 'over-limit',
         type: 'error',
         icon: AlertTriangle,
-        title: 'Limit Ã¼berschritten!',
-        message: `Du hast dein Limit um ${excess}mg Ã¼berschritten (${todayStats.totalCaffeine}/${limit}mg)`,
+        title: 'Limit ÃƒÂ¼berschritten!',
+        message: `Du hast dein Limit um ${excess}mg ÃƒÂ¼berschritten (${todayStats.totalCaffeine}/${limit}mg)`,
         color: 'red',
       });
     }
@@ -45,8 +43,8 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
             id: 'late-caffeine',
             type: 'warning',
             icon: Moon,
-            title: 'SpÃ¤tes Koffein',
-            message: `${lastDrink.name} um ${drinkTime.getHours()}:${String(drinkTime.getMinutes()).padStart(2, '0')} Uhr kÃ¶nnte deinen Schlaf beeinflussen`,
+            title: 'SpÃƒÂ¤tes Koffein',
+            message: `${lastDrink.name} um ${drinkTime.getHours()}:${String(drinkTime.getMinutes()).padStart(2, '0')} Uhr kÃƒÂ¶nnte deinen Schlaf beeinflussen`,
             color: 'blue',
           });
         }
@@ -65,7 +63,7 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
           type: 'info',
           icon: Zap,
           title: 'Schnelle Folge erkannt',
-          message: `${recentDrinks.length} GetrÃ¤nke in 2h â€“ versuche langsamer zu trinken!`,
+          message: `${recentDrinks.length} GetrÃƒÂ¤nke in 2h Ã¢â‚¬â€œ versuche langsamer zu trinken!`,
           color: 'amber',
         });
       }
@@ -128,6 +126,7 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
     </div>
   );
 }
+
 
 
 

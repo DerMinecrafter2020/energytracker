@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../context/LanguageContext';
 import { Bell, Mail, MessageCircle, Save } from 'lucide-react';
 import { fetchReminderSettings, saveReminderSettings, testUserEmail } from '../services/api';

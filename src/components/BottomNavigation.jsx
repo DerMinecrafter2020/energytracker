@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Home, Search, BarChart2 } from 'lucide-react';
 import { useTranslation } from '../context/LanguageContext';
 

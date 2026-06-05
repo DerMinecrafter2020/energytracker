@@ -100,7 +100,7 @@ function App() {
 
 
 
-  // ── If not logged in, show Login / Register ───────────────────────────
+  // â”€â”€ If not logged in, show Login / Register â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (!session && authView === 'register') {
     return <RegisterPage onBack={() => setAuthView('login')} />;
   }
@@ -108,7 +108,7 @@ function App() {
     return <LoginPage onLogin={(s) => setSession(s)} onShowRegister={() => setAuthView('register')} />;
   }
 
-  // ── If admin, show Admin Panel ────────────────────────────────────────
+  // â”€â”€ If admin, show Admin Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (session.role === 'admin' && adminView === 'admin') {
     return (
       <AdminPanel
@@ -122,20 +122,20 @@ function App() {
     );
   }
 
-  // ── Regular user tracker ──────────────────────────────────
+  // â”€â”€ Regular user tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <>
       {impersonator && (
         <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-3
           px-4 py-2 bg-amber-500 text-amber-950 text-sm font-medium shadow-lg">
           <span>
-            👁️ Du siehst die App als <strong>{session.name}</strong> ({session.email})
+            ðŸ‘ï¸ Du siehst die App als <strong>{session.name}</strong> ({session.email})
           </span>
           <button
             onClick={handleStopImpersonation}
             className="px-3 py-1 rounded-lg bg-amber-950/20 hover:bg-amber-950/30
               text-amber-950 font-semibold transition-all text-xs shrink-0">
-            ← Zurück zum Admin-Panel
+            â† ZurÃ¼ck zum Admin-Panel
           </button>
         </div>
       )}
@@ -152,7 +152,7 @@ function App() {
   );
 }
 
-// ── Tracker (extracted so hooks are always called in the same order) ────────
+// â”€â”€ Tracker (extracted so hooks are always called in the same order) â”€â”€â”€â”€â”€â”€â”€â”€
 function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPersistScrollY }) {
   const { t } = useTranslation();
   const [isAppLoading, setIsAppLoading] = useState(true);
@@ -313,7 +313,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         setTodayStats(stats);
       }
     } catch (err) {
-      setError('Fehler beim Hinzufügen. Bitte versuche es erneut.');
+      setError('Fehler beim HinzufÃ¼gen. Bitte versuche es erneut.');
       console.error(err);
     } finally {
       setIsOperationLoading(false);
@@ -336,7 +336,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         setTodayStats(stats);
       }
     } catch (err) {
-      setError('Fehler beim Löschen. Bitte versuche es erneut.');
+      setError('Fehler beim LÃ¶schen. Bitte versuche es erneut.');
       console.error(err);
     } finally {
       setIsOperationLoading(false);
@@ -368,7 +368,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
           size: Number(log.size),
           caffeine: Number(log.caffeine),
           caffeinePerMl: log.caffeinePerMl ?? null,
-          icon: log.icon || '🥤',
+          icon: log.icon || 'ðŸ¥¤',
         },
       });
 
@@ -431,7 +431,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         {latestVersion && latestVersion !== currentVersion && (
           <div className="glass-card border border-blue-500/30 bg-blue-500/10
             px-4 py-3 rounded-2xl mb-6 animate-fade-in">
-            <p className="text-sm font-medium text-blue-300">Update verfügbar: {latestVersion}</p>
+            <p className="text-sm font-medium text-blue-300">Update verfÃ¼gbar: {latestVersion}</p>
             <button onClick={() => window.location.reload()}
               className="text-xs underline mt-1 text-blue-400">
               Neu laden

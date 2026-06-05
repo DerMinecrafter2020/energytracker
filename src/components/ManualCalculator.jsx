@@ -1,10 +1,8 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
-import { useTranslation } from '../context/LanguageContext';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Calculator, Plus } from 'lucide-react';
 import { DRINK_SIZES, calculateFromPer100ml } from '../utils/caffeineUtils';
 
 const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) => {
-  const { t } = useTranslation();
   const [drinkName, setDrinkName]           = useState('');
   const [caffeinePer100ml, setCaffeinePer100ml] = useState(32);
   const [selectedSize, setSelectedSize]     = useState(250);
@@ -30,7 +28,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
       size: selectedSize,
       caffeine: totalCaffeine,
       caffeinePerMl: caffeinePer100ml / 100,
-      icon: '🥤',
+      icon: 'ðŸ¥¤',
       isPreset: false,
     });
     setDrinkName('');
@@ -49,7 +47,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
         {/* Name */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            Getränkename
+            GetrÃ¤nkename
           </label>
           <input
             type="text"
@@ -83,7 +81,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
         {/* Size buttons */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            Dosengröße
+            DosengrÃ¶ÃŸe
           </label>
           <div className="flex gap-2 flex-wrap">
             {DRINK_SIZES.map((size) => (
@@ -125,7 +123,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
             flex items-center justify-center gap-2"
         >
           <Plus className="w-5 h-5" />
-          Hinzufügen
+          HinzufÃ¼gen
         </button>
       </form>
     </div>
@@ -133,6 +131,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
 };
 
 export default ManualCalculator;
+
 
 
 
