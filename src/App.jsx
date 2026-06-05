@@ -368,7 +368,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
           size: Number(log.size),
           caffeine: Number(log.caffeine),
           caffeinePerMl: log.caffeinePerMl ?? null,
-          icon: log.icon || 'ðŸ¥¤',
+          icon: log.icon || '🥤',
         },
       });
 

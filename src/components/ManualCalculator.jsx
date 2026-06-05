@@ -28,7 +28,7 @@ const ManualCalculator = ({ onAddDrink, isLoading, prefill, onPrefillApplied }) 
       size: selectedSize,
       caffeine: totalCaffeine,
       caffeinePerMl: caffeinePer100ml / 100,
-      icon: 'ðŸ¥¤',
+      icon: '🥤',
       isPreset: false,
     });
     setDrinkName('');

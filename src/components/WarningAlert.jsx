@@ -21,8 +21,8 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
         id: 'over-limit',
         type: 'error',
         icon: AlertTriangle,
-        title: 'Limit ÃƒÂ¼berschritten!',
-        message: `Du hast dein Limit um ${excess}mg ÃƒÂ¼berschritten (${todayStats.totalCaffeine}/${limit}mg)`,
+        title: 'Limit überschritten!',
+        message: `Du hast dein Limit um ${excess}mg überschritten (${todayStats.totalCaffeine}/${limit}mg)`,
         color: 'red',
       });
     }
@@ -43,8 +43,8 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
             id: 'late-caffeine',
             type: 'warning',
             icon: Moon,
-            title: 'SpÃƒÂ¤tes Koffein',
-            message: `${lastDrink.name} um ${drinkTime.getHours()}:${String(drinkTime.getMinutes()).padStart(2, '0')} Uhr kÃƒÂ¶nnte deinen Schlaf beeinflussen`,
+            title: 'Spätes Koffein',
+            message: `${lastDrink.name} um ${drinkTime.getHours()}:${String(drinkTime.getMinutes()).padStart(2, '0')} Uhr könnte deinen Schlaf beeinflussen`,
             color: 'blue',
           });
         }
@@ -63,7 +63,7 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
           type: 'info',
           icon: Zap,
           title: 'Schnelle Folge erkannt',
-          message: `${recentDrinks.length} GetrÃƒÂ¤nke in 2h Ã¢â‚¬“ versuche langsamer zu trinken!`,
+          message: `${recentDrinks.length} Getränke in 2h – versuche langsamer zu trinken!`,
           color: 'amber',
         });
       }

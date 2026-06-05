@@ -510,7 +510,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               <StatCard icon={Calendar}   label="Logs heute"      value={stats.todayLogs}   color="green"  />
               <StatCard icon={Zap}        label="Koffein heute"   value={`${stats.todayCaff} mg`} color="amber" />
               <StatCard icon={TrendingUp} label="Koffein gesamt"  value={`${stats.totalCaff} mg`} color="purple"/>
-              <StatCard icon={Coffee}     label="Ã˜ pro Getränk"   value={`${stats.avgPerDrink} mg`} color="red" />
+              <StatCard icon={Coffee}     label="Ø pro Getränk"   value={`${stats.avgPerDrink} mg`} color="red" />
             </div>
 
             {/* Chart – last 7 days */}
@@ -578,7 +578,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                           style={{ width: `${(count / allLogs.length) * 100}%` }}
                         />
                       </div>
-                      <span className="text-xs text-slate-400 w-12 text-right">{count}Ã—</span>
+                      <span className="text-xs text-slate-400 w-12 text-right">{count}×</span>
                     </div>
                   ));
               })()}
@@ -667,7 +667,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                         className="grid grid-cols-[2fr_1fr_1fr_1fr_2fr_auto] gap-4 px-5 py-3.5
                           hover:bg-white/5 transition-colors items-center text-sm">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-lg shrink-0">{log.icon || 'ðŸ¥¤'}</span>
+                          <span className="text-lg shrink-0">{log.icon || '🥤'}</span>
                           <span className="text-white font-medium truncate">{log.name}</span>
                         </div>
                         <span className="text-blue-400 font-semibold">{log.caffeine} mg</span>
@@ -1246,7 +1246,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   ${aiMsg.type === 'success' ? 'bg-green-500/10 border border-green-500/30 text-green-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}>
                   {aiMsg.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
                   {aiMsg.text}
-                  <button onClick={() => setAiMsg(null)} className="ml-auto text-xs opacity-60 hover:opacity-100">Ã—</button>
+                  <button onClick={() => setAiMsg(null)} className="ml-auto text-xs opacity-60 hover:opacity-100">×</button>
                 </div>
               )}
             </div>
@@ -1342,7 +1342,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   : <AlertTriangle className="w-5 h-5 shrink-0" />}
                 <span className="text-sm">{smtpMsg.text}</span>
                 <button onClick={() => setSmtpMsg(null)} className="ml-auto text-xs underline opacity-60 hover:opacity-100">
-                  Ã—
+                  ×
                 </button>
               </div>
             )}

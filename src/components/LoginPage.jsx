@@ -191,7 +191,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
         </div>
         <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
           <div className="mb-8 text-center md:text-left">
-            <h2 className="text-2xl font-bold text-white">Willkommen zurÃƒÂ¼ck</h2>
+            <h2 className="text-2xl font-bold text-white">Willkommen zurück</h2>
             <p className="text-slate-400 text-sm mt-1">Bitte melde dich an, um fortzufahren.</p>
           </div>
 
@@ -229,11 +229,11 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
             )}
             <button type="submit" disabled={isLoading}
               className="w-full py-3.5 rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
-              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort zurÃƒÂ¼cksetzen'}
+              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort zurücksetzen'}
             </button>
             <div className="text-center mt-4">
               <button type="button" onClick={() => { setView('login'); setError(''); setMsg(null); }} className="text-sm text-slate-400 hover:text-white transition-colors">
-                ZurÃƒÂ¼ck zur Anmeldung
+                Zurück zur Anmeldung
               </button>
             </div>
           </form>
@@ -280,7 +280,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input type={showPw ? 'text' : 'password'} value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢" autoComplete="current-password"
+                  placeholder="••••••••" autoComplete="current-password"
                   className="input-dark pl-12 pr-12" />
                 <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">

@@ -44,14 +44,14 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
             {/* Icon */}
             <div className="w-9 h-9 rounded-xl flex items-center justify-center
               bg-gradient-to-br from-blue-600/30 to-blue-400/10 border border-blue-500/20 shrink-0 text-lg">
-              {log.icon || 'ðŸ¥¤'}
+              {log.icon || '🥤'}
             </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-white text-sm truncate">{log.name}</h4>
               <p className="text-xs text-slate-500">
-                {log.size}Â ml • {formatTime(log.createdAt)}
+                {log.size} ml • {formatTime(log.createdAt)}
               </p>
             </div>
 

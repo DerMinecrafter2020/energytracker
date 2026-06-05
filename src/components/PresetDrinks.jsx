@@ -33,7 +33,7 @@ const PresetDrinks = ({ favorites, onAddDrink, onRemoveFavorite, isLoading }) =>
               
               <div className="flex justify-between items-start w-full relative z-10 mb-2">
                 <div className="w-12 h-12 rounded-2xl bg-[#2c2f38] rounded-full flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                  {drink.icon || 'ðŸ¥¤'}
+                  {drink.icon || '🥤'}
                 </div>
                 <button
                   onClick={(e) => {
