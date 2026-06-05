@@ -1,7 +1,7 @@
 {
   "name": "energy-drink-caffeine-tracker",
   "private": true,
-  "version": "1.6.0",
+  "version": "1.6.5",
   "type": "module",
   "scripts": {
     "version:auto": "node scripts/bump-version.mjs",
@@ -9,7 +9,6 @@
     "prebuild": "npm run version:auto",
     "dev": "vite",
     "server": "node server.js",
-    
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -17,7 +16,6 @@
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.1",
     "cors": "^2.8.6",
-    
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "firebase": "^12.14.0",
