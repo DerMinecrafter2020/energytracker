@@ -374,7 +374,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         )}
       </footer>
 
-      {!showSettings && <AIAssistant totalCaffeineToday={totalCaffeineToday} onAddDrink={handleAddDrink} />}
+      {!showSettings && <AIAssistant totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} />}
       </div>
     </>
   );

@@ -60,7 +60,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     const loadSettings = async () => {
       try {
         const userPayload = {
-          userId: session.userId || null,
+          userId: session.id || null,
           email: session.email,
         };
         const data = await fetchUserSettings(userPayload);
@@ -93,7 +93,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     try {
       const dailyLimit = Math.max(0, Math.round(Number(localLimit) || 400));
       const updatedSettings = await updateUserSettings({
-        userId: session.userId || null,
+        userId: session.id || null,
         email: session.email,
         dailyLimit,
         notifyAtLimit,
@@ -129,7 +129,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     setProfileMessage('');
     try {
       await updateUserProfile({
-        userId: session.userId || null,
+        userId: session.id || null,
         email: session.email,
         currentPassword,
         newName: profileName,
@@ -155,7 +155,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     setSecurityMessage('');
     try {
       const data = await setupTotp({
-        userId: session.userId || null,
+        userId: session.id || null,
         email: session.email,
         password: totpPassword,
       });
@@ -178,7 +178,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     setSecurityMessage('');
     try {
       const data = await enableTotp({
-        userId: session.userId || null,
+        userId: session.id || null,
         email: session.email,
         code: totpCode,
       });
@@ -204,7 +204,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     setSecurityMessage('');
     try {
       const data = await disableTotp({
-        userId: session.userId || null,
+        userId: session.id || null,
         email: session.email,
         password: totpDisablePassword,
       });
@@ -228,14 +228,14 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     setSecurityMessage('');
     try {
       const reg = await fetchPasskeyRegistrationOptions({
-        userId: session.userId || null,
+        userId: session.id || null,
         email: session.email,
       });
 
       const attestation = await startRegistration({ optionsJSON: reg.options });
       const label = `YubiKey ${new Date().toLocaleDateString('de-DE')}`;
       const verified = await verifyPasskeyRegistration({
-        userId: session.userId || null,
+        userId: session.id || null,
         email: session.email,
         challengeToken: reg.challengeToken,
         response: attestation,
@@ -256,7 +256,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     setSecurityMessage('');
     try {
       const data = await removePasskey({
-        userId: session.userId || null,
+        userId: session.id || null,
         email: session.email,
         credentialId,
       });

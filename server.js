@@ -194,6 +194,8 @@ const REDIS_KEYS = {
 };
 
 let dbState = {
+  s3_config: { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' },
+  update_webhook: '',
   caffeine_logs: [],
   users: [],
   smtp_settings: null,
@@ -2622,7 +2624,7 @@ app.post('/api/admin/ai', requireAdmin, (req, res) => {
 // ── AI Chat ──────────────────────────────────────────────────────────────────
 app.post('/api/ai/chat', async (req, res) => {
   try {
-    const { messages, totalCaffeineToday, dailyLimit, clientTime } = req.body || {};
+    const { messages, totalCaffeineToday, dailyLimit, clientTime, logs } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0)
       return res.status(400).json({ error: 'messages ist erforderlich.' });
     if (messages.length > 40)
@@ -2640,9 +2642,10 @@ app.post('/api/ai/chat', async (req, res) => {
       ? `Aktuelle Koffein-Einnahme heute: ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
       : '';
 
+    const logsInfo = Array.isArray(logs) && logs.length > 0 ? `Heutige Getränke bisher: ${logs.map(l => `${l.size}ml ${l.name}`).join(', ')}. ` : 'Bisher heute keine Getränke getrackt. ';
     const timeInfo = clientTime ? `Die aktuelle Uhrzeit beim Nutzer ist ${clientTime}. Berücksichtige diese Uhrzeit unbedingt bei deinen Empfehlungen (z.B. warne vor spätem Koffeinkonsum am Abend, oder gib morgens einen Energiekick-Tipp). ` : '';
 
-    const systemPrompt = `Du bist ein hilfreicher Assistent für den Koffein-Tracker. Du beantwortest Fragen zu Koffein, Schlaf, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo}
+    const systemPrompt = `Du bist ein hilfreicher Assistent für den Drink-Tracker (Version 2.0). Du beantwortest Fragen zu Hydration, Kalorien, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo} ${logsInfo}
 Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen (z.B. 'Füge einen halben Liter Red Bull hinzu'), antworte ganz normal auf seine Anfrage und hänge GANZ AM ENDE deiner Antwort einen exakten JSON-Block in folgendem Format an:
 \`\`\`json
 {

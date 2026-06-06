@@ -13,7 +13,7 @@ const parseMarkdown = (text) => {
     .replace(/_(.*?)_/g, '<em>$1</em>');
 };
 
-const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
+const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
   const [open, setOpen]       = useState(false);
   const [minimized, setMin]   = useState(false);
   const [messages, setMessages] = useState(() => {
@@ -35,7 +35,6 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
   const [error, setError]     = useState('');
   const [width, setWidth]     = useState(384); // w-96 = 384px
   const [height, setHeight]   = useState(480);
-  const [isResizing, setIsResizing] = useState(null);
   const bottomRef             = useRef(null);
   const containerRef          = useRef(null);
 
@@ -54,36 +53,6 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
     }
   }, [messages]);
 
-  // Resize Handling
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e) => {
-      if (isResizing === 'se') { // South-East
-        const newWidth = Math.max(320, e.clientX - containerRef.current?.getBoundingClientRect().left);
-        const newHeight = Math.max(300, e.clientY - containerRef.current?.getBoundingClientRect().top);
-        setWidth(newWidth);
-        setHeight(newHeight);
-      } else if (isResizing === 's') { // South
-        const newHeight = Math.max(300, e.clientY - containerRef.current?.getBoundingClientRect().top);
-        setHeight(newHeight);
-      } else if (isResizing === 'e') { // East
-        const newWidth = Math.max(320, e.clientX - containerRef.current?.getBoundingClientRect().left);
-        setWidth(newWidth);
-      }
-    };
-
-    const handleMouseUp = () => setIsResizing(null);
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing]);
-
   const handleSend = async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -101,6 +70,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
       let reply = await sendAiChat({
         messages: history,
         totalCaffeineToday,
+        logs,
         dailyLimit: DAILY_LIMIT,
       });
 
@@ -160,9 +130,9 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
   return (
     <div
       ref={containerRef}
-      className={`fixed z-50 flex flex-col rounded-2xl shadow-2xl overflow-hidden transition-all duration-200 ${minimized ? 'cursor-auto' : 'cursor-auto'} 
-        bottom-24 left-4 right-4 md:bottom-6 md:left-auto md:right-6 
-        max-md:!w-auto ${minimized ? 'max-md:!h-[56px]' : 'max-md:!h-[60vh]'}`}
+      className={`fixed z-50 flex flex-col rounded-2xl shadow-2xl overflow-hidden transition-all duration-200 cursor-auto 
+        top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+        max-md:!w-[90vw] max-md:!max-w-[400px] ${minimized ? 'max-md:!h-[56px]' : 'max-md:!h-[60vh]'}`}
       style={{
         width: minimized ? 288 : `${width}px`,
         height: minimized ? 56 : `${height}px`,
@@ -245,37 +215,8 @@ const AIAssistant = ({ totalCaffeineToday = 0, onAddDrink }) => {
           </div>
         </>
       )}
-
-      {/* Resize Handles */}
-      {!minimized && (
-        <>
-          {/* South-East corner */}
-          <div
-            onMouseDown={() => setIsResizing('se')}
-            className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize hover:bg-violet-500/20 rounded-tl"
-            style={{ background: 'linear-gradient(135deg, transparent 50%, rgba(139,92,246,0.4) 50%)' }}
-          />
-          {/* South edge */}
-          <div
-            onMouseDown={() => setIsResizing('s')}
-            className="absolute bottom-0 left-0 right-0 h-1 cursor-s-resize hover:bg-violet-500/30"
-            style={{ background: 'linear-gradient(180deg, transparent 50%, rgba(139,92,246,0.2) 50%)' }}
-          />
-          {/* East edge */}
-          <div
-            onMouseDown={() => setIsResizing('e')}
-            className="absolute top-0 bottom-0 right-0 w-1 cursor-e-resize hover:bg-violet-500/30"
-            style={{ background: 'linear-gradient(90deg, transparent 50%, rgba(139,92,246,0.2) 50%)' }}
-          />
-        </>
-      )}
     </div>
   );
 };
 
 export default AIAssistant;
-
-
-
-
-

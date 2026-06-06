@@ -1134,6 +1134,65 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               </button>
             </div>
 
+            
+            {/* S3 config card */}
+            <div className="glass-card rounded-2xl p-6 space-y-5">
+              <h2 className="font-semibold text-white flex items-center gap-2">
+                <Database className="w-5 h-5 text-blue-400" />
+                S3 Backup Konfiguration
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Endpoint URL (Optional für MinIO etc.)</label>
+                  <input type="text" value={s3Config.endpoint} onChange={e => handleS3Change('endpoint', e.target.value)} placeholder="https://minio.example.com" className="input-dark w-full" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Region</label>
+                  <input type="text" value={s3Config.region} onChange={e => handleS3Change('region', e.target.value)} placeholder="eu-central-1" className="input-dark w-full" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Bucket Name</label>
+                <input type="text" value={s3Config.bucket} onChange={e => handleS3Change('bucket', e.target.value)} placeholder="my-backups" className="input-dark w-full" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Access Key ID</label>
+                  <input type="text" value={s3Config.accessKeyId} onChange={e => handleS3Change('accessKeyId', e.target.value)} className="input-dark w-full" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Secret Access Key</label>
+                  <input type="password" value={s3Config.secretAccessKey} onChange={e => handleS3Change('secretAccessKey', e.target.value)} className="input-dark w-full" />
+                </div>
+              </div>
+
+              <button onClick={handleS3Save} disabled={s3Saving} className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-60 transition-all shadow-glow-blue flex items-center justify-center gap-2">
+                {s3Saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Database className="w-4 h-4" />}
+                S3 Konfiguration speichern
+              </button>
+            </div>
+
+            {/* Update Webhook config card */}
+            <div className="glass-card rounded-2xl p-6 space-y-5">
+              <h2 className="font-semibold text-white flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-purple-400" />
+                Docker Update Webhook (Watchtower / Portainer)
+              </h2>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Webhook URL</label>
+                <input type="text" value={updateWebhook} onChange={e => setUpdateWebhook(e.target.value)} placeholder="http://watchtower:8080/v1/update" className="input-dark w-full" />
+              </div>
+
+              <button onClick={handleWebhookSave} disabled={webhookSaving} className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 disabled:opacity-60 transition-all shadow-glow-purple flex items-center justify-center gap-2">
+                {webhookSaving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Webhook URL speichern
+              </button>
+            </div>
+
             {/* Registration toggle card */}
             <div className="glass-card rounded-2xl p-6">
               <div className="flex items-center justify-between gap-4">
