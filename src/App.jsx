@@ -4,6 +4,7 @@ import ProgressBar from './components/ProgressBar';
 import ReminderSettings from './components/ReminderSettings';
 import AIAssistant from './components/AIAssistant';
 import AIDailySummary from './components/AIDailySummary';
+import DrinkHistoryChart from './components/DrinkHistoryChart';
 import LoginPage from './components/LoginPage';
 import { Zap, Loader2 } from 'lucide-react';
 import AdminPanel from './components/AdminPanel';
@@ -341,6 +342,8 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
             )}
 
             <AIDailySummary logs={logs} totalCaffeine={totalCaffeineToday} />
+            <DrinkHistoryChart logs={logs} />
+            <AIAssistant totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} />
             
             <div className="glass-card rounded-[2rem] p-6 text-center border border-white/5">
               <h2 className="text-xl font-bold mb-2">Wie viel hast du getrunken?</h2>
@@ -374,7 +377,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         )}
       </footer>
 
-      {!showSettings && <AIAssistant totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} />}
+      
       </div>
     </>
   );

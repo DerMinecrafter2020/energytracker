@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Send, X, Minimize2, Maximize2, MessageSquare, GripHorizontal } from 'lucide-react';
+import { Terminal, Send, Bot } from 'lucide-react';
 import { sendAiChat } from '../services/aiApi';
 
 const DAILY_LIMIT = 400;
 
-// Hilfsfunktion: Markdown ** zu HTML <strong> konvertieren
 const parseMarkdown = (text) => {
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -14,8 +13,6 @@ const parseMarkdown = (text) => {
 };
 
 const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
-  const [open, setOpen]       = useState(false);
-  const [minimized, setMin]   = useState(false);
   const [messages, setMessages] = useState(() => {
     try {
       const saved = localStorage.getItem('ai_chat_messages');
@@ -27,24 +24,18 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
       console.error('Error loading chat messages:', e);
     }
     return [
-      { role: 'assistant', content: 'Hallo! Ich bin dein Koffein-Assistent. Stell mir Fragen zu Koffein, Schlaf oder Energie – oder frag mich, wie viel du heute noch trinken kannst.' },
+      { role: 'assistant', content: 'SYSTEM INITIALIZED.\nKoffein-Assistent online. Warte auf Eingabe...' },
     ];
   });
   const [input, setInput]     = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
-  const [width, setWidth]     = useState(384); // w-96 = 384px
-  const [height, setHeight]   = useState(480);
   const bottomRef             = useRef(null);
-  const containerRef          = useRef(null);
 
   useEffect(() => {
-    if (open && !minimized) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, open, minimized]);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  // Persist messages to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('ai_chat_messages', JSON.stringify(messages));
@@ -65,7 +56,6 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
     setLoading(true);
 
     try {
-      // Only send user/assistant messages (not system) to API
       const history = [...messages.slice(1), userMsg].map(({ role, content }) => ({ role, content }));
       let reply = await sendAiChat({
         messages: history,
@@ -86,14 +76,12 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
         } catch (e) {
           console.error('Fehler beim Parsen der AI JSON-Antwort', e);
         }
-        // Remove the JSON block from the displayed reply
         reply = reply.replace(/```json\s*([\s\S]*?)\s*```/, '').trim();
       }
 
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
 
       if (drinkToAdd && onAddDrink) {
-        // Automatically add the drink
         await onAddDrink({
           name: drinkToAdd.name || 'AI Drink',
           size: Number(drinkToAdd.size) || 0,
@@ -115,106 +103,60 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
     }
   };
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
-        title="AI-Assistent öffnen"
-      >
-        <Bot className="w-7 h-7 text-white" />
-      </button>
-    );
-  }
-
   return (
-    <div
-      ref={containerRef}
-      className={`fixed z-50 flex flex-col rounded-2xl shadow-2xl overflow-hidden transition-all duration-200 cursor-auto 
-        top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-        max-md:!w-[90vw] max-md:!max-w-[400px] ${minimized ? 'max-md:!h-[56px]' : 'max-md:!h-[60vh]'}`}
-      style={{
-        width: minimized ? 288 : `${width}px`,
-        height: minimized ? 56 : `${height}px`,
-        background: 'linear-gradient(160deg, rgba(30,22,50,0.98), rgba(15,10,30,0.98))',
-        border: '1px solid rgba(139,92,246,0.3)',
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-700/80 to-purple-700/60 shrink-0">
-        <div className="flex items-center gap-2">
-          <Bot className="w-5 h-5 text-violet-200" />
-          <span className="text-sm font-semibold text-white">Koffein-Assistent</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => setMin((v) => !v)} className="p-1 rounded hover:bg-white/10 text-violet-300">
-            {minimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
-          </button>
-          <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-white/10 text-violet-300">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    <div className="glass-card rounded-3xl overflow-hidden animate-fade-in flex flex-col mb-6 h-[400px] border border-white/5 shadow-xl">
+      <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600/20 to-purple-600/10 border-b border-white/10 shrink-0">
+        <Bot className="w-5 h-5 text-violet-400" />
+        <span className="text-sm font-bold text-white tracking-wide">KI Konsole</span>
       </div>
 
-      {!minimized && (
-        <>
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 text-sm">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap
-                  ${msg.role === 'user'
-                    ? 'bg-violet-600 text-white rounded-br-sm'
-                    : 'bg-white/8 text-slate-200 rounded-bl-sm border border-white/10'}`}
-                >
-                  {msg.role === 'assistant' ? (
-                    <div dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) }} />
-                  ) : (
-                    msg.content
-                  )}
-                </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm custom-scrollbar">
+        {messages.map((msg, i) => (
+          <div key={i} className="flex flex-col">
+            {msg.role === 'user' ? (
+              <div className="text-slate-200">
+                <span className="text-violet-400 font-bold opacity-80 mr-2">&gt; USER:</span> 
+                {msg.content}
               </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-white/8 border border-white/10 px-4 py-2 rounded-2xl rounded-bl-sm">
-                  <span className="inline-flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </span>
-                </div>
+            ) : (
+              <div className="text-slate-300">
+                <span className="text-purple-400 font-bold opacity-80">&gt; ASSISTANT:</span>
+                <div className="mt-1 pl-4 whitespace-pre-wrap leading-relaxed border-l-2 border-purple-500/30" dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) }} />
               </div>
             )}
-            {error && (
-              <p className="text-xs text-red-400 text-center px-2">{error}</p>
-            )}
-            <div ref={bottomRef} />
           </div>
+        ))}
+        {loading && (
+          <div className="text-violet-400 font-bold animate-pulse">
+            &gt; VERARBEITE...
+          </div>
+        )}
+        {error && (
+          <div className="text-red-400 font-bold">
+            &gt; FEHLER: {error}
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
 
-          {/* Input */}
-          <div className="p-3 border-t border-white/10 shrink-0">
-            <div className="flex gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Frage stellen... (Enter zum Senden)"
-                rows={1}
-                className="flex-1 bg-white/5 border border-white/10 text-slate-200 placeholder-slate-600 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-violet-500/50 transition-colors"
-                style={{ maxHeight: '80px' }}
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || loading}
-                className="px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
-              >
-                <Send className="w-4 h-4 text-white" />
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+      <div className="p-3 border-t border-white/10 bg-white/5 shrink-0 flex items-center gap-2">
+        <span className="text-violet-400 font-bold opacity-80 shrink-0 text-lg leading-none">&gt;</span>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Kommando eingeben..."
+          className="flex-1 bg-transparent border-none text-white placeholder-slate-500 focus:outline-none focus:ring-0 text-sm"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || loading}
+          className="text-violet-400 hover:text-violet-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 p-1 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+        >
+          <Send className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 };
