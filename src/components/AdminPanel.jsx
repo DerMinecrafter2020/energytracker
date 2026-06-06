@@ -68,6 +68,10 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
     const [msg, setMsg] = useState(null);
 
+  // Edit Log modal state
+  const [editingLog, setEditingLog] = useState(null);
+  const [editLogData, setEditLogData] = useState({ name: '', size: 0, caffeine: 0, icon: '' });
+  const [editLogSaving, setEditLogSaving] = useState(false);
   
   
 
