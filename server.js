@@ -1,3 +1,7 @@
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { exec } from 'child_process';
+import util from 'util';
+const execAsync = util.promisify(exec);
 import express from 'express';
 import cors from 'cors';
 
@@ -902,12 +906,11 @@ const getUserSettings = ({ userId, email }) => {
     discordNotifyLate: false,
     discordNotifyRapid: false,
     theme: 'system',
-    language: 'de',
     createdAt: new Date().toISOString(),
   };
 };
 
-const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme, language }) => {
+const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   let settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
   if (!settings) {
@@ -922,7 +925,6 @@ const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLa
   if (discordNotifyLate !== undefined) settings.discordNotifyLate = discordNotifyLate;
   if (discordNotifyRapid !== undefined) settings.discordNotifyRapid = discordNotifyRapid;
   if (theme !== undefined) settings.theme = theme;
-  if (language !== undefined) settings.language = language;
   
   settings.updatedAt = new Date().toISOString();
   persistDbState();
@@ -1462,6 +1464,56 @@ app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// ── Admin S3 Backup Route ─────────────────────────────────────────────────────
+app.post('/api/admin/backup/s3', requireAdmin, async (req, res) => {
+  try {
+    const bucket = process.env.AWS_S3_BUCKET;
+    const region = process.env.AWS_REGION || 'eu-central-1';
+    
+    if (!bucket) {
+      return res.status(400).json({ error: 'S3 Bucket ist nicht konfiguriert (AWS_S3_BUCKET).' });
+    }
+
+    const s3Client = new S3Client({ region });
+    const backupData = JSON.stringify(dbState, null, 2);
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+    const key = `backup-${dateStr}.json`;
+
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: backupData,
+      ContentType: 'application/json',
+    });
+
+    await s3Client.send(command);
+    res.json({ success: true, message: `Backup erfolgreich hochgeladen: ${key}` });
+  } catch (err) {
+    console.error('S3 Backup Error:', err);
+    res.status(500).json({ error: 'Fehler beim S3 Backup: ' + err.message });
+  }
+});
+
+// ── Admin Update Route ────────────────────────────────────────────────────────
+app.post('/api/admin/update', requireAdmin, async (req, res) => {
+  try {
+    const scriptPath = path.join(__dirname, 'deploy.sh');
+    if (fs.existsSync(scriptPath)) {
+      // Execute the deploy.sh script
+      const { stdout, stderr } = await execAsync('bash ' + scriptPath);
+      res.json({ success: true, message: 'Update gestartet. Log: ' + stdout });
+    } else {
+      // Mock update if script doesn't exist
+      res.json({ success: true, message: 'Mock-Update erfolgreich (deploy.sh nicht gefunden).' });
+    }
+  } catch (err) {
+    console.error('Update Error:', err);
+    res.status(500).json({ error: 'Fehler beim Update: ' + err.message });
+  }
+});
+
 
 // ── User Management Routes ────────────────────────────────────────────────────
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
@@ -2096,7 +2148,7 @@ app.get('/api/settings/me', async (req, res) => {
 
 app.post('/api/settings/me', async (req, res) => {
   try {
-    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme, language } = req.body || {};
+    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme } = req.body || {};
     const safeEmail = String(email || '').toLowerCase().trim();
     const safeUserId = String(userId || '').trim() || null;
 
@@ -2114,9 +2166,7 @@ app.post('/api/settings/me', async (req, res) => {
       discordNotifyAtLimit,
       discordNotifyLate,
       discordNotifyRapid,
-      theme,
-      language
-    });
+      theme });
 
     res.json(settings);
   } catch (err) {
@@ -2522,7 +2572,6 @@ app.get('/api/stats/today', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
-
 app.get('/api/stats/weekly', async (req, res) => {
   try {
     const userId = String(req.query.userId || '').trim() || null;

@@ -26,7 +26,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
   const [discordNotifyLate, setDiscordNotifyLate] = useState(false);
   const [discordNotifyRapid, setDiscordNotifyRapid] = useState(false);
   const [theme, setTheme] = useState('system');
-  const [settingLanguage, setSettingLanguage] = useState('de');
+  
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   
@@ -73,7 +73,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         setDiscordNotifyLate(!!data.discordNotifyLate);
         setDiscordNotifyRapid(!!data.discordNotifyRapid);
         setTheme(data.theme || 'system');
-        setSettingLanguage(data.language || 'de');
+        
 
         const sec = await fetchSecurityStatus(userPayload);
         setSecurity(sec);
@@ -103,7 +103,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         discordNotifyLate,
         discordNotifyRapid,
         theme,
-        language: settingLanguage,
+
       });
 
       setSettings(updatedSettings);

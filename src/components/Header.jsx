@@ -30,7 +30,7 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
         {/* Title + date */}
         <div className="flex-1 min-w-0">
           <button onClick={onGoHome} className="text-left focus:outline-none transition-opacity hover:opacity-80">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#e2e2e5] leading-tight tracking-tight">Koffein-Tracker</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#e2e2e5] leading-tight tracking-tight">Drink-Tracker</h1>
             <p className="text-xs sm:text-sm text-slate-400 truncate">{today}</p>
           </button>
         </div>

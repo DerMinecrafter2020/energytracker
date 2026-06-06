@@ -1,7 +1,7 @@
 {
   "name": "energy-drink-caffeine-tracker",
   "private": true,
-  "version": "1.8.1",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "version:auto": "node scripts/bump-version.mjs",
@@ -13,6 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1063.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.1",
     "compression": "^1.8.1",

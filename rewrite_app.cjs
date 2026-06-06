@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+const fs = require('fs');
+
+const appJsx = `import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Header from './components/Header';
 import ProgressBar from './components/ProgressBar';
 import ReminderSettings from './components/ReminderSettings';
@@ -204,7 +206,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
   useEffect(() => {
     if (settings?.theme) {
-      document.documentElement.className = settings.theme === 'system' ? '' : `theme-${settings.theme}`;
+      document.documentElement.className = settings.theme === 'system' ? '' : \`theme-\${settings.theme}\`;
     }
   }, [settings?.theme]);
 
@@ -381,3 +383,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 }
 
 export default App;
+`;
+
+fs.writeFileSync('src/App.jsx', appJsx);
+console.log('App.jsx simplified');
