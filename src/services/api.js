@@ -322,3 +322,23 @@ export const removePasskey = async ({ userId, email, credentialId }) => {
 
 
 
+
+export const fetchPublicSettings = async () => {
+  const res = await fetch(`${API_BASE}/api/public/settings`);
+  if (!res.ok) throw new Error('Fehler beim Laden der öffentlichen Einstellungen');
+  return res.json();
+};
+
+export const updateAppName = async (appName) => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/api/admin/app-name`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ appName }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Fehler beim Speichern');
+  }
+  return res.json();
+};

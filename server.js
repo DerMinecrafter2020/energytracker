@@ -191,11 +191,13 @@ const REDIS_KEYS = {
   ai_config:     'koffein:ai_config',
   user_settings: 'koffein:user_settings',
   custom_drinks: 'koffein:custom_drinks',
+  app_name:      'koffein:app_name',
 };
 
 let dbState = {
   s3_config: { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' },
   update_webhook: '',
+  appName: 'Drink-Tracker',
   caffeine_logs: [],
   users: [],
   smtp_settings: null,
@@ -221,7 +223,7 @@ const loadDbState = async () => {
       return;
     }
 
-    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks] = await redis.mget(
+    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, appName] = await redis.mget(
       REDIS_KEYS.caffeine_logs,
       REDIS_KEYS.users,
       REDIS_KEYS.smtp_settings,
@@ -231,6 +233,7 @@ const loadDbState = async () => {
       REDIS_KEYS.ai_config,
       REDIS_KEYS.user_settings,
       REDIS_KEYS.custom_drinks,
+      REDIS_KEYS.app_name,
     );
     const parsedAi = safeParse(ai, {});
     dbState = {
@@ -247,6 +250,7 @@ const loadDbState = async () => {
       },
       user_settings: safeParse(settings, []),
       custom_drinks: safeParse(drinks, []),
+      appName:       appName || 'Drink-Tracker',
     };
   } catch (err) {
     console.error('[DB] Redis Ladefehler:', err.message);
@@ -255,6 +259,7 @@ const loadDbState = async () => {
 
 const persistDbState = () => {
   redis.mset(
+    REDIS_KEYS.app_name,      dbState.appName || 'Drink-Tracker',
     REDIS_KEYS.caffeine_logs,  JSON.stringify(dbState.caffeine_logs),
     REDIS_KEYS.users,          JSON.stringify(dbState.users),
     REDIS_KEYS.smtp_settings,  JSON.stringify(dbState.smtp_settings),

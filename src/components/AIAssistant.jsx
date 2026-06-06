@@ -30,10 +30,12 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
   const [input, setInput]     = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
-  const bottomRef             = useRef(null);
+  const scrollContainerRef    = useRef(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -110,7 +112,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
         <span className="text-sm font-bold text-white tracking-wide">KI Konsole</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm custom-scrollbar" ref={scrollContainerRef}>
         {messages.map((msg, i) => (
           <div key={i} className="flex flex-col">
             {msg.role === 'user' ? (
@@ -136,7 +138,6 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
             &gt; FEHLER: {error}
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       <div className="p-3 border-t border-white/10 bg-white/5 shrink-0 flex items-center gap-2">

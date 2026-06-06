@@ -345,10 +345,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
             <DrinkHistoryChart logs={logs} />
             <AIAssistant totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} />
             
-            <div className="glass-card rounded-[2rem] p-6 text-center border border-white/5">
-              <h2 className="text-xl font-bold mb-2">Wie viel hast du getrunken?</h2>
-              <p className="text-sm text-slate-400 mb-4">Nutze die KI am unteren Bildschirmrand, um deine Getränke zu tracken. Beispiel: "Ein Glas Wasser" oder "300ml O-Saft".</p>
-            </div>
+
           </div>
         )}
 

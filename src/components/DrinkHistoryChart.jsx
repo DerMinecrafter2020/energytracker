@@ -4,7 +4,7 @@ export default function DrinkHistoryChart({ logs }) {
   if (!logs || logs.length === 0) {
     return (
       <div className="glass-card rounded-3xl p-6 mb-6">
-        <h3 className="text-white font-bold mb-4">Tagesverlauf</h3>
+        <h3 className="text-white font-bold mb-4">Heute, {new Date().toLocaleDateString('de-DE')}</h3>
         <p className="text-slate-400 text-sm">Noch keine Getränke heute eingetragen.</p>
       </div>
     );
@@ -16,7 +16,7 @@ export default function DrinkHistoryChart({ logs }) {
 
   return (
     <div className="glass-card rounded-3xl p-6 mb-6 animate-fade-in">
-      <h3 className="text-white font-bold mb-6">Tagesverlauf</h3>
+      <h3 className="text-white font-bold mb-6">Heute, {new Date().toLocaleDateString('de-DE')}</h3>
       <div className="flex items-end gap-2 h-40 overflow-x-auto pb-2 custom-scrollbar">
         {sortedLogs.map((log) => {
           const heightPercent = Math.max(5, Math.min(100, ((log.caffeine || 0) / maxCaffeine) * 100));
