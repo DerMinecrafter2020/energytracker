@@ -48,6 +48,42 @@ const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
       <p className="text-2xl font-bold text-white">{value}</p>
       <p className="text-sm text-slate-400 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-slate-600 mt-1">{sub}</p>}
+
+      {/* Edit Log Modal */}
+      {editingLog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-md rounded-2xl p-6 shadow-2xl animate-scale-up">
+            <h3 className="text-xl font-bold text-white mb-6">Log bearbeiten</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Name</label>
+                <input type="text" value={editLogData.name} onChange={e => setEditLogData({...editLogData, name: e.target.value})} className="input-dark w-full" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Größe (ml)</label>
+                  <input type="number" value={editLogData.size} onChange={e => setEditLogData({...editLogData, size: e.target.value})} className="input-dark w-full" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Koffein (mg)</label>
+                  <input type="number" value={editLogData.caffeine} onChange={e => setEditLogData({...editLogData, caffeine: e.target.value})} className="input-dark w-full" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Icon (Emoji)</label>
+                <input type="text" value={editLogData.icon} onChange={e => setEditLogData({...editLogData, icon: e.target.value})} className="input-dark w-full" maxLength={2} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-8">
+              <button onClick={() => setEditingLog(null)} className="px-4 py-2 text-slate-400 hover:text-white transition-colors text-sm font-medium">Abbrechen</button>
+              <button onClick={handleEditSave} disabled={editLogSaving} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-all text-sm shadow-glow-blue disabled:opacity-50">
+                {editLogSaving ? 'Speichern...' : 'Speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -381,6 +417,22 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   };
 
   // â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  
+  const handleEditSave = async () => {
+    if (!editingLog) return;
+    setEditLogSaving(true);
+    try {
+      const { adminUpdateLog } = await import('../services/api');
+      await adminUpdateLog(editingLog.id, editLogData);
+      setAllLogs(prev => prev.map(l => l.id === editingLog.id ? { ...l, ...editLogData } : l));
+      setEditingLog(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setEditLogSaving(false);
+    }
+  };
+  
   const handleDelete = async (id) => {
     if (!window.confirm('Diesen Eintrag wirklich löschen?')) return;
     setDeleting(id);
@@ -721,6 +773,19 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                         <span className="text-slate-400">{log.size} ml</span>
                         <span className="text-slate-400">{log.date || '–'}</span>
                         <span className="text-slate-500 text-xs">{formatDate(log.createdAt)}</span>
+                        
+                        <button
+                          onClick={() => {
+                            setEditingLog(log);
+                            setEditLogData({ name: log.name, size: log.size, caffeine: log.caffeine, icon: log.icon });
+                          }}
+                          className="p-1.5 rounded-lg text-slate-600 hover:text-blue-400 hover:bg-blue-500/10
+                            transition-all"
+                          aria-label="Bearbeiten"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+
                         <button
                           onClick={() => handleDelete(log.id)}
                           disabled={deleting === log.id}

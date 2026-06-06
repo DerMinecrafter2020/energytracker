@@ -1323,6 +1323,26 @@ app.post('/api/logs', async (req, res) => {
   }
 });
 
+
+app.put('/api/logs/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, size, caffeine, icon } = req.body;
+    const logIndex = dbState.caffeine_logs.findIndex(l => l.id === id && l.userId === req.user.email);
+    if (logIndex === -1) return res.status(404).json({ error: 'Log nicht gefunden' });
+    
+    if (name) dbState.caffeine_logs[logIndex].name = name;
+    if (size) dbState.caffeine_logs[logIndex].size = Number(size);
+    if (caffeine) dbState.caffeine_logs[logIndex].caffeine = Number(caffeine);
+    if (icon) dbState.caffeine_logs[logIndex].icon = icon;
+    
+    await persistDbState();
+    res.json(dbState.caffeine_logs[logIndex]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/logs/:id', async (req, res) => {
   try {
     const { id } = req.params;

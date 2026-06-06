@@ -342,3 +342,36 @@ export const updateAppName = async (appName) => {
   }
   return res.json();
 };
+
+
+export const updateLog = async (id, data) => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/api/logs/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Fehler beim Aktualisieren des Logs');
+  return res.json();
+};
+
+export const adminUpdateLog = async (id, data) => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/api/admin/logs/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Fehler beim Aktualisieren');
+  return res.json();
+};
+
+export const adminDeleteLog = async (id) => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/api/admin/logs/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Fehler beim Löschen');
+  return res.json();
+};

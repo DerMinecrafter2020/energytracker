@@ -12,7 +12,7 @@ const parseMarkdown = (text) => {
     .replace(/_(.*?)_/g, '<em>$1</em>');
 };
 
-const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
+const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDrink, onUpdateDrink }) => {
   const [messages, setMessages] = useState(() => {
     try {
       const saved = localStorage.getItem('ai_chat_messages');
@@ -66,7 +66,11 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
         dailyLimit: DAILY_LIMIT,
       });
 
+      
       let drinkToAdd = null;
+      let drinkToDelete = null;
+      let drinkToUpdate = null;
+      
       const jsonMatch = reply.match(/```json\s*([\s\S]*?)\s*```/);
       
       if (jsonMatch) {
@@ -74,6 +78,10 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
           const parsed = JSON.parse(jsonMatch[1]);
           if (parsed.action === 'ADD_DRINK') {
             drinkToAdd = parsed;
+          } else if (parsed.action === 'DELETE_DRINK') {
+            drinkToDelete = parsed;
+          } else if (parsed.action === 'UPDATE_DRINK') {
+            drinkToUpdate = parsed;
           }
         } catch (e) {
           console.error('Fehler beim Parsen der AI JSON-Antwort', e);
@@ -81,6 +89,12 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
         reply = reply.replace(/```json\s*([\s\S]*?)\s*```/, '').trim();
       }
 
+      if (!reply && jsonMatch) {
+        if (drinkToAdd) reply = 'Getränk hinzugefügt.';
+        if (drinkToDelete) reply = 'Getränk gelöscht.';
+        if (drinkToUpdate) reply = 'Getränk aktualisiert.';
+      }
+      
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
 
       if (drinkToAdd && onAddDrink) {
@@ -88,10 +102,30 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
           name: drinkToAdd.name || 'AI Drink',
           size: Number(drinkToAdd.size) || 0,
           caffeine: Number(drinkToAdd.caffeine) || 0,
-          icon: '🤖'
+          icon: drinkToAdd.icon || '🤖'
         });
       }
-    } catch (err) {
+      
+      if (drinkToDelete && onDeleteDrink) {
+        // Find the log id that matches the name closely
+        const match = logs.find(l => l.name.toLowerCase().includes(drinkToDelete.name.toLowerCase()));
+        if (match) {
+          await onDeleteDrink(match.id);
+        }
+      }
+      
+      if (drinkToUpdate && onUpdateDrink) {
+        const match = logs.find(l => l.name.toLowerCase().includes(drinkToUpdate.name.toLowerCase()));
+        if (match) {
+          await onUpdateDrink(match.id, {
+            name: drinkToUpdate.new_name || match.name,
+            size: drinkToUpdate.new_size ? Number(drinkToUpdate.new_size) : match.size,
+            caffeine: drinkToUpdate.new_caffeine ? Number(drinkToUpdate.new_caffeine) : match.caffeine,
+            icon: drinkToUpdate.icon || match.icon
+          });
+        }
+      }
+} catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
@@ -106,7 +140,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
   };
 
   return (
-    <div className="glass-card rounded-3xl overflow-hidden animate-fade-in flex flex-col mb-6 h-[400px] border border-white/5 shadow-xl">
+    <div className="glass-card rounded-3xl overflow-hidden animate-fade-in flex flex-col mb-6 h-[600px] border border-white/5 shadow-xl">
       <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600/20 to-purple-600/10 border-b border-white/10 shrink-0">
         <Bot className="w-5 h-5 text-violet-400" />
         <span className="text-sm font-bold text-white tracking-wide">KI Konsole</span>
@@ -129,8 +163,11 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink }) => {
           </div>
         ))}
         {loading && (
-          <div className="text-violet-400 font-bold animate-pulse">
-            &gt; VERARBEITE...
+          <div className="text-violet-400 font-bold flex items-center gap-1">
+            <span>&gt;</span>
+            <div className="flex gap-1 ml-1">
+              <span className="w-2 h-4 bg-violet-400 animate-pulse"></span>
+            </div>
           </div>
         )}
         {error && (

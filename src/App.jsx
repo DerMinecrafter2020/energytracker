@@ -4,7 +4,7 @@ import ProgressBar from './components/ProgressBar';
 import ReminderSettings from './components/ReminderSettings';
 import AIAssistant from './components/AIAssistant';
 import AIDailySummary from './components/AIDailySummary';
-import DrinkHistoryChart from './components/DrinkHistoryChart';
+import DrinkHistory from './components/DrinkHistory';
 import LoginPage from './components/LoginPage';
 import { Zap, Loader2 } from 'lucide-react';
 import AdminPanel from './components/AdminPanel';
@@ -255,6 +255,39 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     [logs]
   );
 
+  
+  
+  const handleUpdateLog = async (logId, data) => {
+    try {
+      const updated = await api.updateLog(logId, data);
+      setLogs(prev => prev.map(l => l.id === logId ? { ...l, ...updated } : l));
+      const total = await api.getDailyTotal();
+      setTotalCaffeineToday(total.totalCaffeine);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  
+  const handleDeleteLog = async (logId) => {
+    try {
+      await api.deleteLog(logId);
+      setLogs(prev => prev.filter(l => l.id !== logId));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleToggleFavorite = async (log, isFavorite) => {
+    try {
+      if (isFavorite) {
+        // Find favorite ID by log match (pseudo logic, adjust based on actual api)
+        // If we don't have full favorites logic here, we just ignore or implement basic
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  
   const handleAddDrink = useCallback(async (drinkData) => {
     setIsOperationLoading(true);
     setError(null);
@@ -342,8 +375,8 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
             )}
 
             <AIDailySummary logs={logs} totalCaffeine={totalCaffeineToday} />
-            <DrinkHistoryChart logs={logs} />
-            <AIAssistant totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} />
+            <DrinkHistory logs={logs} onDeleteLog={handleDeleteLog} onToggleFavorite={handleToggleFavorite} isFavoriteLog={() => false} />
+            <AIAssistant totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} onDeleteDrink={handleDeleteLog} onUpdateDrink={handleUpdateLog} />
             
 
           </div>
