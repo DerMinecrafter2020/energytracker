@@ -352,6 +352,25 @@ class FileDbAdapter {
       return [makeResult(affectedRows)];
     }
 
+    if (q.startsWith('update caffeine_logs set name = ?, size = ?, caffeine = ?, icon = ? where id = ?')) {
+      const name = params[0];
+      const size = params[1];
+      const caffeine = params[2];
+      const icon = params[3];
+      const id = Number(params[4]);
+      
+      const log = dbState.caffeine_logs.find((r) => Number(r.id) === id);
+      if (!log) return [makeResult(0)];
+      
+      if (name !== undefined) log.name = name;
+      if (size !== undefined) log.size = Number(size);
+      if (caffeine !== undefined) log.caffeine = Number(caffeine);
+      if (icon !== undefined) log.icon = icon;
+      
+      persistDbState();
+      return [makeResult(1)];
+    }
+
     if (q.includes('from users') && q.includes('order by created_at desc')) {
       const rows = [...dbState.users]
         .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
@@ -1332,18 +1351,6 @@ app.put('/api/logs/:id', async (req, res) => {
     // Assuming simple updates without strict user filtering for now since the app.delete didn't have it either.
     await dbPool.execute('UPDATE caffeine_logs SET name = ?, size = ?, caffeine = ?, icon = ? WHERE id = ?', [name, Number(size), Number(caffeine), icon, id]);
     res.json({ id, name, size: Number(size), caffeine: Number(caffeine), icon });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-    
-    if (name) dbState.caffeine_logs[logIndex].name = name;
-    if (size) dbState.caffeine_logs[logIndex].size = Number(size);
-    if (caffeine) dbState.caffeine_logs[logIndex].caffeine = Number(caffeine);
-    if (icon) dbState.caffeine_logs[logIndex].icon = icon;
-    
-    await persistDbState();
-    res.json(dbState.caffeine_logs[logIndex]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
