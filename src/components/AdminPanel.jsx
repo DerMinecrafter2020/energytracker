@@ -73,7 +73,40 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [editLogData, setEditLogData] = useState({ name: '', size: 0, caffeine: 0, icon: '' });
   const [editLogSaving, setEditLogSaving] = useState(false);
   
-  
+  // S3 Backup state
+  const defaultS3 = { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' };
+  const [s3Config, setS3Config] = useState(defaultS3);
+  const [s3Saving, setS3Saving] = useState(false);
+
+  const handleS3Change = (field, value) => {
+    setS3Config(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleS3Save = async () => {
+    setS3Saving(true);
+    try {
+      const res = await fetch('/api/admin/backup/s3/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Secret': 'et-admin-2024'
+        },
+        body: JSON.stringify(s3Config)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+         setSmtpMsg({ type: 'success', text: 'S3 Konfiguration gespeichert.' });
+      } else {
+         setSmtpMsg({ type: 'error', text: 'Fehler beim Speichern der S3 Konfig: ' + (data.error || 'Unknown') });
+      }
+    } catch (err) {
+      setSmtpMsg({ type: 'error', text: err.message });
+    } finally {
+      setS3Saving(false);
+    }
+  };
+
+
 
   // â”€â”€ SMTP state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const defaultSmtp = { host: '', port: 587, secure: false, auth: { user: '', pass: '' },
