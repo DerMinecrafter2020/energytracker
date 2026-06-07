@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal, Send, Bot } from 'lucide-react';
-import { sendAiChat } from '../services/aiApi';
+import { Send, Bot, Trash2, Brain, RefreshCw, Zap, Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { sendAiChat, fetchDailySummary } from '../services/aiApi';
 
 const DAILY_LIMIT = 400;
 
@@ -24,13 +24,20 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
       console.error('Error loading chat messages:', e);
     }
     return [
-      { role: 'assistant', content: 'SYSTEM INITIALIZED.\nKoffein-Assistent online. Warte auf Eingabe...' },
+      { role: 'assistant', type: 'text', content: 'Hallo! Ich bin dein Koffein-Assistent. Wie kann ich dir heute helfen?' },
     ];
   });
-  const [input, setInput]     = useState('');
+  
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const scrollContainerRef    = useRef(null);
+  const [error, setError] = useState('');
+  const scrollContainerRef = useRef(null);
+
+  // Daily Summary State
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     if (scrollContainerRef.current) {
@@ -46,21 +53,37 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
     }
   }, [messages]);
 
+  const handleFetchSummary = async () => {
+    setSummaryLoading(true);
+    setSummaryError('');
+    setShowSummary(true);
+    try {
+      const data = await fetchDailySummary({ logs, totalCaffeine: totalCaffeineToday, dailyLimit: DAILY_LIMIT });
+      setSummary(data);
+    } catch (err) {
+      setSummaryError(err.message);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || loading) return;
     setInput('');
     setError('');
 
-    const userMsg = { role: 'user', content: text };
-    const newMessages = [...messages.filter((m) => m.role !== 'assistant' || messages.indexOf(m) > 0), userMsg];
+    const userMsg = { role: 'user', type: 'text', content: text };
+    const historyForApi = [...messages.filter((m) => m.role !== 'assistant' || messages.indexOf(m) > 0), userMsg]
+      .filter(m => m.type !== 'drink_added') // AI expects text history
+      .map(({ role, content }) => ({ role, content: content || '' }));
+      
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
     try {
-      const history = [...messages.slice(1), userMsg].map(({ role, content }) => ({ role, content }));
       let { content: reply, tool_calls } = await sendAiChat({
-        messages: history,
+        messages: historyForApi,
         totalCaffeineToday,
         logs,
         dailyLimit: DAILY_LIMIT,
@@ -74,14 +97,19 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
             try {
               const args = JSON.parse(call.function.arguments);
               if (onAddDrink) {
-                await onAddDrink({
+                const addedDrink = await onAddDrink({
                   name: args.name || 'AI Drink',
                   size: Number(args.size) || 0,
                   caffeine: Number(args.caffeine) || 0,
                   icon: args.icon || '🤖'
                 });
+                
+                if (addedDrink) {
+                  actionsPerformed.push({ type: 'drink_added', drink: addedDrink });
+                } else {
+                  actionsPerformed.push({ type: 'text', content: 'Getränk hinzugefügt.' });
+                }
               }
-              actionsPerformed.push('Getränk hinzugefügt.');
             } catch (e) {
               console.error('Fehler beim Ausführen von add_drink', e);
             }
@@ -92,7 +120,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
                 const match = logs.find(l => String(l.id) === String(args.id));
                 if (match) {
                   await onDeleteDrink(match.id);
-                  actionsPerformed.push('Getränk gelöscht.');
+                  actionsPerformed.push({ type: 'text', content: `Getränk "${match.name}" gelöscht.` });
                 } else {
                   setError('Zu löschendes Getränk (ID) nicht gefunden.');
                 }
@@ -112,7 +140,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
                     caffeine: args.caffeine ? Number(args.caffeine) : match.caffeine,
                     icon: args.icon || match.icon
                   });
-                  actionsPerformed.push('Getränk aktualisiert.');
+                  actionsPerformed.push({ type: 'text', content: `Getränk "${match.name}" aktualisiert.` });
                 } else {
                   setError('Zu aktualisierendes Getränk (ID) nicht gefunden.');
                 }
@@ -124,11 +152,21 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
         }
       }
 
-      if (!reply && actionsPerformed.length > 0) {
-        reply = actionsPerformed.join(' ');
-      }
-      
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+      setMessages(prev => {
+        const newMsgs = [...prev];
+        if (reply) {
+          newMsgs.push({ role: 'assistant', type: 'text', content: reply });
+        }
+        actionsPerformed.forEach(action => {
+          newMsgs.push({ role: 'assistant', ...action });
+        });
+        // Fallback if AI did something but returned no message
+        if (!reply && actionsPerformed.length === 0) {
+          newMsgs.push({ role: 'assistant', type: 'text', content: 'Aktion ausgeführt.' });
+        }
+        return newMsgs;
+      });
+
     } catch (err) {
       setError(err.message);
     } finally {
@@ -143,61 +181,160 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
     }
   };
 
+  const handleDeleteAddedDrink = async (drinkId, index) => {
+    if (onDeleteDrink) {
+      await onDeleteDrink(drinkId);
+      setMessages(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
   return (
-    <div className="glass-card rounded-3xl overflow-hidden animate-fade-in flex flex-col mb-6 h-[600px] border border-white/5 shadow-xl">
-      <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600/20 to-purple-600/10 border-b border-white/10 shrink-0">
-        <Bot className="w-5 h-5 text-violet-400" />
-        <span className="text-sm font-bold text-white tracking-wide">KI Konsole</span>
+    <div className="glass-card rounded-[2rem] overflow-hidden animate-fade-in flex flex-col mb-6 h-[650px] shadow-glass flex-shrink-0">
+      
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-violet-600/30 to-purple-600/20 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center shadow-inner">
+            <Bot className="w-5 h-5 text-violet-300" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-white tracking-wide">KI-Assistent</h2>
+            <p className="text-xs text-violet-300/70">Powered by AI</p>
+          </div>
+        </div>
+        
+        <button 
+          onClick={handleFetchSummary}
+          disabled={summaryLoading}
+          className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-violet-300 text-sm font-medium transition-all shadow-sm border border-white/5"
+        >
+          {summaryLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+          <span className="hidden sm:inline">Tagesanalyse</span>
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm custom-scrollbar" ref={scrollContainerRef}>
-        {messages.map((msg, i) => (
-          <div key={i} className="flex flex-col">
-            {msg.role === 'user' ? (
-              <div className="text-slate-200">
-                <span className="text-violet-400 font-bold opacity-80 mr-2">&gt; USER:</span> 
-                {msg.content}
-              </div>
-            ) : (
-              <div className="text-slate-300">
-                <span className="text-purple-400 font-bold opacity-80">&gt; ASSISTANT:</span>
-                <div className="mt-1 pl-4 whitespace-pre-wrap leading-relaxed border-l-2 border-purple-500/30" dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) }} />
-              </div>
-            )}
+      {/* Daily Summary Panel */}
+      {showSummary && (
+        <div className="bg-violet-900/20 border-b border-white/5 p-4 shrink-0 animate-fade-in relative">
+          <button onClick={() => setShowSummary(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+            <ChevronUp className="w-5 h-5" />
+          </button>
+          
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4 text-violet-400" />
+            <h3 className="text-sm font-bold text-white">Aktuelle Auswertung</h3>
           </div>
-        ))}
+          
+          {summaryError && (
+            <div className="text-sm text-red-400 bg-red-500/10 rounded-xl p-3 flex justify-between items-center">
+              <span>{summaryError}</span>
+              <button onClick={handleFetchSummary} className="underline font-medium">Erneut</button>
+            </div>
+          )}
+          
+          {summary && !summaryError && (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                {summary.summary.replace(/^#+\s*/gm, '').replace(/\*\*/g, '')}
+              </p>
+              <div className="flex justify-end">
+                <button onClick={handleFetchSummary} className="text-xs flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors">
+                  <RefreshCw className="w-3 h-3" /> Aktualisieren
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Chat Messages */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm custom-scrollbar bg-black/10" ref={scrollContainerRef}>
+        {messages.map((msg, i) => {
+          const isUser = msg.role === 'user';
+          
+          if (msg.type === 'drink_added' && msg.drink) {
+            return (
+              <div key={i} className="flex justify-start w-full animate-fade-in">
+                <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-2xl p-4 max-w-[85%] sm:max-w-[75%] shadow-sm">
+                  <div className="text-xs font-semibold text-indigo-400 mb-2 flex items-center gap-1">
+                    <Zap className="w-3 h-3" /> KI hat ein Getränk hinzugefügt
+                  </div>
+                  <div className="flex items-center justify-between gap-4 bg-black/20 rounded-xl p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="text-2xl">{msg.drink.icon}</div>
+                      <div>
+                        <div className="font-bold text-white text-base">{msg.drink.name}</div>
+                        <div className="text-xs text-slate-400">{msg.drink.size} ml • {msg.drink.caffeine} mg Koffein</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteAddedDrink(msg.drink.id, i)}
+                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                      title="Eintrag löschen"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
+              <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-3.5 shadow-sm
+                ${isUser 
+                  ? 'bg-violet-600 text-white rounded-br-sm' 
+                  : 'bg-white/5 border border-white/10 text-slate-200 rounded-bl-sm'}`}
+              >
+                <div 
+                  className="whitespace-pre-wrap leading-relaxed" 
+                  dangerouslySetInnerHTML={{ __html: isUser ? msg.content : parseMarkdown(msg.content || '') }} 
+                />
+              </div>
+            </div>
+          );
+        })}
+        
         {loading && (
-          <div className="text-violet-400 font-bold flex items-center gap-1">
-            <span>&gt;</span>
-            <div className="flex gap-1 ml-1">
-              <span className="w-2 h-4 bg-violet-400 animate-pulse"></span>
+          <div className="flex justify-start w-full">
+            <div className="bg-white/5 border border-white/10 rounded-2xl rounded-bl-sm px-5 py-4 flex items-center gap-2">
+              <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
             </div>
           </div>
         )}
+        
         {error && (
-          <div className="text-red-400 font-bold">
-            &gt; FEHLER: {error}
+          <div className="flex justify-center w-full my-2">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-2 rounded-xl text-center">
+              Fehler: {error}
+            </div>
           </div>
         )}
       </div>
 
-      <div className="p-3 border-t border-white/10 bg-white/5 shrink-0 flex items-center gap-2">
-        <span className="text-violet-400 font-bold opacity-80 shrink-0 text-lg leading-none">&gt;</span>
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="Kommando eingeben..."
-          className="flex-1 bg-transparent border-none text-white placeholder-slate-500 focus:outline-none focus:ring-0 text-sm"
-        />
-        <button
-          onClick={handleSend}
-          disabled={!input.trim() || loading}
-          className="text-violet-400 hover:text-violet-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 p-1 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
-        >
-          <Send className="w-4 h-4" />
-        </button>
+      {/* Input Area */}
+      <div className="p-4 bg-white/5 border-t border-white/10 shrink-0">
+        <div className="relative flex items-center">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Kommando oder Frage eingeben..."
+            className="w-full bg-black/20 border border-white/10 text-white placeholder-slate-500 rounded-2xl pl-5 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none custom-scrollbar"
+            rows="1"
+            style={{ minHeight: '56px', maxHeight: '120px' }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || loading}
+            className="absolute right-3 p-2 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-600/30 disabled:text-white/30 text-white rounded-xl transition-colors"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -3,7 +3,6 @@ import Header from './components/Header';
 import ProgressBar from './components/ProgressBar';
 import ReminderSettings from './components/ReminderSettings';
 import AIAssistant from './components/AIAssistant';
-import AIDailySummary from './components/AIDailySummary';
 import DrinkHistory from './components/DrinkHistory';
 import LoginPage from './components/LoginPage';
 import { Zap, Loader2 } from 'lucide-react';
@@ -316,6 +315,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         });
         setTodayStats(stats);
       }
+      return created;
     } catch (err) {
       setError('Fehler beim Hinzufügen. Bitte versuche es erneut.');
     } finally {
@@ -387,7 +387,6 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
               <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
             )}
 
-            <AIDailySummary logs={logs} totalCaffeine={totalCaffeineToday} />
             <DrinkHistory logs={logs} onDeleteLog={handleDeleteLog} onToggleFavorite={handleToggleFavorite} isFavoriteLog={() => false} />
             <AIAssistant totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} onDeleteDrink={handleDeleteLog} onUpdateDrink={handleUpdateLog} />
             
