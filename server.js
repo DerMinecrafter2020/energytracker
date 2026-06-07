@@ -192,6 +192,7 @@ const REDIS_KEYS = {
   user_settings: 'koffein:user_settings',
   custom_drinks: 'koffein:custom_drinks',
   app_name:      'koffein:app_name',
+  s3_config:     'koffein:s3_config',
 };
 
 let dbState = {
@@ -223,7 +224,7 @@ const loadDbState = async () => {
       return;
     }
 
-    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, appName] = await redis.mget(
+    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, appName, s3] = await redis.mget(
       REDIS_KEYS.caffeine_logs,
       REDIS_KEYS.users,
       REDIS_KEYS.smtp_settings,
@@ -234,6 +235,7 @@ const loadDbState = async () => {
       REDIS_KEYS.user_settings,
       REDIS_KEYS.custom_drinks,
       REDIS_KEYS.app_name,
+      REDIS_KEYS.s3_config,
     );
     const parsedAi = safeParse(ai, {});
     dbState = {
@@ -251,6 +253,7 @@ const loadDbState = async () => {
       user_settings: safeParse(settings, []),
       custom_drinks: safeParse(drinks, []),
       appName:       appName || 'Drink-Tracker',
+      s3_config:     safeParse(s3, { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' }),
     };
   } catch (err) {
     console.error('[DB] Redis Ladefehler:', err.message);
@@ -269,6 +272,7 @@ const persistDbState = () => {
     REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
     REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
     REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
+    REDIS_KEYS.s3_config,      JSON.stringify(dbState.s3_config),
   ).catch((err) => console.error('[DB] Redis Speicherfehler:', err.message));
 };
 
@@ -609,6 +613,22 @@ const initDb = async () => {
   getPool();
   await loadDbState();
   console.log(`[DB] ✓ Redis bereit: ${redisUrl}`);
+};
+
+// ── S3 Config helpers ─────────────────────────────────────────────────────────
+const loadS3Config = () => {
+  return dbState.s3_config || { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' };
+};
+
+const saveS3Config = (cfg) => {
+  dbState.s3_config = {
+    endpoint: String(cfg.endpoint || '').trim(),
+    region: String(cfg.region || '').trim(),
+    bucket: String(cfg.bucket || '').trim(),
+    accessKeyId: String(cfg.accessKeyId || '').trim(),
+    secretAccessKey: String(cfg.secretAccessKey || '').trim(),
+  };
+  persistDbState();
 };
 
 // ── AI / OpenRouter helpers ───────────────────────────────────────────────────
@@ -1349,7 +1369,10 @@ app.put('/api/logs/:id', async (req, res) => {
     const { name, size, caffeine, icon } = req.body;
     const dbPool = getPool();
     // Assuming simple updates without strict user filtering for now since the app.delete didn't have it either.
-    await dbPool.execute('UPDATE caffeine_logs SET name = ?, size = ?, caffeine = ?, icon = ? WHERE id = ?', [name, Number(size), Number(caffeine), icon, id]);
+    const [result] = await dbPool.execute('UPDATE caffeine_logs SET name = ?, size = ?, caffeine = ?, icon = ? WHERE id = ?', [name, Number(size), Number(caffeine), icon, id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Log nicht gefunden.' });
+    }
     res.json({ id, name, size: Number(size), caffeine: Number(caffeine), icon });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1507,16 +1530,53 @@ app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
 
 
 // ── Admin S3 Backup Route ─────────────────────────────────────────────────────
+app.get('/api/admin/backup/s3/config', requireAdmin, async (req, res) => {
+  try {
+    const cfg = loadS3Config();
+    res.json({ ...cfg, secretAccessKey: cfg.secretAccessKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '' });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/admin/backup/s3/config', requireAdmin, async (req, res) => {
+  try {
+    const prev = loadS3Config();
+    const cfg = req.body || {};
+    if (cfg.secretAccessKey === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022') {
+      cfg.secretAccessKey = prev.secretAccessKey;
+    }
+    saveS3Config(cfg);
+    res.json({ success: true, message: 'S3 Konfiguration gespeichert.' });
+  } catch (err) {
+    console.error('S3 Config Save Error:', err);
+    res.status(500).json({ error: 'Fehler beim Speichern der S3 Config: ' + err.message });
+  }
+});
+
 app.post('/api/admin/backup/s3', requireAdmin, async (req, res) => {
   try {
-    const bucket = process.env.AWS_S3_BUCKET;
-    const region = process.env.AWS_REGION || 'eu-central-1';
+    const cfg = loadS3Config();
+    const bucket = cfg.bucket || process.env.AWS_S3_BUCKET;
+    const region = cfg.region || process.env.AWS_REGION || 'eu-central-1';
     
     if (!bucket) {
       return res.status(400).json({ error: 'S3 Bucket ist nicht konfiguriert (AWS_S3_BUCKET).' });
     }
 
-    const s3Client = new S3Client({ region });
+    const s3Options = { region };
+    if (cfg.endpoint) {
+      s3Options.endpoint = cfg.endpoint;
+      s3Options.forcePathStyle = true; 
+    }
+    if (cfg.accessKeyId && cfg.secretAccessKey) {
+      s3Options.credentials = {
+        accessKeyId: cfg.accessKeyId,
+        secretAccessKey: cfg.secretAccessKey,
+      };
+    }
+
+    const s3Client = new S3Client(s3Options);
     const backupData = JSON.stringify(dbState, null, 2);
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
     const key = `backup-${dateStr}.json`;
@@ -2680,20 +2740,46 @@ app.post('/api/ai/chat', async (req, res) => {
       ? `Aktuelle Koffein-Einnahme heute: ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
       : '';
 
-    const logsInfo = Array.isArray(logs) && logs.length > 0 ? `Heutige Getränke bisher: ${logs.map(l => `${l.size}ml ${l.name}`).join(', ')}. ` : 'Bisher heute keine Getränke getrackt. ';
+    const logsInfo = Array.isArray(logs) && logs.length > 0 ? `Heutige Getränke bisher:\n${logs.map(l => `- ID: ${l.id}, Name: ${l.name}, Menge: ${l.size}ml, Koffein: ${l.caffeine}mg`).join('\n')}\n` : 'Bisher heute keine Getränke getrackt. ';
     const timeInfo = clientTime ? `Die aktuelle Uhrzeit beim Nutzer ist ${clientTime}. Berücksichtige diese Uhrzeit unbedingt bei deinen Empfehlungen (z.B. warne vor spätem Koffeinkonsum am Abend, oder gib morgens einen Energiekick-Tipp). ` : '';
 
-    const systemPrompt = `Du bist ein hilfreicher Assistent für den Drink-Tracker (Version 2.0). Du beantwortest Fragen zu Hydration, Kalorien, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo} ${logsInfo}
-Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen (z.B. 'Füge einen halben Liter Red Bull hinzu'), antworte ganz normal auf seine Anfrage und hänge GANZ AM ENDE deiner Antwort einen exakten JSON-Block in folgendem Format an:
+    const systemPrompt = `Du bist ein hilfreicher Assistent für den Drink-Tracker (Version 2.0). Du beantwortest Fragen zu Hydration, Kalorien, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo}
+${logsInfo}
+
+Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, antworte ganz normal und hänge GANZ AM ENDE deiner Antwort EINEN exakten JSON-Block an.
+Beispiele für den JSON-Block:
+
+Für Hinzufügen (berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy):
 \`\`\`json
 {
   "action": "ADD_DRINK",
   "name": "Name des Getränks",
   "size": 500,
-  "caffeine": 160
+  "caffeine": 160,
+  "icon": "🥤"
 }
 \`\`\`
-Berechne das gesamte Koffein ('caffeine') basierend auf der ml-Menge ('size') und dem typischen Koffeingehalt des Getränks (z.B. Red Bull hat 32mg/100ml, also 160mg für 500ml). Lass das JSON-Feld weg, wenn kein Getränk hinzugefügt werden soll.`.trim();
+
+Für Löschen (nutze exakt die ID aus der Liste der heutigen Getränke):
+\`\`\`json
+{
+  "action": "DELETE_DRINK",
+  "id": 123
+}
+\`\`\`
+
+Für Ändern (gib die ID des zu ändernden Getränks an und fülle die neuen Werte aus):
+\`\`\`json
+{
+  "action": "UPDATE_DRINK",
+  "id": 123,
+  "name": "Neuer Name",
+  "size": 330,
+  "caffeine": 105,
+  "icon": "🧊"
+}
+\`\`\`
+Lass den JSON-Block komplett weg, wenn keine dieser Aktionen gewünscht ist.`.trim();
 
     const fullMessages = [
       { role: 'system', content: systemPrompt },

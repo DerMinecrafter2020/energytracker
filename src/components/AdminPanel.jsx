@@ -159,8 +159,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           setAiModel(cfg.model || 'google/gemini-2.0-flash-001'); 
           setAiKeyMasked(cfg.apiKeyMasked || ''); 
           setBraveKeyMasked(cfg.braveSearchKeyMasked || ''); 
-
         })
+        .catch(() => {});
+      fetch('/api/admin/backup/s3/config', { headers: { 'X-Admin-Secret': 'et-admin-2024' } })
+        .then(res => res.json())
+        .then(cfg => { if (cfg && !cfg.error) setS3Config(cfg); })
         .catch(() => {});
       handleRedisCheck();
     }

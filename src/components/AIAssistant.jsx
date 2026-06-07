@@ -107,22 +107,26 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
       }
       
       if (drinkToDelete && onDeleteDrink) {
-        // Find the log id that matches the name closely
-        const match = logs.find(l => l.name.toLowerCase().includes(drinkToDelete.name.toLowerCase()));
+        // Find the log id exactly
+        const match = logs.find(l => String(l.id) === String(drinkToDelete.id));
         if (match) {
           await onDeleteDrink(match.id);
+        } else {
+          setError('Zu löschendes Getränk (ID) nicht gefunden.');
         }
       }
       
       if (drinkToUpdate && onUpdateDrink) {
-        const match = logs.find(l => l.name.toLowerCase().includes(drinkToUpdate.name.toLowerCase()));
+        const match = logs.find(l => String(l.id) === String(drinkToUpdate.id));
         if (match) {
           await onUpdateDrink(match.id, {
-            name: drinkToUpdate.new_name || match.name,
-            size: drinkToUpdate.new_size ? Number(drinkToUpdate.new_size) : match.size,
-            caffeine: drinkToUpdate.new_caffeine ? Number(drinkToUpdate.new_caffeine) : match.caffeine,
+            name: drinkToUpdate.name || match.name,
+            size: drinkToUpdate.size ? Number(drinkToUpdate.size) : match.size,
+            caffeine: drinkToUpdate.caffeine ? Number(drinkToUpdate.caffeine) : match.caffeine,
             icon: drinkToUpdate.icon || match.icon
           });
+        } else {
+          setError('Zu aktualisierendes Getränk (ID) nicht gefunden.');
         }
       }
 } catch (err) {

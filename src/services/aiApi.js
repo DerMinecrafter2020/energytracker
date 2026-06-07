@@ -1,10 +1,10 @@
-﻿const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
-export const sendAiChat = async ({ messages, totalCaffeineToday, dailyLimit }) => {
+export const sendAiChat = async ({ messages, totalCaffeineToday, dailyLimit, logs }) => {
   const res = await fetch(`${API_BASE}/api/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, totalCaffeineToday, dailyLimit, clientTime: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) }),
+    body: JSON.stringify({ messages, totalCaffeineToday, dailyLimit, logs, clientTime: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'AI-Fehler');
