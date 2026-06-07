@@ -33,11 +33,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
   const [error, setError] = useState('');
   const scrollContainerRef = useRef(null);
 
-  // Daily Summary State
-  const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState('');
-  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     if (scrollContainerRef.current) {
@@ -55,15 +51,27 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
 
   const handleFetchSummary = async () => {
     setSummaryLoading(true);
-    setSummaryError('');
-    setShowSummary(true);
+    setLoading(true);
+    
+    const userMsg = { role: 'user', type: 'text', content: 'Erstelle eine KI-Tagesauswertung meines Koffeinkonsums.' };
+    setMessages(prev => [...prev, userMsg]);
+
     try {
       const data = await fetchDailySummary({ logs, totalCaffeine: totalCaffeineToday, dailyLimit: DAILY_LIMIT });
-      setSummary(data);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        type: 'daily_summary', 
+        summary: data.summary 
+      }]);
     } catch (err) {
-      setSummaryError(err.message);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        type: 'text', 
+        content: `Fehler bei der Auswertung: ${err.message}` 
+      }]);
     } finally {
       setSummaryLoading(false);
+      setLoading(false);
     }
   };
 
@@ -228,39 +236,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
         </button>
       </div>
 
-      {/* Daily Summary Panel */}
-      {showSummary && (
-        <div className="bg-violet-900/20 border-b border-white/5 p-4 shrink-0 animate-fade-in relative">
-          <button onClick={() => setShowSummary(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-            <ChevronUp className="w-5 h-5" />
-          </button>
-          
-          <div className="flex items-center gap-2 mb-3">
-            <Activity className="w-4 h-4 text-violet-400" />
-            <h3 className="text-sm font-bold text-white">Aktuelle Auswertung</h3>
-          </div>
-          
-          {summaryError && (
-            <div className="text-sm text-red-400 bg-red-500/10 rounded-xl p-3 flex justify-between items-center">
-              <span>{summaryError}</span>
-              <button onClick={handleFetchSummary} className="underline font-medium">Erneut</button>
-            </div>
-          )}
-          
-          {summary && !summaryError && (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
-                {summary.summary.replace(/^#+\s*/gm, '').replace(/\*\*/g, '')}
-              </p>
-              <div className="flex justify-end">
-                <button onClick={handleFetchSummary} className="text-xs flex items-center gap-1 text-violet-400 hover:text-violet-300 transition-colors">
-                  <RefreshCw className="w-3 h-3" /> Aktualisieren
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm custom-scrollbar bg-black/10" ref={scrollContainerRef}>
@@ -289,6 +265,21 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (msg.type === 'daily_summary' && msg.summary) {
+            return (
+              <div key={i} className="flex justify-start w-full animate-fade-in">
+                <div className="bg-gradient-to-br from-violet-600/20 to-purple-600/20 border border-violet-500/30 rounded-2xl p-5 max-w-[90%] sm:max-w-[85%] shadow-sm">
+                  <div className="text-sm font-bold text-violet-300 mb-3 flex items-center gap-2">
+                    <Activity className="w-4 h-4" /> Deine KI-Tagesauswertung
+                  </div>
+                  <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                    {msg.summary.replace(/^#+\s*/gm, '').replace(/\*\*/g, '')}
                   </div>
                 </div>
               </div>
