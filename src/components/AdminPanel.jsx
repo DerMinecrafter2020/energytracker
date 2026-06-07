@@ -4,7 +4,7 @@ import {
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
   Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle, Globe,
-  CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash,
+  CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash, Edit3,
 } from 'lucide-react';
 import { logout } from '../services/auth';
 import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
