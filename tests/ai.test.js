@@ -36,6 +36,6 @@ test('AI Chat sendet Logs und verarbeitet Request korrekt bis zum API-Key Fehler
   } else {
     // Falls ein Key gesetzt ist und OpenRouter antwortet
     assert.strictEqual(res.status, 200);
-    assert.ok(data.reply);
+    assert.ok(data.content !== undefined || data.tool_calls !== undefined);
   }
 });

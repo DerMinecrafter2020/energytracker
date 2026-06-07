@@ -645,12 +645,15 @@ const saveAiConfig = (cfg) => {
   persistDbState();
 };
 
-const callOpenRouter = async (messages, { model, apiKey } = {}) => {
+const callOpenRouter = async (messages, { model, apiKey, tools } = {}) => {
   const cfg = loadAiConfig();
   const key = apiKey || cfg.apiKey;
   const mdl = model || cfg.model || 'deepseek/deepseek-v3';
 
   if (!key) throw new Error('Kein OpenRouter API-Key konfiguriert. Bitte im Admin-Panel eintragen.');
+
+  const payload = { model: mdl, messages };
+  if (tools && tools.length > 0) payload.tools = tools;
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -660,7 +663,7 @@ const callOpenRouter = async (messages, { model, apiKey } = {}) => {
       'HTTP-Referer': 'https://github.com/DerMinecrafter2020/energytracker',
       'X-Title': 'Koffein-Tracker',
     },
-    body: JSON.stringify({ model: mdl, messages }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(120000),
   });
 
@@ -670,7 +673,8 @@ const callOpenRouter = async (messages, { model, apiKey } = {}) => {
   }
 
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || '';
+  const msg = data.choices?.[0]?.message;
+  return { content: msg?.content || '', tool_calls: msg?.tool_calls || [] };
 };
 
 const OFF_SEARCH_URL     = 'https://world.openfoodfacts.org/cgi/search.pl';
@@ -2746,48 +2750,68 @@ app.post('/api/ai/chat', async (req, res) => {
     const systemPrompt = `Du bist ein hilfreicher Assistent für den Drink-Tracker (Version 2.0). Du beantwortest Fragen zu Hydration, Kalorien, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo}
 ${logsInfo}
 
-Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, antworte ganz normal und hänge GANZ AM ENDE deiner Antwort EINEN exakten JSON-Block an.
-Beispiele für den JSON-Block:
-
-Für Hinzufügen (berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy):
-\`\`\`json
-{
-  "action": "ADD_DRINK",
-  "name": "Name des Getränks",
-  "size": 500,
-  "caffeine": 160,
-  "icon": "🥤"
-}
-\`\`\`
-
-Für Löschen (nutze exakt die ID aus der Liste der heutigen Getränke):
-\`\`\`json
-{
-  "action": "DELETE_DRINK",
-  "id": 123
-}
-\`\`\`
-
-Für Ändern (gib die ID des zu ändernden Getränks an und fülle die neuen Werte aus):
-\`\`\`json
-{
-  "action": "UPDATE_DRINK",
-  "id": 123,
-  "name": "Neuer Name",
-  "size": 330,
-  "caffeine": 105,
-  "icon": "🧊"
-}
-\`\`\`
-Lass den JSON-Block komplett weg, wenn keine dieser Aktionen gewünscht ist.`.trim();
+Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, nutze die zur Verfügung gestellten Tools (Funktionen), um die Aktion auszuführen.
+Für Hinzufügen (add_drink): Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks. Nutze ein passendes Emoji.
+Für Ändern/Löschen (update_drink/delete_drink): Nutze exakt die ID aus der Liste der heutigen Getränke.
+Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.`.trim();
 
     const fullMessages = [
       { role: 'system', content: systemPrompt },
       ...messages,
     ];
 
-    const reply = await callOpenRouter(fullMessages);
-    res.json({ reply });
+    const tools = [
+      {
+        type: "function",
+        function: {
+          name: "add_drink",
+          description: "Fügt ein neues Getränk zum heutigen Log hinzu.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Name des Getränks" },
+              size: { type: "number", description: "Menge in ml" },
+              caffeine: { type: "number", description: "Gesamtes Koffein in mg" },
+              icon: { type: "string", description: "Passendes Emoji für das Getränk" }
+            },
+            required: ["name", "size", "caffeine"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "delete_drink",
+          description: "Löscht ein Getränk aus dem heutigen Log anhand der ID.",
+          parameters: {
+            type: "object",
+            properties: { id: { type: "number", description: "ID des zu löschenden Getränks" } },
+            required: ["id"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "update_drink",
+          description: "Aktualisiert ein Getränk im heutigen Log anhand der ID.",
+          parameters: {
+            type: "object",
+            properties: {
+              id: { type: "number", description: "ID des Getränks" },
+              name: { type: "string", description: "Neuer Name" },
+              size: { type: "number", description: "Neue Menge in ml" },
+              caffeine: { type: "number", description: "Neues Koffein in mg" },
+              icon: { type: "string", description: "Neues Emoji" }
+            },
+            required: ["id"]
+          }
+        }
+      }
+    ];
+
+    const reply = await callOpenRouter(fullMessages, { tools });
+    res.json(reply); // reply is already { content, tool_calls }
   } catch (err) {
     console.error('[AI Chat] Fehler:', err.message);
     res.status(500).json({ error: err.message });

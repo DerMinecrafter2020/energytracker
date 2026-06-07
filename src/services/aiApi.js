@@ -8,7 +8,7 @@ export const sendAiChat = async ({ messages, totalCaffeineToday, dailyLimit, log
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'AI-Fehler');
-  return data.reply;
+  return data;
 };
 
 export const recognizeDrink = async (description) => {

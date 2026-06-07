@@ -59,77 +59,77 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
 
     try {
       const history = [...messages.slice(1), userMsg].map(({ role, content }) => ({ role, content }));
-      let reply = await sendAiChat({
+      let { content: reply, tool_calls } = await sendAiChat({
         messages: history,
         totalCaffeineToday,
         logs,
         dailyLimit: DAILY_LIMIT,
       });
 
-      
-      let drinkToAdd = null;
-      let drinkToDelete = null;
-      let drinkToUpdate = null;
-      
-      const jsonMatch = reply.match(/```json\s*([\s\S]*?)\s*```/);
-      
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[1]);
-          if (parsed.action === 'ADD_DRINK') {
-            drinkToAdd = parsed;
-          } else if (parsed.action === 'DELETE_DRINK') {
-            drinkToDelete = parsed;
-          } else if (parsed.action === 'UPDATE_DRINK') {
-            drinkToUpdate = parsed;
+      let actionsPerformed = [];
+
+      if (tool_calls && tool_calls.length > 0) {
+        for (const call of tool_calls) {
+          if (call.function.name === 'add_drink') {
+            try {
+              const args = JSON.parse(call.function.arguments);
+              if (onAddDrink) {
+                await onAddDrink({
+                  name: args.name || 'AI Drink',
+                  size: Number(args.size) || 0,
+                  caffeine: Number(args.caffeine) || 0,
+                  icon: args.icon || '🤖'
+                });
+              }
+              actionsPerformed.push('Getränk hinzugefügt.');
+            } catch (e) {
+              console.error('Fehler beim Ausführen von add_drink', e);
+            }
+          } else if (call.function.name === 'delete_drink') {
+            try {
+              const args = JSON.parse(call.function.arguments);
+              if (onDeleteDrink) {
+                const match = logs.find(l => String(l.id) === String(args.id));
+                if (match) {
+                  await onDeleteDrink(match.id);
+                  actionsPerformed.push('Getränk gelöscht.');
+                } else {
+                  setError('Zu löschendes Getränk (ID) nicht gefunden.');
+                }
+              }
+            } catch (e) {
+              console.error('Fehler beim Ausführen von delete_drink', e);
+            }
+          } else if (call.function.name === 'update_drink') {
+            try {
+              const args = JSON.parse(call.function.arguments);
+              if (onUpdateDrink) {
+                const match = logs.find(l => String(l.id) === String(args.id));
+                if (match) {
+                  await onUpdateDrink(match.id, {
+                    name: args.name || match.name,
+                    size: args.size ? Number(args.size) : match.size,
+                    caffeine: args.caffeine ? Number(args.caffeine) : match.caffeine,
+                    icon: args.icon || match.icon
+                  });
+                  actionsPerformed.push('Getränk aktualisiert.');
+                } else {
+                  setError('Zu aktualisierendes Getränk (ID) nicht gefunden.');
+                }
+              }
+            } catch (e) {
+              console.error('Fehler beim Ausführen von update_drink', e);
+            }
           }
-        } catch (e) {
-          console.error('Fehler beim Parsen der AI JSON-Antwort', e);
         }
-        reply = reply.replace(/```json\s*([\s\S]*?)\s*```/, '').trim();
       }
 
-      if (!reply && jsonMatch) {
-        if (drinkToAdd) reply = 'Getränk hinzugefügt.';
-        if (drinkToDelete) reply = 'Getränk gelöscht.';
-        if (drinkToUpdate) reply = 'Getränk aktualisiert.';
+      if (!reply && actionsPerformed.length > 0) {
+        reply = actionsPerformed.join(' ');
       }
       
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
-
-      if (drinkToAdd && onAddDrink) {
-        await onAddDrink({
-          name: drinkToAdd.name || 'AI Drink',
-          size: Number(drinkToAdd.size) || 0,
-          caffeine: Number(drinkToAdd.caffeine) || 0,
-          icon: drinkToAdd.icon || '🤖'
-        });
-      }
-      
-      if (drinkToDelete && onDeleteDrink) {
-        // Find the log id exactly
-        const match = logs.find(l => String(l.id) === String(drinkToDelete.id));
-        if (match) {
-          await onDeleteDrink(match.id);
-        } else {
-          setError('Zu löschendes Getränk (ID) nicht gefunden.');
-        }
-      }
-      
-      if (drinkToUpdate && onUpdateDrink) {
-        const match = logs.find(l => String(l.id) === String(drinkToUpdate.id));
-        if (match) {
-          await onUpdateDrink(match.id, {
-            name: drinkToUpdate.name || match.name,
-            size: drinkToUpdate.size ? Number(drinkToUpdate.size) : match.size,
-            caffeine: drinkToUpdate.caffeine ? Number(drinkToUpdate.caffeine) : match.caffeine,
-            icon: drinkToUpdate.icon || match.icon
-          });
-        } else {
-          setError('Zu aktualisierendes Getränk (ID) nicht gefunden.');
-        }
-      }
-} catch (err) {
+    } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
