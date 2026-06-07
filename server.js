@@ -1,7 +1,3 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { exec } from 'child_process';
-import util from 'util';
-const execAsync = util.promisify(exec);
 import express from 'express';
 import cors from 'cors';
 
@@ -192,12 +188,9 @@ const REDIS_KEYS = {
   user_settings: 'koffein:user_settings',
   custom_drinks: 'koffein:custom_drinks',
   app_name:      'koffein:app_name',
-  s3_config:     'koffein:s3_config',
 };
 
 let dbState = {
-  s3_config: { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' },
-  update_webhook: '',
   appName: 'Drink-Tracker',
   caffeine_logs: [],
   users: [],
@@ -224,7 +217,7 @@ const loadDbState = async () => {
       return;
     }
 
-    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, appName, s3] = await redis.mget(
+    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, appName] = await redis.mget(
       REDIS_KEYS.caffeine_logs,
       REDIS_KEYS.users,
       REDIS_KEYS.smtp_settings,
@@ -235,7 +228,6 @@ const loadDbState = async () => {
       REDIS_KEYS.user_settings,
       REDIS_KEYS.custom_drinks,
       REDIS_KEYS.app_name,
-      REDIS_KEYS.s3_config,
     );
     const parsedAi = safeParse(ai, {});
     dbState = {
@@ -253,7 +245,6 @@ const loadDbState = async () => {
       user_settings: safeParse(settings, []),
       custom_drinks: safeParse(drinks, []),
       appName:       appName || 'Drink-Tracker',
-      s3_config:     safeParse(s3, { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' }),
     };
   } catch (err) {
     console.error('[DB] Redis Ladefehler:', err.message);
@@ -272,7 +263,6 @@ const persistDbState = () => {
     REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
     REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
     REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
-    REDIS_KEYS.s3_config,      JSON.stringify(dbState.s3_config),
   ).catch((err) => console.error('[DB] Redis Speicherfehler:', err.message));
 };
 
@@ -615,21 +605,7 @@ const initDb = async () => {
   console.log(`[DB] ✓ Redis bereit: ${redisUrl}`);
 };
 
-// ── S3 Config helpers ─────────────────────────────────────────────────────────
-const loadS3Config = () => {
-  return dbState.s3_config || { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' };
-};
 
-const saveS3Config = (cfg) => {
-  dbState.s3_config = {
-    endpoint: String(cfg.endpoint || '').trim(),
-    region: String(cfg.region || '').trim(),
-    bucket: String(cfg.bucket || '').trim(),
-    accessKeyId: String(cfg.accessKeyId || '').trim(),
-    secretAccessKey: String(cfg.secretAccessKey || '').trim(),
-  };
-  persistDbState();
-};
 
 // ── AI / OpenRouter helpers ───────────────────────────────────────────────────
 const loadAiConfig = () => {
@@ -1533,90 +1509,7 @@ app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
 });
 
 
-// ── Admin S3 Backup Route ─────────────────────────────────────────────────────
-app.get('/api/admin/backup/s3/config', requireAdmin, async (req, res) => {
-  try {
-    const cfg = loadS3Config();
-    res.json({ ...cfg, secretAccessKey: cfg.secretAccessKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '' });
-  } catch (err) {
-    res.status(500).json({ error: 'Database error' });
-  }
-});
 
-app.post('/api/admin/backup/s3/config', requireAdmin, async (req, res) => {
-  try {
-    const prev = loadS3Config();
-    const cfg = req.body || {};
-    if (cfg.secretAccessKey === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022') {
-      cfg.secretAccessKey = prev.secretAccessKey;
-    }
-    saveS3Config(cfg);
-    res.json({ success: true, message: 'S3 Konfiguration gespeichert.' });
-  } catch (err) {
-    console.error('S3 Config Save Error:', err);
-    res.status(500).json({ error: 'Fehler beim Speichern der S3 Config: ' + err.message });
-  }
-});
-
-app.post('/api/admin/backup/s3', requireAdmin, async (req, res) => {
-  try {
-    const cfg = loadS3Config();
-    const bucket = cfg.bucket || process.env.AWS_S3_BUCKET;
-    const region = cfg.region || process.env.AWS_REGION || 'eu-central-1';
-    
-    if (!bucket) {
-      return res.status(400).json({ error: 'S3 Bucket ist nicht konfiguriert (AWS_S3_BUCKET).' });
-    }
-
-    const s3Options = { region };
-    if (cfg.endpoint) {
-      s3Options.endpoint = cfg.endpoint;
-      s3Options.forcePathStyle = true; 
-    }
-    if (cfg.accessKeyId && cfg.secretAccessKey) {
-      s3Options.credentials = {
-        accessKeyId: cfg.accessKeyId,
-        secretAccessKey: cfg.secretAccessKey,
-      };
-    }
-
-    const s3Client = new S3Client(s3Options);
-    const backupData = JSON.stringify(dbState, null, 2);
-    const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
-    const key = `backup-${dateStr}.json`;
-
-    const command = new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: backupData,
-      ContentType: 'application/json',
-    });
-
-    await s3Client.send(command);
-    res.json({ success: true, message: `Backup erfolgreich hochgeladen: ${key}` });
-  } catch (err) {
-    console.error('S3 Backup Error:', err);
-    res.status(500).json({ error: 'Fehler beim S3 Backup: ' + err.message });
-  }
-});
-
-// ── Admin Update Route ────────────────────────────────────────────────────────
-app.post('/api/admin/update', requireAdmin, async (req, res) => {
-  try {
-    const scriptPath = path.join(__dirname, 'deploy.sh');
-    if (fs.existsSync(scriptPath)) {
-      // Execute the deploy.sh script
-      const { stdout, stderr } = await execAsync('bash ' + scriptPath);
-      res.json({ success: true, message: 'Update gestartet. Log: ' + stdout });
-    } else {
-      // Mock update if script doesn't exist
-      res.json({ success: true, message: 'Mock-Update erfolgreich (deploy.sh nicht gefunden).' });
-    }
-  } catch (err) {
-    console.error('Update Error:', err);
-    res.status(500).json({ error: 'Fehler beim Update: ' + err.message });
-  }
-});
 
 
 // ── User Management Routes ────────────────────────────────────────────────────

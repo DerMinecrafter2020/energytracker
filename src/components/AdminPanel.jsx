@@ -73,39 +73,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [editLogData, setEditLogData] = useState({ name: '', size: 0, caffeine: 0, icon: '' });
   const [editLogSaving, setEditLogSaving] = useState(false);
   
-  // S3 Backup state
-  const defaultS3 = { endpoint: '', region: '', bucket: '', accessKeyId: '', secretAccessKey: '' };
-  const [s3Config, setS3Config] = useState(defaultS3);
-  const [s3Saving, setS3Saving] = useState(false);
-
-  const handleS3Change = (field, value) => {
-    setS3Config(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleS3Save = async () => {
-    setS3Saving(true);
-    try {
-      const res = await fetch('/api/admin/backup/s3/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Secret': 'et-admin-2024'
-        },
-        body: JSON.stringify(s3Config)
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-         setSmtpMsg({ type: 'success', text: 'S3 Konfiguration gespeichert.' });
-      } else {
-         setSmtpMsg({ type: 'error', text: 'Fehler beim Speichern der S3 Konfig: ' + (data.error || 'Unknown') });
-      }
-    } catch (err) {
-      setSmtpMsg({ type: 'error', text: err.message });
-    } finally {
-      setS3Saving(false);
-    }
-  };
-
 
 
   // â”€â”€ SMTP state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -161,11 +128,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           setBraveKeyMasked(cfg.braveSearchKeyMasked || ''); 
         })
         .catch(() => {});
-      fetch('/api/admin/backup/s3/config', { headers: { 'X-Admin-Secret': 'et-admin-2024' } })
-        .then(res => res.json())
-        .then(cfg => { if (cfg && !cfg.error) setS3Config(cfg); })
-        .catch(() => {});
-      handleRedisCheck();
+
     }
     if (activeTab === 'users') loadRegUsers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -567,48 +530,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           <div className="animate-fade-in space-y-6 pb-10">
 
             {/* System Actions */}
-            <div className="glass-card rounded-2xl p-6 flex flex-col sm:flex-row gap-4 justify-between items-center bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/20 mb-6">
-              <div>
-                <h2 className="font-semibold text-white text-lg">Systemverwaltung</h2>
-                <p className="text-sm text-slate-400">Backups und Updates durchführen</p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={async () => {
-                    try {
-                      alert('Starte S3 Backup...');
-                      const res = await fetch('/api/admin/backup/s3', { method: 'POST' });
-                      const data = await res.json();
-                      if (data.success) alert('Backup erfolgreich auf S3 hochgeladen.');
-                      else alert('Fehler: ' + data.error);
-                    } catch (e) {
-                      alert('Fehler: ' + e.message);
-                    }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
-                >
-                  <Database className="w-4 h-4" />
-                  S3 Backup
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      alert('Überprüfe auf Updates...');
-                      const res = await fetch('/api/admin/update', { method: 'POST' });
-                      const data = await res.json();
-                      if (data.success) alert(data.message || 'Update erfolgreich.');
-                      else alert('Fehler: ' + data.error);
-                    } catch (e) {
-                      alert('Fehler: ' + e.message);
-                    }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Update
-                </button>
-              </div>
-            </div>
+
 
             {/* Stats grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -1206,64 +1128,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               </button>
             </div>
 
-            
-            {/* S3 config card */}
-            <div className="glass-card rounded-2xl p-6 space-y-5">
-              <h2 className="font-semibold text-white flex items-center gap-2">
-                <Database className="w-5 h-5 text-blue-400" />
-                S3 Backup Konfiguration
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Endpoint URL (Optional für MinIO etc.)</label>
-                  <input type="text" value={s3Config.endpoint} onChange={e => handleS3Change('endpoint', e.target.value)} placeholder="https://minio.example.com" className="input-dark w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Region</label>
-                  <input type="text" value={s3Config.region} onChange={e => handleS3Change('region', e.target.value)} placeholder="eu-central-1" className="input-dark w-full" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Bucket Name</label>
-                <input type="text" value={s3Config.bucket} onChange={e => handleS3Change('bucket', e.target.value)} placeholder="my-backups" className="input-dark w-full" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Access Key ID</label>
-                  <input type="text" value={s3Config.accessKeyId} onChange={e => handleS3Change('accessKeyId', e.target.value)} className="input-dark w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Secret Access Key</label>
-                  <input type="password" value={s3Config.secretAccessKey} onChange={e => handleS3Change('secretAccessKey', e.target.value)} className="input-dark w-full" />
-                </div>
-              </div>
-
-              <button onClick={handleS3Save} disabled={s3Saving} className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:opacity-60 transition-all shadow-glow-blue flex items-center justify-center gap-2">
-                {s3Saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Database className="w-4 h-4" />}
-                S3 Konfiguration speichern
-              </button>
-            </div>
-
-            {/* Update Webhook config card */}
-            <div className="glass-card rounded-2xl p-6 space-y-5">
-              <h2 className="font-semibold text-white flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-purple-400" />
-                Docker Update Webhook (Watchtower / Portainer)
-              </h2>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Webhook URL</label>
-                <input type="text" value={updateWebhook} onChange={e => setUpdateWebhook(e.target.value)} placeholder="http://watchtower:8080/v1/update" className="input-dark w-full" />
-              </div>
-
-              <button onClick={handleWebhookSave} disabled={webhookSaving} className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 disabled:opacity-60 transition-all shadow-glow-purple flex items-center justify-center gap-2">
-                {webhookSaving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Webhook URL speichern
-              </button>
-            </div>
 
             {/* Registration toggle card */}
             <div className="glass-card rounded-2xl p-6">
