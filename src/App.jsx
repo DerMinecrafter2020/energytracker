@@ -14,6 +14,7 @@ import WarningAlert from './components/WarningAlert';
 import {
   fetchTodayStats,
   fetchUserSettings,
+  updateLog,
 } from './services/api';
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
@@ -43,7 +44,7 @@ function App() {
   const [session, setSession]     = useState(() => getSession());
   const [publicSettings, setPublicSettings] = useState({ authMode: 'local', setupRequired: false });
   const [authView, setAuthView]   = useState(initialViewState.authView || 'login'); 
-  const [adminView, setAdminView] = useState(initialViewState.adminView || 'admin'); 
+  const [adminView, setAdminView] = useState('admin'); 
   const [adminTab, setAdminTab]   = useState(initialViewState.adminTab || 'overview');
 
   const impersonator = getImpersonatorSession();
@@ -55,8 +56,8 @@ function App() {
 
   useEffect(() => {
     const current = loadViewState();
-    saveViewState({ ...current, authView, adminView, adminTab });
-  }, [authView, adminView, adminTab]);
+    saveViewState({ ...current, authView, adminTab });
+  }, [authView, adminTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -90,7 +91,7 @@ function App() {
     return <RegisterPage onBack={() => setAuthView('login')} />;
   }
   if (!session) {
-    return <LoginPage onLogin={(s) => setSession(s)} onShowRegister={() => setAuthView('register')} />;
+    return <LoginPage onLogin={(s) => { setSession(s); setAdminView('admin'); }} onShowRegister={() => setAuthView('register')} />;
   }
 
   if (session.role === 'admin' && adminView === 'admin') {
@@ -259,10 +260,15 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   
   const handleUpdateLog = async (logId, data) => {
     try {
-      const updated = await api.updateLog(logId, data);
+      const updated = await updateLog(logId, data);
       setLogs(prev => prev.map(l => l.id === logId ? { ...l, ...updated } : l));
-      const total = await api.getDailyTotal();
-      setTotalCaffeineToday(total.totalCaffeine);
+      if (session?.email) {
+        const stats = await fetchTodayStats({
+          userId: session?.id || null,
+          email: session?.email,
+        });
+        setTodayStats(stats);
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -270,8 +276,15 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   
   const handleDeleteLog = async (logId) => {
     try {
-      await api.deleteLog(logId);
+      await removeLog(logId);
       setLogs(prev => prev.filter(l => l.id !== logId));
+      if (session?.email) {
+        const stats = await fetchTodayStats({
+          userId: session?.id || null,
+          email: session?.email,
+        });
+        setTodayStats(stats);
+      }
     } catch (err) {
       setError(err.message);
     }
