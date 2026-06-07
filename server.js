@@ -188,6 +188,7 @@ const REDIS_KEYS = {
   user_settings: 'koffein:user_settings',
   custom_drinks: 'koffein:custom_drinks',
   app_name:      'koffein:app_name',
+  discord_schedules: 'koffein:discord_schedules',
 };
 
 let dbState = {
@@ -201,6 +202,7 @@ let dbState = {
   ai_config: { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '' },
   user_settings: [], // [{userId/email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid}]
   custom_drinks: [], // [{id, ownerKey, name, size, caffeine, icon}]
+  discord_schedules: [], // [{id, time, message, sent, date}]
 };
 
 const safeParse = (s, fallback) => {
@@ -217,7 +219,7 @@ const loadDbState = async () => {
       return;
     }
 
-    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, appName] = await redis.mget(
+    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, appName, discordSchedules] = await redis.mget(
       REDIS_KEYS.caffeine_logs,
       REDIS_KEYS.users,
       REDIS_KEYS.smtp_settings,
@@ -228,6 +230,7 @@ const loadDbState = async () => {
       REDIS_KEYS.user_settings,
       REDIS_KEYS.custom_drinks,
       REDIS_KEYS.app_name,
+      REDIS_KEYS.discord_schedules,
     );
     const parsedAi = safeParse(ai, {});
     dbState = {
@@ -244,7 +247,7 @@ const loadDbState = async () => {
       },
       user_settings: safeParse(settings, []),
       custom_drinks: safeParse(drinks, []),
-      appName:       appName || 'Drink-Tracker',
+      discord_schedules: safeParse(discordSchedules, []),
     };
   } catch (err) {
     console.error('[DB] Redis Ladefehler:', err.message);
@@ -263,6 +266,7 @@ const persistDbState = () => {
     REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
     REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
     REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
+    REDIS_KEYS.discord_schedules, JSON.stringify(dbState.discord_schedules),
   ).catch((err) => console.error('[DB] Redis Speicherfehler:', err.message));
 };
 
@@ -1183,38 +1187,68 @@ const sendDiscordReminder = async ({ webhookUrl, email, title, message }) => {
 };
 
 const processRemindersTick = async () => {
-  if (!Array.isArray(dbState.reminders) || dbState.reminders.length === 0) return;
-
   const now = new Date();
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const today = now.toISOString().slice(0, 10);
   const cfg = await loadSmtpConfig();
+  let stateChanged = false;
 
-  for (const reminder of dbState.reminders) {
-    const normalized = sanitizeReminder(reminder);
-    if (!normalized.enabled) continue;
-    if (normalized.time !== hhmm) continue;
-    if (normalized.lastTriggeredDate === today) continue;
+  // 1. Regular Reminders
+  if (Array.isArray(dbState.reminders) && dbState.reminders.length > 0) {
+    for (const reminder of dbState.reminders) {
+      const normalized = sanitizeReminder(reminder);
+      if (!normalized.enabled) continue;
+      if (normalized.time !== hhmm) continue;
+      if (normalized.lastTriggeredDate === today) continue;
 
-    try {
-      // E-Mail Adresse sicher aus den aktuellen Benutzerdaten auslesen
-      const user = dbState.users.find(u => (reminder.userId && String(u.id) === String(reminder.userId)) || (reminder.email && String(u.email).toLowerCase() === String(reminder.email).toLowerCase()));
-      const targetEmail = user?.email || reminder.email;
+      try {
+        const user = dbState.users.find(u => (reminder.userId && String(u.id) === String(reminder.userId)) || (reminder.email && String(u.email).toLowerCase() === String(reminder.email).toLowerCase()));
+        const targetEmail = user?.email || reminder.email;
 
-      if (normalized.mailEnabled) {
-        await sendReminderEmail({ to: targetEmail });
+        if (normalized.mailEnabled) {
+          await sendReminderEmail({ to: targetEmail });
+        }
+        if (normalized.discordEnabled && cfg.discordWebhook) {
+          await sendDiscordReminder({ webhookUrl: cfg.discordWebhook, email: targetEmail });
+        }
+
+        reminder.lastTriggeredDate = today;
+        reminder.updatedAt = new Date().toISOString();
+        stateChanged = true;
+        console.log(`[Reminder] Gesendet an ${reminder.email} (${normalized.time})`);
+      } catch (err) {
+        console.error(`[Reminder] Fehler für ${reminder.email}:`, err.message);
       }
-      if (normalized.discordEnabled && cfg.discordWebhook) {
-        await sendDiscordReminder({ webhookUrl: cfg.discordWebhook, email: targetEmail });
-      }
-
-      reminder.lastTriggeredDate = today;
-      reminder.updatedAt = new Date().toISOString();
-      persistDbState();
-      console.log(`[Reminder] Gesendet an ${reminder.email} (${normalized.time})`);
-    } catch (err) {
-      console.error(`[Reminder] Fehler für ${reminder.email}:`, err.message);
     }
+  }
+
+  // 2. Scheduled AI Discord Messages
+  if (Array.isArray(dbState.discord_schedules) && dbState.discord_schedules.length > 0) {
+    for (let i = 0; i < dbState.discord_schedules.length; i++) {
+      const sched = dbState.discord_schedules[i];
+      if (!sched.sent && sched.time === hhmm) {
+        try {
+          if (cfg && cfg.discordWebhook) {
+            await sendDiscordReminder({ 
+              webhookUrl: cfg.discordWebhook, 
+              title: "KI-Assistent", 
+              message: sched.message 
+            });
+            console.log(`[Discord Schedule] Gesendet (${sched.time})`);
+          } else {
+            console.log(`[Discord Schedule] Übersprungen (${sched.time}): Kein Webhook hinterlegt.`);
+          }
+          sched.sent = true;
+          stateChanged = true;
+        } catch(err) {
+          console.error(`[Discord Schedule] Fehler:`, err.message);
+        }
+      }
+    }
+  }
+
+  if (stateChanged) {
+    persistDbState();
   }
 };
 
@@ -2646,6 +2680,7 @@ ${logsInfo}
 Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, nutze die zur Verfügung gestellten Tools (Funktionen), um die Aktion auszuführen.
 Für Hinzufügen (add_drink): Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks. Nutze ein passendes Emoji.
 Für Ändern/Löschen (update_drink/delete_drink): Nutze exakt die ID aus der Liste der heutigen Getränke.
+Für geplante Discord-Nachrichten (schedule_discord_message): Nutze dieses Tool, um eine Nachricht zu einer bestimmten Uhrzeit in Discord (Admin Webhook) posten zu lassen.
 Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.`.trim();
 
     const fullMessages = [
@@ -2700,6 +2735,21 @@ Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.
             required: ["id"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "schedule_discord_message",
+          description: "Plant eine einmalige Nachricht an den Discord-Webhook für eine bestimmte Uhrzeit (Format HH:MM).",
+          parameters: {
+            type: "object",
+            properties: {
+              time: { type: "string", description: "Uhrzeit im Format HH:MM (z.B. 15:30)" },
+              message: { type: "string", description: "Die Nachricht, die gesendet werden soll" }
+            },
+            required: ["time", "message"]
+          }
+        }
       }
     ];
 
@@ -2707,6 +2757,34 @@ Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.
     res.json(reply); // reply is already { content, tool_calls }
   } catch (err) {
     console.error('[AI Chat] Fehler:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── AI Schedule Discord ──────────────────────────────────────────────────────
+app.post('/api/ai/schedule-discord', async (req, res) => {
+  try {
+    const { time, message } = req.body || {};
+    if (!time || !message) return res.status(400).json({ error: 'time und message werden benötigt.' });
+    if (!/^\d{2}:\d{2}$/.test(time)) return res.status(400).json({ error: 'time muss im Format HH:MM sein.' });
+    
+    if (!Array.isArray(dbState.discord_schedules)) {
+      dbState.discord_schedules = [];
+    }
+    
+    const id = Date.now();
+    dbState.discord_schedules.push({
+      id,
+      time,
+      message,
+      sent: false,
+      date: new Date().toISOString()
+    });
+    
+    persistDbState();
+    res.json({ success: true, id, time, message });
+  } catch (err) {
+    console.error('[AI Schedule Discord] Fehler:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

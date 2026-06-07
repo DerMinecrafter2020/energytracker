@@ -33,3 +33,13 @@ export const fetchDailySummary = async ({ logs, totalCaffeine, dailyLimit }) => 
   return data;
 };
 
+export const scheduleDiscordMessage = async (time, message) => {
+  const res = await fetch(`${API_BASE}/api/ai/schedule-discord`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ time, message }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'AI-Fehler');
+  return data;
+};

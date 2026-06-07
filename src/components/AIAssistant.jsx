@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Trash2, Brain, RefreshCw, Zap, Activity, ChevronDown, ChevronUp } from 'lucide-react';
-import { sendAiChat, fetchDailySummary } from '../services/aiApi';
+import { Send, Bot, Trash2, Brain, RefreshCw, Zap, Activity, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { sendAiChat, fetchDailySummary, scheduleDiscordMessage } from '../services/aiApi';
 
 const DAILY_LIMIT = 400;
 
@@ -148,6 +148,17 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
             } catch (e) {
               console.error('Fehler beim Ausführen von update_drink', e);
             }
+          } else if (call.function.name === 'schedule_discord_message') {
+            try {
+              const args = JSON.parse(call.function.arguments);
+              const data = await scheduleDiscordMessage(args.time, args.message);
+              if (data && data.success) {
+                actionsPerformed.push({ type: 'discord_scheduled', time: args.time, message: args.message });
+              }
+            } catch (e) {
+              console.error('Fehler beim Einplanen der Discord-Nachricht', e);
+              setError('Fehler beim Einplanen der Discord-Nachricht: ' + e.message);
+            }
           }
         }
       }
@@ -184,7 +195,11 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
   const handleDeleteAddedDrink = async (drinkId, index) => {
     if (onDeleteDrink) {
       await onDeleteDrink(drinkId);
-      setMessages(prev => prev.filter((_, i) => i !== index));
+      setMessages(prev => prev.map((msg, i) => 
+        i === index 
+          ? { role: 'assistant', type: 'text', content: `Getränk "${msg.drink?.name || ''}" wurde entfernt.` } 
+          : msg
+      ));
     }
   };
 
@@ -274,6 +289,23 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (msg.type === 'discord_scheduled' && msg.time && msg.message) {
+            return (
+              <div key={i} className="flex justify-start w-full animate-fade-in">
+                <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-2xl p-4 max-w-[85%] sm:max-w-[75%] shadow-sm">
+                  <div className="text-xs font-semibold text-blue-400 mb-2 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Discord-Nachricht geplant für {msg.time} Uhr
+                  </div>
+                  <div className="bg-black/20 rounded-xl p-3">
+                    <div className="text-sm text-slate-200 italic">
+                      "{msg.message}"
+                    </div>
                   </div>
                 </div>
               </div>
