@@ -2766,7 +2766,11 @@ app.post('/api/ai/schedule-discord', async (req, res) => {
   try {
     const { time, message } = req.body || {};
     if (!time || !message) return res.status(400).json({ error: 'time und message werden benötigt.' });
-    if (!/^\d{2}:\d{2}$/.test(time)) return res.status(400).json({ error: 'time muss im Format HH:MM sein.' });
+    
+    let timeMatch = String(time).match(/\d{1,2}:\d{2}/);
+    if (!timeMatch) return res.status(400).json({ error: 'time muss eine Uhrzeit im Format HH:MM enthalten.' });
+    
+    const formattedTime = timeMatch[0].padStart(5, '0');
     
     if (!Array.isArray(dbState.discord_schedules)) {
       dbState.discord_schedules = [];
@@ -2775,14 +2779,14 @@ app.post('/api/ai/schedule-discord', async (req, res) => {
     const id = Date.now();
     dbState.discord_schedules.push({
       id,
-      time,
+      time: formattedTime,
       message,
       sent: false,
       date: new Date().toISOString()
     });
     
     persistDbState();
-    res.json({ success: true, id, time, message });
+    res.json({ success: true, id, time: formattedTime, message });
   } catch (err) {
     console.error('[AI Schedule Discord] Fehler:', err.message);
     res.status(500).json({ error: err.message });
@@ -2963,7 +2967,7 @@ Bitte: 1) kurze Bewertung, 2) ob ich noch Koffein trinken sollte, 3) ein praktis
     ];
 
     const summary = await callOpenRouter(messages);
-    res.json({ summary, total, limit, remaining, percent });
+    res.json({ summary: summary?.content || 'Keine Antwort erhalten', total, limit, remaining, percent });
   } catch (err) {
     console.error('[AI Summary] Fehler:', err.message);
     res.status(500).json({ error: err.message });

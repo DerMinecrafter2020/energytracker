@@ -279,7 +279,7 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
                     <Activity className="w-4 h-4" /> Deine KI-Tagesauswertung
                   </div>
                   <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
-                    {msg.summary.replace(/^#+\s*/gm, '').replace(/\*\*/g, '')}
+                    {typeof msg.summary === 'string' ? msg.summary.replace(/^#+\s*/gm, '').replace(/\*\*/g, '') : (msg.summary?.content || JSON.stringify(msg.summary)).replace(/^#+\s*/gm, '').replace(/\*\*/g, '')}
                   </div>
                 </div>
               </div>
