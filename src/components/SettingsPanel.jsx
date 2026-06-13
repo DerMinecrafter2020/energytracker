@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Zap, Shield, KeyRound, Trash2, User, Mail, Lock } from 'lucide-react';
+import { Settings, Zap, Shield, KeyRound, Trash2, User, Mail, Lock, Moon } from 'lucide-react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import {
   fetchUserSettings,
@@ -75,6 +75,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
   
   const [settings, setSettings] = useState(null);
   const [localLimit, setLocalLimit] = useState('400');
+  const [sleepTime, setSleepTime] = useState('23:00');
   const [notifyAtLimit, setNotifyAtLimit] = useState(true);
   const [notifyLate, setNotifyLate] = useState(true);
   const [notifyRapid, setNotifyRapid] = useState(true);
@@ -119,6 +120,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         const data = await fetchUserSettings(payload);
         setSettings(data);
         setLocalLimit(String(data.dailyLimit || 400));
+        setSleepTime(data.sleepTime || '23:00');
         setNotifyAtLimit(data.notifyAtLimit !== false);
         setNotifyLate(data.notifyLate !== false);
         setNotifyRapid(data.notifyRapid !== false);
@@ -147,6 +149,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
       const dailyLimit = Math.max(0, Math.round(Number(localLimit) || 400));
       const updatedSettings = await updateUserSettings(userPayload(session, {
         dailyLimit,
+        sleepTime,
         notifyAtLimit,
         notifyLate,
         notifyRapid,
@@ -355,6 +358,25 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
           </p>
         </div>
 
+        {/* Sleep time */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            Schlafenszeit
+          </label>
+          <div className="relative">
+            <Moon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400/60" />
+            <input
+              type="time"
+              value={sleepTime}
+              onChange={(e) => setSleepTime(e.target.value)}
+              className="input-dark pl-10"
+            />
+          </div>
+          <p className="text-xs text-slate-500 mt-1.5">
+            Wird fuer Schlaf-Warnungen und die Koffein-Abbaukurve genutzt.
+          </p>
+        </div>
+
         {/* Notifications */}
         <div className="border-t border-white/10 pt-5">
           <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
@@ -528,5 +550,4 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     </div>
   );
 }
-
 

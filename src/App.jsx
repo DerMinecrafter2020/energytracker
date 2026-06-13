@@ -4,7 +4,14 @@ import ProgressBar from './components/ProgressBar';
 import ReminderSettings from './components/ReminderSettings';
 import AIAssistant from './components/AIAssistant';
 import CalendarWidget from './components/CalendarWidget';
+import CaffeineDecayChart from './components/CaffeineDecayChart';
+import GoalOverview from './components/GoalOverview';
 import DrinkHistory from './components/DrinkHistory';
+import FavoriteQuickActions from './components/FavoriteQuickActions';
+import PatternInsights from './components/PatternInsights';
+import AchievementsPanel from './components/AchievementsPanel';
+import ExportPanel from './components/ExportPanel';
+import CalendarSuggestions from './components/CalendarSuggestions';
 import LoginPage from './components/LoginPage';
 import { Zap, Loader2 } from 'lucide-react';
 import AdminPanel from './components/AdminPanel';
@@ -13,7 +20,12 @@ import SettingsPanel from './components/SettingsPanel';
 import WarningAlert from './components/WarningAlert';
 import {
   fetchTodayStats,
+  fetchStatsOverview,
+  fetchInsights,
   fetchUserSettings,
+  fetchFavorites,
+  addFavorite,
+  removeFavorite,
   updateLog,
 } from './services/api';
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
@@ -36,6 +48,12 @@ const formatDateLabel = (dateKey) => {
   const date = new Date(year, month - 1, day);
   return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
+const drinkKey = (drink) => [
+  String(drink?.name || '').toLowerCase().trim(),
+  Number(drink?.size || 0),
+  Number(drink?.caffeine || 0),
+  String(drink?.icon || '').trim(),
+].join('|');
 const VIEW_STATE_KEY = 'et:last-view-state';
 const userPayload = (session) => ({ userId: session?.id || null, email: session?.email });
 
@@ -152,7 +170,10 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [currentVersion, setCurrentVersion] = useState(null);
   const [latestVersion, setLatestVersion]   = useState(null);
   const [todayStats, setTodayStats] = useState(null);
+  const [overviewStats, setOverviewStats] = useState(null);
+  const [insights, setInsights] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [favorites, setFavorites] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getTodayKey);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
@@ -161,19 +182,33 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const isSelectedDateToday = selectedDate === getTodayKey();
 
   const refreshStats = useCallback(async () => {
-    if (session?.email) setTodayStats(await fetchTodayStats(currentUser));
+    if (!session?.email) return;
+    const [statsData, overviewData, insightsData] = await Promise.all([
+      fetchTodayStats(currentUser),
+      fetchStatsOverview(currentUser),
+      fetchInsights(currentUser),
+    ]);
+    setTodayStats(statsData);
+    setOverviewStats(overviewData);
+    setInsights(insightsData);
   }, [session?.email, currentUser]);
 
   const fetchAllData = useCallback(async () => {
     try {
-      const [selectedLogs, statsData, userSettings] = await Promise.all([
+      const [selectedLogs, statsData, overviewData, insightsData, userSettings, favoriteItems] = await Promise.all([
         fetchTodayLogs(selectedDate, currentUser),
         session?.email ? fetchTodayStats(currentUser) : Promise.resolve(null),
+        session?.email ? fetchStatsOverview(currentUser) : Promise.resolve(null),
+        session?.email ? fetchInsights(currentUser) : Promise.resolve(null),
         session?.email ? fetchUserSettings(currentUser) : Promise.resolve(null),
+        session?.email ? fetchFavorites(currentUser) : Promise.resolve([]),
       ]);
       setLogs(selectedLogs);
       if (statsData) setTodayStats(statsData);
+      if (overviewData) setOverviewStats(overviewData);
+      if (insightsData) setInsights(insightsData);
       if (userSettings) setSettings(userSettings);
+      setFavorites(Array.isArray(favoriteItems) ? favoriteItems : []);
     } catch (err) {
       console.error('Fehler beim Laden der Daten:', err);
       setError('Fehler beim Laden der Daten.');
@@ -298,9 +333,37 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const handleToggleFavorite = async (log, isFavorite) => {
     try {
       if (isFavorite) {
-        // Find favorite ID by log match (pseudo logic, adjust based on actual api)
-        // If we don't have full favorites logic here, we just ignore or implement basic
+        const existing = favorites.find((favorite) => drinkKey(favorite) === drinkKey(log));
+        if (existing) {
+          await removeFavorite({ ...currentUser, favoriteId: existing.id });
+          setFavorites((prev) => prev.filter((favorite) => favorite.id !== existing.id));
+        }
+      } else {
+        const data = await addFavorite({ ...currentUser, drink: log });
+        if (data?.item) {
+          setFavorites((prev) => [data.item, ...prev.filter((favorite) => favorite.id !== data.item.id)]);
+        }
       }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleAddFavoriteDrink = async (drink) => {
+    await handleAddDrink({
+      name: drink.name,
+      size: Number(drink.size) || 0,
+      caffeine: Number(drink.caffeine) || 0,
+      caffeinePerMl: drink.caffeinePerMl,
+      icon: drink.icon || '🥤',
+      date: selectedDate,
+    });
+  };
+
+  const handleRemoveFavorite = async (favoriteId) => {
+    try {
+      await removeFavorite({ ...currentUser, favoriteId });
+      setFavorites((prev) => prev.filter((favorite) => favorite.id !== favoriteId));
     } catch (err) {
       setError(err.message);
     }
@@ -387,11 +450,23 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         {!showSettings && (
           <div className="space-y-6 animate-fade-in">
             <ProgressBar currentCaffeine={selectedDateCaffeine} title={progressTitle} isToday={isSelectedDateToday} />
+            {overviewStats && <GoalOverview overview={overviewStats} />}
+            {isSelectedDateToday && (
+              <CaffeineDecayChart logs={logs} sleepTime={settings?.sleepTime || '23:00'} />
+            )}
             
             {isSelectedDateToday && todayStats && settings && (
               <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
             )}
 
+            <FavoriteQuickActions
+              favorites={favorites}
+              onAddFavorite={handleAddFavoriteDrink}
+              onRemoveFavorite={handleRemoveFavorite}
+              isLoading={isOperationLoading}
+            />
+            {insights && <PatternInsights insights={insights} />}
+            {insights?.achievements && <AchievementsPanel achievements={insights.achievements} />}
             <CalendarWidget
               selectedDate={selectedDate}
               logs={logs}
@@ -402,8 +477,16 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
               refreshKey={calendarRefreshKey}
               isLoading={isOperationLoading}
             />
-            <DrinkHistory selectedDate={selectedDate} logs={logs} onDeleteLog={handleDeleteLog} onToggleFavorite={handleToggleFavorite} isFavoriteLog={() => false} />
+            <CalendarSuggestions
+              selectedDate={selectedDate}
+              logs={logs}
+              totalCaffeine={selectedDateCaffeine}
+              dailyLimit={settings?.dailyLimit || todayStats?.dailyLimit || 400}
+              insights={insights}
+            />
+            <DrinkHistory selectedDate={selectedDate} logs={logs} onDeleteLog={handleDeleteLog} onToggleFavorite={handleToggleFavorite} isFavoriteLog={(log) => favorites.some((favorite) => drinkKey(favorite) === drinkKey(log))} />
             <AIAssistant key={session?.id || session?.email} session={session} selectedDate={selectedDate} totalCaffeineToday={selectedDateCaffeine} logs={logs} onAddDrink={handleAddDrink} onDeleteDrink={handleDeleteLog} onUpdateDrink={handleUpdateLog} />
+            <ExportPanel userIdentity={currentUser} />
             
 
           </div>

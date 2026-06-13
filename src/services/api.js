@@ -76,8 +76,17 @@ export const removeCustomDrink = ({ userId, email, drinkId }) =>
 export const fetchTodayStats = (user) =>
   get('/api/stats/today', identity(user), 'Fehler beim Abrufen der Statistiken');
 
+export const fetchStatsOverview = (user) =>
+  get('/api/stats/overview', identity(user), 'Fehler beim Abrufen der Zieluebersicht');
+
 export const fetchWeeklyStats = async (user) =>
   (await get('/api/stats/weekly', identity(user), 'Fehler beim Abrufen der Wochenstatistiken')).items || [];
+
+export const fetchInsights = (user) =>
+  get('/api/insights/me', identity(user), 'Fehler beim Abrufen der Muster');
+
+export const fetchExportLogs = ({ userId, email, start, end }) =>
+  get('/api/export/logs', { userId, email, start, end }, 'Fehler beim Exportieren der Logs');
 
 export const fetchSecurityStatus = (user) =>
   get('/api/security/me', identity(user), 'Fehler beim Abrufen der Sicherheitseinstellungen');

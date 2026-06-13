@@ -931,9 +931,10 @@ const getSettingsOwnerKey = ({ userId, email }) => {
 const getUserSettings = ({ userId, email }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   const settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
-  return settings || {
+  const defaults = {
     ownerKey,
     dailyLimit: 400,
+    sleepTime: '23:00',
     notifyAtLimit: true,
     notifyLate: true,
     notifyRapid: true,
@@ -943,9 +944,12 @@ const getUserSettings = ({ userId, email }) => {
     theme: 'system',
     createdAt: new Date().toISOString(),
   };
+  return settings ? { ...defaults, ...settings } : defaults;
 };
 
-const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }) => {
+const isValidTime = (time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(time || ''));
+
+const updateUserSettings = ({ userId, email, dailyLimit, sleepTime, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   let settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
   if (!settings) {
@@ -953,6 +957,7 @@ const updateUserSettings = ({ userId, email, dailyLimit, notifyAtLimit, notifyLa
     dbState.user_settings.push(settings);
   }
   if (dailyLimit !== undefined) settings.dailyLimit = dailyLimit;
+  if (sleepTime !== undefined) settings.sleepTime = sleepTime;
   if (notifyAtLimit !== undefined) settings.notifyAtLimit = notifyAtLimit;
   if (notifyLate !== undefined) settings.notifyLate = notifyLate;
   if (notifyRapid !== undefined) settings.notifyRapid = notifyRapid;
@@ -1167,6 +1172,355 @@ const getTodayStats = ({ userId, email }) => {
     isOverLimit,
     logCount: logsForToday.length,
     logs: logsForToday,
+  };
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEKDAY_LABELS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+const isValidDateKey = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false;
+  const [year, month, day] = String(value).split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+};
+
+const parseDateKey = (value) => {
+  if (!isValidDateKey(value)) return null;
+  const [year, month, day] = String(value).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+const toDateKey = (date) => date.toISOString().slice(0, 10);
+
+const addDays = (date, days) => new Date(date.getTime() + days * DAY_MS);
+
+const getTodayKey = () => toDateKey(new Date());
+
+const startOfWeek = (date) => {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const offset = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - offset);
+  return d;
+};
+
+const endOfWeek = (date) => addDays(startOfWeek(date), 6);
+
+const startOfMonth = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+
+const endOfMonth = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
+
+const eachDateKey = (startKey, endKey) => {
+  const start = parseDateKey(startKey);
+  const end = parseDateKey(endKey);
+  if (!start || !end || start > end) return [];
+  const days = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) days.push(toDateKey(d));
+  return days;
+};
+
+const getLogDateTime = (log) => {
+  const value = log?.createdAt || log?.timestamp || log?.date;
+  const parsed = value ? new Date(value) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+};
+
+const logMatchesUser = (log, { userId, email } = {}) => {
+  const safeEmail = String(email || '').toLowerCase().trim();
+  const matchId = userId && String(log.userId) === String(userId);
+  const matchEmail = safeEmail && String(log.email || '').toLowerCase() === safeEmail;
+  return !!(matchId || matchEmail);
+};
+
+const getLogsForUser = ({ userId, email, start, end }) =>
+  dbState.caffeine_logs
+    .filter((log) => logMatchesUser(log, { userId, email }))
+    .filter((log) => (!start || String(log.date || '') >= start) && (!end || String(log.date || '') <= end))
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+
+const getRangeFromQuery = (query, defaultDays = 30) => {
+  const end = isValidDateKey(query.end) ? String(query.end) : getTodayKey();
+  const defaultStart = toDateKey(addDays(parseDateKey(end), -(defaultDays - 1)));
+  const start = isValidDateKey(query.start) ? String(query.start) : defaultStart;
+
+  const startDate = parseDateKey(start);
+  const endDate = parseDateKey(end);
+  if (!startDate || !endDate || startDate > endDate) {
+    const err = new Error('start und end muessen gueltige Datumswerte im Format YYYY-MM-DD sein.');
+    err.status = 400;
+    throw err;
+  }
+  if ((endDate - startDate) / DAY_MS > 366) {
+    const err = new Error('Der Exportzeitraum darf maximal 366 Tage umfassen.');
+    err.status = 400;
+    throw err;
+  }
+
+  return { start, end };
+};
+
+const summarizePeriod = ({ logs, start, end, dailyLimit }) => {
+  const days = eachDateKey(start, end);
+  const daily = days.map((date) => {
+    const dayLogs = logs.filter((log) => log.date === date);
+    const totalCaffeine = dayLogs.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
+    return { date, totalCaffeine, count: dayLogs.length, isOverLimit: totalCaffeine > dailyLimit };
+  });
+  const totalCaffeine = daily.reduce((sum, day) => sum + day.totalCaffeine, 0);
+  const target = dailyLimit * Math.max(1, days.length);
+  return {
+    start,
+    end,
+    days: days.length,
+    totalCaffeine,
+    target,
+    percent: target > 0 ? Math.round((totalCaffeine / target) * 100) : 0,
+    averagePerDay: days.length ? Math.round(totalCaffeine / days.length) : 0,
+    loggedDays: daily.filter((day) => day.count > 0).length,
+    daysOverLimit: daily.filter((day) => day.isOverLimit).length,
+    logCount: logs.length,
+    daily,
+  };
+};
+
+const getStatsOverview = ({ userId, email }) => {
+  const settings = getUserSettings({ userId, email });
+  const dailyLimit = Number(settings.dailyLimit) || 400;
+  const today = parseDateKey(getTodayKey());
+  const weekStart = toDateKey(startOfWeek(today));
+  const weekEnd = toDateKey(endOfWeek(today));
+  const monthStart = toDateKey(startOfMonth(today));
+  const monthEnd = toDateKey(endOfMonth(today));
+
+  return {
+    dailyLimit,
+    week: summarizePeriod({
+      logs: getLogsForUser({ userId, email, start: weekStart, end: weekEnd }),
+      start: weekStart,
+      end: weekEnd,
+      dailyLimit,
+    }),
+    month: summarizePeriod({
+      logs: getLogsForUser({ userId, email, start: monthStart, end: monthEnd }),
+      start: monthStart,
+      end: monthEnd,
+      dailyLimit,
+    }),
+  };
+};
+
+const buildAchievements = ({ logs, dailyLimit }) => {
+  const today = parseDateKey(getTodayKey());
+  const last30Start = toDateKey(addDays(today, -29));
+  const weekStart = toDateKey(startOfWeek(today));
+  const weekEnd = toDateKey(endOfWeek(today));
+  const last30Days = summarizePeriod({ logs: logs.filter((log) => log.date >= last30Start), start: last30Start, end: getTodayKey(), dailyLimit }).daily;
+  const weekLogs = logs.filter((log) => log.date >= weekStart && log.date <= weekEnd);
+  const weekTotal = weekLogs.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
+  const lateWeek = weekLogs.some((log) => {
+    const logTime = getLogDateTime(log);
+    return logTime && logTime.getHours() >= 18;
+  });
+  let underLimitStreak = 0;
+  for (let i = 0; i < 14; i += 1) {
+    const date = toDateKey(addDays(today, -i));
+    const day = last30Days.find((entry) => entry.date === date);
+    if (!day || day.count === 0 || day.totalCaffeine > dailyLimit) break;
+    underLimitStreak += 1;
+  }
+  const trackedDays = last30Days.filter((day) => day.count > 0).length;
+
+  return [
+    {
+      id: 'under-limit-3',
+      title: '3 Tage unter Limit',
+      description: 'Drei getrackte Tage in Folge unter deinem Tageslimit.',
+      progress: Math.min(underLimitStreak, 3),
+      target: 3,
+      unlocked: underLimitStreak >= 3,
+    },
+    {
+      id: 'no-late-week',
+      title: 'Keine spaeten Drinks',
+      description: 'Diese Woche kein Koffein nach 18:00 Uhr.',
+      progress: lateWeek ? 0 : 1,
+      target: 1,
+      unlocked: weekLogs.length > 0 && !lateWeek,
+    },
+    {
+      id: 'tracked-7',
+      title: '7 Tage getrackt',
+      description: 'Sieben verschiedene Tage mit Eintraegen im letzten Monat.',
+      progress: Math.min(trackedDays, 7),
+      target: 7,
+      unlocked: trackedDays >= 7,
+    },
+    {
+      id: 'week-under-limit',
+      title: 'Woche im Rahmen',
+      description: 'Aktuelle Woche bleibt unter dem Wochenziel.',
+      progress: Math.min(weekTotal, dailyLimit * 7),
+      target: dailyLimit * 7,
+      unlocked: weekLogs.length > 0 && weekTotal <= dailyLimit * 7,
+      unit: 'mg',
+    },
+  ];
+};
+
+const getUserInsights = ({ userId, email }) => {
+  const settings = getUserSettings({ userId, email });
+  const dailyLimit = Number(settings.dailyLimit) || 400;
+  const today = parseDateKey(getTodayKey());
+  const start = toDateKey(addDays(today, -29));
+  const end = getTodayKey();
+  const logs = getLogsForUser({ userId, email, start, end });
+  const days = summarizePeriod({ logs, start, end, dailyLimit }).daily;
+  const weekdayStats = Array.from({ length: 7 }, (_, index) => ({ index, label: WEEKDAY_LABELS[index], total: 0, count: 0, activeDays: 0 }));
+  const drinkStats = new Map();
+
+  days.forEach((day) => {
+    const parsed = parseDateKey(day.date);
+    const weekday = parsed.getUTCDay();
+    weekdayStats[weekday].total += day.totalCaffeine;
+    weekdayStats[weekday].count += day.count;
+    if (day.count > 0) weekdayStats[weekday].activeDays += 1;
+  });
+
+  logs.forEach((log) => {
+    const key = String(log.name || 'Unbekannt').toLowerCase().trim();
+    const entry = drinkStats.get(key) || { name: log.name || 'Unbekannt', count: 0, totalCaffeine: 0 };
+    entry.count += 1;
+    entry.totalCaffeine += Number(log.caffeine) || 0;
+    drinkStats.set(key, entry);
+  });
+
+  const topWeekday = weekdayStats
+    .filter((entry) => entry.total > 0)
+    .sort((a, b) => b.total - a.total)[0] || null;
+  const lateDrinks = logs.filter((log) => {
+    const logTime = getLogDateTime(log);
+    return logTime && logTime.getHours() >= 18;
+  });
+  const topDrink = [...drinkStats.values()].sort((a, b) => b.count - a.count || b.totalCaffeine - a.totalCaffeine)[0] || null;
+  const overLimitDays = days.filter((day) => day.isOverLimit);
+
+  const messages = [];
+  if (topWeekday) messages.push(`Du trinkst an ${topWeekday.label}en besonders viel Koffein (${topWeekday.total} mg in 30 Tagen).`);
+  if (lateDrinks.length > 0) messages.push(`${lateDrinks.length} Eintraege lagen nach 18:00 Uhr. Deine Schlaf-Warnung ist hier besonders sinnvoll.`);
+  if (topDrink) messages.push(`${topDrink.name} ist dein haeufigstes Getraenk (${topDrink.count}x).`);
+  if (overLimitDays.length > 0) messages.push(`${overLimitDays.length} Tage lagen im letzten Monat ueber deinem Limit.`);
+  if (messages.length === 0) messages.push('Noch zu wenig Daten fuer robuste Muster. Tracke ein paar Tage weiter.');
+
+  return {
+    range: { start, end },
+    messages,
+    topWeekday,
+    lateDrinkCount: lateDrinks.length,
+    overLimitDays: overLimitDays.length,
+    topDrinks: [...drinkStats.values()].sort((a, b) => b.count - a.count).slice(0, 5),
+    achievements: buildAchievements({ logs, dailyLimit }),
+  };
+};
+
+const csvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+const buildLogsCsv = (logs) => {
+  const header = ['ID', 'Name', 'Koffein (mg)', 'Groesse (ml)', 'Datum', 'E-Mail', 'Erstellt'];
+  const rows = logs.map((log) => [
+    log.id,
+    log.name,
+    log.caffeine,
+    log.size,
+    log.date,
+    log.email || '',
+    log.createdAt || '',
+  ].map(csvValue).join(','));
+  return [header.map(csvValue).join(','), ...rows].join('\n');
+};
+
+const getExportSummary = (logs, start, end) => ({
+  start,
+  end,
+  logCount: logs.length,
+  totalCaffeine: logs.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0),
+  totalSize: logs.reduce((sum, log) => sum + (Number(log.size) || 0), 0),
+});
+
+const getOwnerLabelForLog = (log) => {
+  const email = String(log.email || '').toLowerCase();
+  const user = dbState.users.find((entry) =>
+    (log.userId && String(entry.id) === String(log.userId))
+    || (email && String(entry.email || '').toLowerCase() === email)
+  );
+  return {
+    ownerKey: log.userId ? `user:${log.userId}` : email ? `email:${email}` : 'unknown',
+    userId: user?.id || log.userId || null,
+    name: user?.name || (email ? email.split('@')[0] : 'Unbekannt'),
+    email: user?.email || email || '',
+    role: user?.role || 'user',
+  };
+};
+
+const getAdminActivity = () => {
+  const today = getTodayKey();
+  const todayDate = parseDateKey(today);
+  const sevenDaysAgo = toDateKey(addDays(todayDate, -6));
+  const thirtyDaysAgo = toDateKey(addDays(todayDate, -29));
+  const logsToday = dbState.caffeine_logs.filter((log) => log.date === today);
+  const logsLast7 = dbState.caffeine_logs.filter((log) => log.date >= sevenDaysAgo);
+  const logsLast30 = dbState.caffeine_logs.filter((log) => log.date >= thirtyDaysAgo);
+
+  const activeOwnerKeys = new Set(logsLast7.map((log) => getOwnerLabelForLog(log).ownerKey));
+  dbState.users.forEach((user) => {
+    if (user.last_login && user.last_login >= `${sevenDaysAgo}T00:00:00`) activeOwnerKeys.add(`user:${user.id}`);
+  });
+
+  const drinkMap = new Map();
+  logsLast30.forEach((log) => {
+    const key = String(log.name || 'Unbekannt').toLowerCase().trim();
+    const entry = drinkMap.get(key) || { name: log.name || 'Unbekannt', count: 0, totalCaffeine: 0 };
+    entry.count += 1;
+    entry.totalCaffeine += Number(log.caffeine) || 0;
+    drinkMap.set(key, entry);
+  });
+
+  const byOwnerToday = new Map();
+  logsToday.forEach((log) => {
+    const owner = getOwnerLabelForLog(log);
+    const entry = byOwnerToday.get(owner.ownerKey) || { ...owner, totalCaffeine: 0, logCount: 0 };
+    entry.totalCaffeine += Number(log.caffeine) || 0;
+    entry.logCount += 1;
+    byOwnerToday.set(owner.ownerKey, entry);
+  });
+
+  const usersOverLimit = [...byOwnerToday.values()]
+    .map((entry) => {
+      const settings = getUserSettings({ userId: entry.userId, email: entry.email || `${entry.ownerKey}@unknown.local` });
+      const dailyLimit = Number(settings.dailyLimit) || 400;
+      return { ...entry, dailyLimit, overBy: entry.totalCaffeine - dailyLimit };
+    })
+    .filter((entry) => entry.overBy > 0)
+    .sort((a, b) => b.overBy - a.overBy);
+
+  return {
+    totals: {
+      registeredUsers: dbState.users.length,
+      activeUsers7Days: activeOwnerKeys.size,
+      logsToday: logsToday.length,
+      caffeineToday: logsToday.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0),
+      usersOverLimit: usersOverLimit.length,
+    },
+    recentLogins: [...dbState.users]
+      .filter((user) => user.last_login)
+      .sort((a, b) => String(b.last_login).localeCompare(String(a.last_login)))
+      .slice(0, 8)
+      .map((user) => ({ id: user.id, name: user.name, email: user.email, role: user.role, lastLogin: user.last_login })),
+    topDrinks: [...drinkMap.values()].sort((a, b) => b.count - a.count || b.totalCaffeine - a.totalCaffeine).slice(0, 8),
+    usersOverLimit,
+    recentLogs: [...dbState.caffeine_logs]
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+      .slice(0, 12)
+      .map((log) => ({ ...log, owner: getOwnerLabelForLog(log) })),
   };
 };
 
@@ -1698,6 +2052,38 @@ app.get('/api/admin/ai/chat-stats', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('GET /api/admin/ai/chat-stats error:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/admin/activity', requireAdmin, async (req, res) => {
+  try {
+    res.json(getAdminActivity());
+  } catch (err) {
+    console.error('GET /api/admin/activity error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/admin/export/logs', requireAdmin, async (req, res) => {
+  try {
+    const { start, end } = getRangeFromQuery(req.query, 30);
+    const email = String(req.query.email || '').toLowerCase().trim();
+    const format = String(req.query.format || 'json').toLowerCase();
+    const logs = dbState.caffeine_logs
+      .filter((log) => (!email || String(log.email || '').toLowerCase() === email))
+      .filter((log) => String(log.date || '') >= start && String(log.date || '') <= end)
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="koffein-admin-${start}-${end}.csv"`);
+      return res.send(buildLogsCsv(logs));
+    }
+
+    res.json({ items: logs, summary: getExportSummary(logs, start, end) });
+  } catch (err) {
+    console.error('GET /api/admin/export/logs error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'Database error' });
   }
 });
 
@@ -2311,18 +2697,21 @@ app.get('/api/settings/me', async (req, res) => {
 
 app.post('/api/settings/me', async (req, res) => {
   try {
-    const { userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme } = req.body || {};
+    const { userId, email, dailyLimit, sleepTime, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme } = req.body || {};
     const safeEmail = String(email || '').toLowerCase().trim();
     const safeUserId = String(userId || '').trim() || null;
 
     if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (dailyLimit !== undefined && (!Number.isFinite(dailyLimit) || dailyLimit < 0))
       return res.status(400).json({ error: 'dailyLimit muss eine positive Zahl sein.' });
+    if (sleepTime !== undefined && !isValidTime(sleepTime))
+      return res.status(400).json({ error: 'sleepTime muss im Format HH:MM sein.' });
 
     const settings = updateUserSettings({
       userId: safeUserId,
       email: safeEmail,
       dailyLimit,
+      sleepTime,
       notifyAtLimit,
       notifyLate,
       notifyRapid,
@@ -2746,6 +3135,55 @@ app.get('/api/stats/weekly', async (req, res) => {
   } catch (err) {
     console.error('GET /api/stats/weekly error:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/stats/overview', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    res.json(getStatsOverview({ userId, email }));
+  } catch (err) {
+    console.error('GET /api/stats/overview error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/insights/me', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    res.json(getUserInsights({ userId, email }));
+  } catch (err) {
+    console.error('GET /api/insights/me error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/export/logs', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const { start, end } = getRangeFromQuery(req.query, 30);
+    const format = String(req.query.format || 'json').toLowerCase();
+    const logs = getLogsForUser({ userId, email, start, end });
+
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="koffein-${start}-${end}.csv"`);
+      return res.send(buildLogsCsv(logs));
+    }
+
+    res.json({ items: logs, summary: getExportSummary(logs, start, end) });
+  } catch (err) {
+    console.error('GET /api/export/logs error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'Database error' });
   }
 });
 
@@ -3230,11 +3668,6 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
-
-
-
-
-
 
 
 

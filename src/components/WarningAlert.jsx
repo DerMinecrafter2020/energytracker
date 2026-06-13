@@ -1,6 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, Moon, Zap, X } from 'lucide-react';
 
+const ACTIVE_SLEEP_THRESHOLD_MG = 50;
+const HALF_LIFE_HOURS = 5;
+
+const getLogDate = (log) => {
+  const value = log?.createdAt || log?.timestamp;
+  const parsed = value ? new Date(value) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+};
+
+const sleepDateForToday = (time) => {
+  const now = new Date();
+  const match = String(time || '').match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  const date = new Date(now);
+  date.setSeconds(0, 0);
+  if (match) date.setHours(Number(match[1]), Number(match[2]), 0, 0);
+  else date.setHours(23, 0, 0, 0);
+  if (date <= now) date.setDate(date.getDate() + 1);
+  return date;
+};
+
+const activeCaffeineAt = (logs, point) =>
+  logs.reduce((sum, log) => {
+    const takenAt = getLogDate(log);
+    if (!takenAt || takenAt > point) return sum;
+    const hours = Math.max(0, (point - takenAt) / 36e5);
+    return sum + (Number(log.caffeine) || 0) * Math.pow(0.5, hours / HALF_LIFE_HOURS);
+  }, 0);
+
 export default function WarningAlert({ todayStats, settings, onClose }) {
   const [warnings, setWarnings] = useState([]);
   const [dismissedWarnings, setDismissedWarnings] = useState(new Set());
@@ -13,6 +41,7 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
 
     const newWarnings = [];
     const limit = settings.dailyLimit || 400;
+    const logs = Array.isArray(todayStats.logs) ? todayStats.logs : [];
 
     // Warning: Over limit
     if (settings.notifyAtLimit && todayStats.isOverLimit) {
@@ -32,13 +61,14 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
       const now = new Date();
       const hour = now.getHours();
       if (hour >= 18) {
-        const recentDrinks = todayStats.logs.filter((log) => {
-          const logTime = new Date(log.timestamp);
+        const recentDrinks = logs.filter((log) => {
+          const logTime = getLogDate(log);
+          if (!logTime) return false;
           return logTime.getHours() >= 18;
         });
         if (recentDrinks.length > 0) {
           const lastDrink = recentDrinks[recentDrinks.length - 1];
-          const drinkTime = new Date(lastDrink.timestamp);
+          const drinkTime = getLogDate(lastDrink);
           newWarnings.push({
             id: 'late-caffeine',
             type: 'warning',
@@ -49,13 +79,29 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
           });
         }
       }
+
+      const sleepAt = sleepDateForToday(settings.sleepTime || '23:00');
+      const activeAtSleep = Math.round(activeCaffeineAt(logs, sleepAt));
+      if (activeAtSleep >= ACTIVE_SLEEP_THRESHOLD_MG) {
+        newWarnings.push({
+          id: 'sleep-caffeine',
+          type: 'warning',
+          icon: Moon,
+          title: 'Koffein zur Schlafenszeit',
+          message: `Um ${sleepAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr sind voraussichtlich noch ca. ${activeAtSleep}mg aktiv.`,
+          color: 'blue',
+        });
+      }
     }
 
     // Warning: Rapid consumption
-    if (settings.notifyRapid && todayStats.logs.length >= 3) {
+    if (settings.notifyRapid && logs.length >= 3) {
       const now = new Date();
       const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-      const recentDrinks = todayStats.logs.filter((log) => new Date(log.timestamp) > twoHoursAgo);
+      const recentDrinks = logs.filter((log) => {
+        const logTime = getLogDate(log);
+        return logTime && logTime > twoHoursAgo;
+      });
 
       if (recentDrinks.length >= 3) {
         newWarnings.push({
@@ -126,8 +172,6 @@ export default function WarningAlert({ todayStats, settings, onClose }) {
     </div>
   );
 }
-
-
 
 
 

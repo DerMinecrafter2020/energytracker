@@ -5,6 +5,7 @@ import {
   Download, Search, ChevronDown, ChevronUp, Coffee,
   Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
   CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash, Edit3,
+  Activity, FileText, Printer,
 } from 'lucide-react';
 import { logout } from '../services/auth';
 import { fetchLogs, deleteLog as deleteApiLog, adminUpdateLog } from '../services/api';
@@ -12,6 +13,7 @@ import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
   testDiscordWebhook, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
+  fetchAdminActivity, fetchAdminExportLogs,
 } from '../services/adminApi';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -29,6 +31,95 @@ const getLast7Days = () =>
     d.setDate(d.getDate() - (6 - i));
     return d.toISOString().split('T')[0];
   });
+
+const dateKey = (date) => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().split('T')[0];
+};
+
+const defaultExportStart = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 29);
+  return dateKey(d);
+};
+
+const csvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+const buildAdminCsv = (items) => {
+  const header = ['ID', 'Name', 'Koffein (mg)', 'Groesse (ml)', 'Datum', 'E-Mail', 'Erstellt'];
+  const rows = items.map((item) => [
+    item.id,
+    item.name,
+    item.caffeine,
+    item.size,
+    item.date,
+    item.email || '',
+    item.createdAt || '',
+  ].map(csvValue).join(','));
+  return [header.map(csvValue).join(','), ...rows].join('\n');
+};
+
+const htmlEscape = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;');
+
+const downloadFile = (content, filename, type) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const renderAdminPrintableHtml = ({ items, summary }) => `
+  <!doctype html>
+  <html lang="de">
+    <head>
+      <meta charset="utf-8" />
+      <title>Admin Export</title>
+      <style>
+        body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
+        h1 { margin: 0 0 8px; }
+        .meta { color: #4b5563; margin-bottom: 24px; }
+        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+        .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+        .value { font-size: 22px; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 8px; }
+        th { background: #f9fafb; }
+      </style>
+    </head>
+    <body>
+      <h1>Admin Export</h1>
+      <div class="meta">${htmlEscape(summary.start)} bis ${htmlEscape(summary.end)}</div>
+      <div class="cards">
+        <div class="card"><div class="value">${summary.logCount}</div><div>Eintraege</div></div>
+        <div class="card"><div class="value">${summary.totalCaffeine} mg</div><div>Koffein</div></div>
+        <div class="card"><div class="value">${summary.totalSize} ml</div><div>Getraenke</div></div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Datum</th><th>Benutzer</th><th>Name</th><th>Groesse</th><th>Koffein</th></tr>
+        </thead>
+        <tbody>
+          ${items.map((item) => `
+            <tr>
+              <td>${htmlEscape(item.date)}</td>
+              <td>${htmlEscape(item.email || '-')}</td>
+              <td>${htmlEscape(item.name)}</td>
+              <td>${htmlEscape(item.size)} ml</td>
+              <td>${htmlEscape(item.caffeine)} mg</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </body>
+  </html>
+`;
 
 // â”€â”€ Stat Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
@@ -134,6 +225,16 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [chatStatsLoading, setChatStatsLoading] = useState(false);
   const [chatStatsMsg, setChatStatsMsg] = useState(null);
 
+  // Admin activity and exports
+  const [adminActivity, setAdminActivity] = useState({ totals: {}, recentLogins: [], topDrinks: [], usersOverLimit: [], recentLogs: [] });
+  const [adminActivityLoading, setAdminActivityLoading] = useState(false);
+  const [adminActivityMsg, setAdminActivityMsg] = useState(null);
+  const [exportStart, setExportStart] = useState(defaultExportStart);
+  const [exportEnd, setExportEnd] = useState(() => dateKey(new Date()));
+  const [exportEmail, setExportEmail] = useState('');
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportMsg, setExportMsg] = useState(null);
+
   // â”€â”€ Users state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [regUsers, setRegUsers]   = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -169,6 +270,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     }
     if (activeTab === 'users') loadRegUsers();
     if (activeTab === 'chat') loadChatStats();
+    if (activeTab === 'activity') loadAdminActivity();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -297,6 +399,75 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       setChatStatsMsg({ type: 'error', text: 'Fehler beim Laden der Chat-Statistik: ' + err.message });
     } finally {
       setChatStatsLoading(false);
+    }
+  };
+
+  const loadAdminActivity = async () => {
+    setAdminActivityLoading(true);
+    setAdminActivityMsg(null);
+    try {
+      const data = await fetchAdminActivity();
+      setAdminActivity({
+        totals: data.totals || {},
+        recentLogins: Array.isArray(data.recentLogins) ? data.recentLogins : [],
+        topDrinks: Array.isArray(data.topDrinks) ? data.topDrinks : [],
+        usersOverLimit: Array.isArray(data.usersOverLimit) ? data.usersOverLimit : [],
+        recentLogs: Array.isArray(data.recentLogs) ? data.recentLogs : [],
+      });
+    } catch (err) {
+      setAdminActivityMsg({ type: 'error', text: 'Fehler beim Laden der Aktivitaet: ' + err.message });
+    } finally {
+      setAdminActivityLoading(false);
+    }
+  };
+
+  const loadAdminExportData = () => fetchAdminExportLogs({
+    start: exportStart,
+    end: exportEnd,
+    email: exportEmail.trim(),
+  });
+
+  const handleAdminCsvExport = async () => {
+    setExportLoading(true);
+    setExportMsg(null);
+    try {
+      const data = await loadAdminExportData();
+      const items = Array.isArray(data.items) ? data.items : [];
+      const summary = data.summary || { start: exportStart, end: exportEnd, logCount: items.length, totalCaffeine: 0, totalSize: 0 };
+      downloadFile(buildAdminCsv(items), `koffein-admin-${summary.start}-${summary.end}.csv`, 'text/csv;charset=utf-8;');
+      setExportMsg({ type: 'success', text: `${summary.logCount} Eintraege exportiert.` });
+    } catch (err) {
+      setExportMsg({ type: 'error', text: err.message });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleAdminPdfExport = async () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      setExportMsg({ type: 'error', text: 'Popup blockiert. Bitte Popups fuer diese Seite erlauben.' });
+      return;
+    }
+
+    setExportLoading(true);
+    setExportMsg(null);
+    printWindow.document.write('<p style="font-family:Arial;padding:24px">Export wird vorbereitet...</p>');
+    try {
+      const data = await loadAdminExportData();
+      const items = Array.isArray(data.items) ? data.items : [];
+      const summary = data.summary || { start: exportStart, end: exportEnd, logCount: items.length, totalCaffeine: 0, totalSize: 0 };
+      printWindow.document.open();
+      printWindow.document.write(renderAdminPrintableHtml({ items, summary }));
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => printWindow.print(), 250);
+      setExportMsg({ type: 'success', text: `${summary.logCount} Eintraege fuer PDF vorbereitet.` });
+    } catch (err) {
+      printWindow.close();
+      setExportMsg({ type: 'error', text: err.message });
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -549,6 +720,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             { id: 'logs',      label: 'Alle Logs',  icon: Database   },
             { id: 'users',     label: 'Benutzer',   icon: Users      },
             { id: 'chat',      label: 'KI-Chat',    icon: MessageCircle },
+            { id: 'activity',  label: 'Aktivität',  icon: Activity   },
             { id: 'settings',  label: 'Einstellungen', icon: Settings },
             
           ].map(({ id, label, icon: Icon }) => (
@@ -1085,6 +1257,155 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ACTIVITY TAB */}
+        {activeTab === 'activity' && (
+          <div className="animate-fade-in pb-10 space-y-6">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="font-semibold text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-green-400" />
+                Admin-Aktivitaet
+              </h2>
+              <button onClick={loadAdminActivity} disabled={adminActivityLoading}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl glass-card
+                  text-slate-400 hover:text-white text-sm transition-all disabled:opacity-50">
+                <RefreshCw className={`w-4 h-4 ${adminActivityLoading ? 'animate-spin' : ''}`} />
+                Aktualisieren
+              </button>
+            </div>
+
+            <MessageBox message={adminActivityMsg} onClose={() => setAdminActivityMsg(null)} />
+
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <StatCard icon={Users} label="Benutzer" value={adminActivity.totals.registeredUsers || 0} color="blue" />
+              <StatCard icon={Activity} label="Aktiv 7 Tage" value={adminActivity.totals.activeUsers7Days || 0} color="green" />
+              <StatCard icon={Calendar} label="Logs heute" value={adminActivity.totals.logsToday || 0} color="purple" />
+              <StatCard icon={Zap} label="Koffein heute" value={`${adminActivity.totals.caffeineToday || 0} mg`} color="amber" />
+              <StatCard icon={AlertTriangle} label="Ueber Limit" value={adminActivity.totals.usersOverLimit || 0} color="red" />
+            </div>
+
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-400" />
+                <h3 className="font-semibold text-white">Zeitraum exportieren</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1.4fr_auto_auto] gap-3">
+                <Field label="Von" type="date" value={exportStart} onChange={(e) => setExportStart(e.target.value)} inputClass="pl-0" />
+                <Field label="Bis" type="date" value={exportEnd} onChange={(e) => setExportEnd(e.target.value)} inputClass="pl-0" />
+                <Field label="Benutzer E-Mail optional" icon={Mail} type="email" value={exportEmail} onChange={(e) => setExportEmail(e.target.value)} placeholder="alle Benutzer" />
+                <button onClick={handleAdminCsvExport} disabled={exportLoading}
+                  className="self-end flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                    bg-green-600/20 border border-green-500/30 text-green-300
+                    hover:bg-green-600/30 text-sm transition-all disabled:opacity-50">
+                  <Download className="w-4 h-4" />
+                  CSV
+                </button>
+                <button onClick={handleAdminPdfExport} disabled={exportLoading}
+                  className="self-end flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                    bg-blue-600/20 border border-blue-500/30 text-blue-300
+                    hover:bg-blue-600/30 text-sm transition-all disabled:opacity-50">
+                  <Printer className="w-4 h-4" />
+                  PDF
+                </button>
+              </div>
+              <MessageBox message={exportMsg} onClose={() => setExportMsg(null)} className="rounded-2xl p-3" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                  <Coffee className="w-5 h-5 text-amber-400" />
+                  Meistgenutzte Getraenke
+                </h3>
+                {adminActivityLoading ? (
+                  <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-10 shimmer rounded-xl" />)}</div>
+                ) : adminActivity.topDrinks.length === 0 ? (
+                  <p className="text-sm text-slate-500">Keine Daten vorhanden.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {adminActivity.topDrinks.map((drink) => {
+                      const max = Math.max(1, ...adminActivity.topDrinks.map((item) => item.count || 0));
+                      return (
+                        <div key={drink.name} className="flex items-center gap-3">
+                          <span className="text-sm text-white truncate flex-1">{drink.name}</span>
+                          <div className="w-28 h-2 rounded-full bg-white/5 overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-300" style={{ width: `${((drink.count || 0) / max) * 100}%` }} />
+                          </div>
+                          <span className="text-xs text-slate-500 w-10 text-right">{drink.count}x</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                  Benutzer ueber Limit
+                </h3>
+                {adminActivityLoading ? (
+                  <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-10 shimmer rounded-xl" />)}</div>
+                ) : adminActivity.usersOverLimit.length === 0 ? (
+                  <p className="text-sm text-slate-500">Heute ist niemand ueber Limit.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {adminActivity.usersOverLimit.map((user) => (
+                      <div key={user.ownerKey} className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm text-white font-medium truncate">{user.name}</p>
+                          <p className="text-xs text-slate-500 truncate">{user.email || user.ownerKey}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-red-300 shrink-0">+{user.overBy} mg</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-green-400" />
+                  Letzte Logins
+                </h3>
+                {adminActivity.recentLogins.length === 0 ? (
+                  <p className="text-sm text-slate-500">Noch keine Logins gespeichert.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {adminActivity.recentLogins.map((user) => (
+                      <div key={user.id} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-white truncate">{user.name || user.email}</span>
+                        <span className="text-xs text-slate-500 shrink-0">{formatDate(user.lastLogin)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="glass-card rounded-2xl p-6">
+                <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                  <Database className="w-5 h-5 text-blue-400" />
+                  Neueste Eintraege
+                </h3>
+                {adminActivity.recentLogs.length === 0 ? (
+                  <p className="text-sm text-slate-500">Keine aktuellen Eintraege.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {adminActivity.recentLogs.slice(0, 8).map((log) => (
+                      <div key={log.id} className="flex items-center justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="text-white truncate">{log.name}</p>
+                          <p className="text-xs text-slate-500 truncate">{log.owner?.email || log.email || 'unbekannt'}</p>
+                        </div>
+                        <span className="text-xs text-blue-300 shrink-0">{log.caffeine} mg</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
