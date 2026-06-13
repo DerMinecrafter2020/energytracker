@@ -52,6 +52,20 @@ const isTodayLogIdsRequest = (text) => {
   const mentionsAccount = /(user|benutzer|konto|account|profil)/.test(value);
   return asksForIds && asksToShow && (mentionsLogs || !mentionsAccount);
 };
+const parseToolArguments = (value) => {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  return JSON.parse(String(value));
+};
+const toDrinkItems = (toolName, args) => {
+  if (toolName === 'add_drinks') {
+    const items = Array.isArray(args.drinks) ? args.drinks : (Array.isArray(args.items) ? args.items : []);
+    return items.map((item) => ({ ...item, date: item.date || args.date }));
+  }
+  if (Array.isArray(args.drinks)) return args.drinks.map((item) => ({ ...item, date: item.date || args.date }));
+  if (Array.isArray(args.items)) return args.items.map((item) => ({ ...item, date: item.date || args.date }));
+  return [args];
+};
 
 const loadLocalMessages = (storageKey) => {
   try {
@@ -224,27 +238,30 @@ const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [],
 
       if (tool_calls && tool_calls.length > 0) {
         for (const call of tool_calls) {
-          if (call.function.name === 'add_drink') {
+          if (call.function.name === 'add_drink' || call.function.name === 'add_drinks') {
             try {
-              const args = JSON.parse(call.function.arguments);
-              if (onAddDrink) {
-                const targetDate = isDateKey(args.date) ? args.date : getLocalDateKey();
-                const addedDrink = await onAddDrink({
-                  name: args.name || 'AI Drink',
-                  size: Number(args.size) || 0,
-                  caffeine: Number(args.caffeine) || 0,
-                  icon: args.icon || '🤖',
-                  date: targetDate,
-                });
-                
-                if (addedDrink) {
-                  actionsPerformed.push({ type: 'drink_added', drink: addedDrink, date: addedDrink.date || targetDate });
-                } else {
-                  actionsPerformed.push({ type: 'text', content: `Getränk für ${formatDateLabel(targetDate) || targetDate} hinzugefügt.` });
+              const args = parseToolArguments(call.function.arguments);
+              const drinkItems = toDrinkItems(call.function.name, args);
+              if (onAddDrink && drinkItems.length > 0) {
+                for (const item of drinkItems) {
+                  const targetDate = isDateKey(item.date) ? item.date : (isDateKey(selectedDate) ? selectedDate : getLocalDateKey());
+                  const addedDrink = await onAddDrink({
+                    name: item.name || 'AI Drink',
+                    size: Number(item.size) || 0,
+                    caffeine: Number(item.caffeine) || 0,
+                    icon: item.icon || '🤖',
+                    date: targetDate,
+                  });
+
+                  if (addedDrink) {
+                    actionsPerformed.push({ type: 'drink_added', drink: addedDrink, date: addedDrink.date || targetDate });
+                  } else {
+                    actionsPerformed.push({ type: 'text', content: `Getränk für ${formatDateLabel(targetDate) || targetDate} hinzugefügt.` });
+                  }
                 }
               }
             } catch (e) {
-              console.error('Fehler beim Ausführen von add_drink', e);
+              console.error('Fehler beim Ausführen von add_drink/add_drinks', e);
             }
           } else if (call.function.name === 'delete_drink') {
             try {

@@ -1625,6 +1625,82 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
   }
 });
 
+app.get('/api/admin/ai/chat-stats', requireAdmin, async (req, res) => {
+  try {
+    const rowsByOwner = new Map();
+
+    dbState.users.forEach((user) => {
+      const ownerKey = getSettingsOwnerKey({ userId: user.id, email: user.email });
+      rowsByOwner.set(ownerKey, {
+        ownerKey,
+        userId: user.id,
+        name: user.name || 'Unbekannt',
+        email: user.email || '',
+        role: user.role || 'user',
+        registered: true,
+        userMessages: 0,
+        assistantMessages: 0,
+        systemMessages: 0,
+        totalMessages: 0,
+        updatedAt: null,
+      });
+    });
+
+    dbState.ai_chat_messages.forEach((entry, index) => {
+      const email = String(entry.email || '').toLowerCase().trim();
+      const user = dbState.users.find((u) =>
+        (entry.userId && String(u.id) === String(entry.userId))
+        || (email && String(u.email || '').toLowerCase() === email)
+      );
+      const ownerKey = user
+        ? getSettingsOwnerKey({ userId: user.id, email: user.email })
+        : entry.ownerKey || (entry.userId || email
+          ? getSettingsOwnerKey({ userId: entry.userId, email })
+          : `unknown:${index}`);
+      const row = rowsByOwner.get(ownerKey) || {
+        ownerKey,
+        userId: entry.userId || user?.id || null,
+        name: user?.name || (email ? email.split('@')[0] : 'Unbekannt'),
+        email: user?.email || email,
+        role: user?.role || 'user',
+        registered: !!user,
+        userMessages: 0,
+        assistantMessages: 0,
+        systemMessages: 0,
+        totalMessages: 0,
+        updatedAt: null,
+      };
+      const messages = Array.isArray(entry.messages) ? entry.messages : [];
+
+      row.userMessages = messages.filter((message) => message?.role === 'user').length;
+      row.assistantMessages = messages.filter((message) => message?.role === 'assistant').length;
+      row.systemMessages = messages.filter((message) => message?.role === 'system').length;
+      row.totalMessages = messages.length;
+      row.updatedAt = entry.updatedAt || null;
+      rowsByOwner.set(ownerKey, row);
+    });
+
+    const users = [...rowsByOwner.values()].sort((a, b) =>
+      (b.userMessages - a.userMessages)
+      || String(a.email || a.name).localeCompare(String(b.email || b.name))
+    );
+
+    res.json({
+      users,
+      totals: {
+        users: users.length,
+        usersWithChat: users.filter((user) => user.totalMessages > 0).length,
+        userMessages: users.reduce((sum, user) => sum + user.userMessages, 0),
+        assistantMessages: users.reduce((sum, user) => sum + user.assistantMessages, 0),
+        totalMessages: users.reduce((sum, user) => sum + user.totalMessages, 0),
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/admin/ai/chat-stats error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 app.post('/api/admin/users/:id/verify', requireAdmin, async (req, res) => {
   try {
     const dbPool = getPool();
@@ -2766,7 +2842,7 @@ ${logsInfo}
 
 Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, nutze die zur Verfügung gestellten Tools (Funktionen), um die Aktion auszuführen.
 Wenn der Nutzer nach IDs, Eintrags-IDs oder einer Liste der Einträge fragt, antworte direkt mit den IDs aus der obigen Liste für ${selectedLogDate}. Behaupte niemals, dass du keine Funktion zum Anzeigen der IDs hast.
-Für Hinzufügen (add_drink): Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks. Nutze ein passendes Emoji. Setze das Feld date immer als ISO-Datum YYYY-MM-DD. Wenn der Nutzer kein Datum nennt, nutze den aktuell ausgewählten Tag ${selectedLogDate}. Wenn der Nutzer relative Tage nennt (z.B. heute, gestern, vorgestern, letzten Montag), berechne das Datum ausgehend vom aktuellen Datum ${today}. Lege keine zukünftigen Log-Einträge an.
+Für Hinzufügen: Nutze add_drink nur für ein einzelnes Getränk. Wenn der Nutzer mehrere Getränke, mehrere Mengen oder Getränke für mehrere Tage nennt, nutze add_drinks und erstelle einen Eintrag pro Getränk. Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks. Nutze ein passendes Emoji. Setze date bei jedem Eintrag immer als ISO-Datum YYYY-MM-DD. Wenn der Nutzer kein Datum nennt, nutze den aktuell ausgewählten Tag ${selectedLogDate}. Wenn der Nutzer relative Tage nennt (z.B. heute, gestern, vorgestern, letzten Montag), berechne das Datum ausgehend vom aktuellen Datum ${today}. Lege keine zukünftigen Log-Einträge an.
 Für Ändern/Löschen (update_drink/delete_drink): Nutze exakt die ID aus der Liste der Getränke für ${selectedLogDate}.
 Für geplante Discord-Nachrichten (schedule_discord_message): Nutze dieses Tool, um eine Nachricht zu einer bestimmten Uhrzeit in Discord (Admin Webhook) posten zu lassen.
 Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.`.trim();
@@ -2792,6 +2868,35 @@ Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.
               date: { type: "string", description: `Datum des Eintrags im Format YYYY-MM-DD. Standard ist der aktuell ausgewählte Tag ${selectedLogDate}; relative Angaben vom Nutzer ausgehend von ${today} umrechnen.` }
             },
             required: ["name", "size", "caffeine", "date"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "add_drinks",
+          description: "Fügt mehrere Getränke zu beliebigen Log-Daten hinzu. Ein Array-Eintrag entspricht genau einem Getränk an genau einem Datum.",
+          parameters: {
+            type: "object",
+            properties: {
+              drinks: {
+                type: "array",
+                minItems: 1,
+                description: "Liste der hinzuzufügenden Getränke. Für mehrere Tage muss jedes Getränk sein eigenes date-Feld haben.",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", description: "Name des Getränks" },
+                    size: { type: "number", description: "Menge in ml" },
+                    caffeine: { type: "number", description: "Gesamtes Koffein in mg" },
+                    icon: { type: "string", description: "Passendes Emoji für das Getränk" },
+                    date: { type: "string", description: `Datum dieses Getränks im Format YYYY-MM-DD. Standard ist der aktuell ausgewählte Tag ${selectedLogDate}; relative Angaben vom Nutzer ausgehend von ${today} umrechnen.` }
+                  },
+                  required: ["name", "size", "caffeine", "date"]
+                }
+              }
+            },
+            required: ["drinks"]
           }
         }
       },
@@ -3125,9 +3230,6 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
-
-
-
 
 
 

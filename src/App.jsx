@@ -55,11 +55,16 @@ const saveViewState = (nextState) => {
   }
 };
 
+const getSavedAdminView = () => {
+  const state = loadViewState();
+  return state.adminView === 'user' ? 'user' : 'admin';
+};
+
 function App() {
   const initialViewState = loadViewState();
   const [session, setSession]     = useState(() => getSession());
   const [authView, setAuthView]   = useState(initialViewState.authView || 'login'); 
-  const [adminView, setAdminView] = useState('admin'); 
+  const [adminView, setAdminView] = useState(initialViewState.adminView === 'user' ? 'user' : 'admin');
   const [adminTab, setAdminTab]   = useState(initialViewState.adminTab || 'overview');
 
   const impersonator = getImpersonatorSession();
@@ -71,8 +76,8 @@ function App() {
 
   useEffect(() => {
     const current = loadViewState();
-    saveViewState({ ...current, authView, adminTab });
-  }, [authView, adminTab]);
+    saveViewState({ ...current, authView, adminTab, adminView });
+  }, [authView, adminTab, adminView]);
 
   const handleImpersonate = (userData) => {
     const newSession = startImpersonation(userData);
@@ -94,7 +99,7 @@ function App() {
     return <RegisterPage onBack={() => setAuthView('login')} />;
   }
   if (!session) {
-    return <LoginPage onLogin={(s) => { setSession(s); setAdminView('admin'); }} onShowRegister={() => setAuthView('register')} />;
+    return <LoginPage onLogin={(s) => { setSession(s); setAdminView(s?.role === 'admin' ? getSavedAdminView() : 'admin'); }} onShowRegister={() => setAuthView('register')} />;
   }
 
   if (session.role === 'admin' && adminView === 'admin') {
@@ -307,10 +312,11 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     try {
       const today = getTodayKey();
       const targetDate = isDateKey(drinkData?.date) ? drinkData.date : today;
-      const payload = { ...drinkData, date: targetDate, ...userPayload(session) };
+      const payload = { ...drinkData, date: targetDate, ...currentUser };
       const created = await addLog(payload);
       setSelectedDate(targetDate);
-      if (targetDate === selectedDate) setLogs((prev) => [created, ...prev]);
+      const targetLogs = await fetchTodayLogs(targetDate, currentUser);
+      setLogs(targetLogs);
       setCalendarRefreshKey((key) => key + 1);
       await refreshStats();
       return created;
@@ -320,7 +326,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     } finally {
       setIsOperationLoading(false);
     }
-  }, [session, refreshStats, selectedDate]);
+  }, [currentUser, refreshStats]);
 
   if (isAppLoading) {
     return (

@@ -23,6 +23,7 @@ export const fetchAiConfig = () => request('/api/admin/ai');
 export const saveAiConfig = ({ apiKey, model, braveSearchKey }) =>
   post('/api/admin/ai', { apiKey, model, braveSearchKey });
 export const fetchAdminUsers = () => request('/api/admin/users');
+export const fetchAdminChatStats = () => request('/api/admin/ai/chat-stats');
 export const verifyAdminUser = (id) => post(`/api/admin/users/${id}/verify`);
 export const deleteAdminUser = (id) => request(`/api/admin/users/${id}`, { method: 'DELETE' });
 export const setUserRole = (id, role) => post(`/api/admin/users/${id}/role`, { role });

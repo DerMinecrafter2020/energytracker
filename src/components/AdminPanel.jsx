@@ -11,7 +11,7 @@ import { fetchLogs, deleteLog as deleteApiLog, adminUpdateLog } from '../service
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
-  testDiscordWebhook, fetchAiConfig, saveAiConfig, fetchRedisHealth,
+  testDiscordWebhook, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
 } from '../services/adminApi';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -129,6 +129,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [aiSaving, setAiSaving]   = useState(false);
   const [aiMsg, setAiMsg]         = useState(null);
 
+  // â”€â”€ AI chat stats state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const [chatStats, setChatStats] = useState({ users: [], totals: {} });
+  const [chatStatsLoading, setChatStatsLoading] = useState(false);
+  const [chatStatsMsg, setChatStatsMsg] = useState(null);
+
   // â”€â”€ Users state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [regUsers, setRegUsers]   = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -163,6 +168,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
     }
     if (activeTab === 'users') loadRegUsers();
+    if (activeTab === 'chat') loadChatStats();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -275,6 +281,22 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       setAiMsg({ type: 'error', text: err.message });
     } finally {
       setAiSaving(false);
+    }
+  };
+
+  const loadChatStats = async () => {
+    setChatStatsLoading(true);
+    setChatStatsMsg(null);
+    try {
+      const data = await fetchAdminChatStats();
+      setChatStats({
+        users: Array.isArray(data.users) ? data.users : [],
+        totals: data.totals || {},
+      });
+    } catch (err) {
+      setChatStatsMsg({ type: 'error', text: 'Fehler beim Laden der Chat-Statistik: ' + err.message });
+    } finally {
+      setChatStatsLoading(false);
     }
   };
 
@@ -526,6 +548,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             { id: 'overview',  label: 'Übersicht',  icon: BarChart2  },
             { id: 'logs',      label: 'Alle Logs',  icon: Database   },
             { id: 'users',     label: 'Benutzer',   icon: Users      },
+            { id: 'chat',      label: 'KI-Chat',    icon: MessageCircle },
             { id: 'settings',  label: 'Einstellungen', icon: Settings },
             
           ].map(({ id, label, icon: Icon }) => (
@@ -977,6 +1000,88 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   </div>
                   <div className="px-5 py-3 border-t border-white/10 text-xs text-slate-600">
                     {regUsers.length} Benutzer
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* â•â•â•â•â•â•â•â•â•â• AI CHAT TAB â•â•â•â•â•â•â•â•â•â• */}
+        {activeTab === 'chat' && (
+          <div className="animate-fade-in pb-10 space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="font-semibold text-white flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-violet-400" />
+                KI-Chat Nachrichten
+              </h2>
+              <button onClick={loadChatStats} disabled={chatStatsLoading}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl glass-card
+                  text-slate-400 hover:text-white text-sm transition-all disabled:opacity-50">
+                <RefreshCw className={`w-4 h-4 ${chatStatsLoading ? 'animate-spin' : ''}`} />
+                Aktualisieren
+              </button>
+            </div>
+
+            <MessageBox message={chatStatsMsg} onClose={() => setChatStatsMsg(null)} />
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard icon={Users} label="Benutzer gesamt" value={chatStats.totals.users || 0} color="blue" />
+              <StatCard icon={MessageCircle} label="Benutzer mit Chat" value={chatStats.totals.usersWithChat || 0} color="purple" />
+              <StatCard icon={User} label="Nutzer-Nachrichten" value={chatStats.totals.userMessages || 0} color="green" />
+              <StatCard icon={Bot} label="KI-Antworten" value={chatStats.totals.assistantMessages || 0} color="amber" />
+            </div>
+
+            <div className="glass-card rounded-2xl overflow-hidden">
+              {chatStatsLoading ? (
+                <div className="p-6 space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="h-12 shimmer rounded-xl" />
+                  ))}
+                </div>
+              ) : chatStats.users.length === 0 ? (
+                <div className="py-16 text-center text-slate-500">
+                  <MessageCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>Noch keine Chatdaten vorhanden.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_1.4fr] gap-3 px-5 py-3
+                    border-b border-white/10 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <span>Benutzer</span>
+                    <span>E-Mail</span>
+                    <span>Nutzer</span>
+                    <span>KI</span>
+                    <span>Gesamt</span>
+                    <span>Letzter Sync</span>
+                  </div>
+                  <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto">
+                    {chatStats.users.map((user) => {
+                      const hasChat = Number(user.totalMessages || 0) > 0;
+                      return (
+                        <div key={user.ownerKey}
+                          className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_1.4fr] gap-3 px-5 py-3.5
+                            hover:bg-white/5 transition-colors items-center text-sm">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 text-white font-medium min-w-0">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${hasChat ? 'bg-green-400' : 'bg-slate-700'}`} />
+                              <span className="truncate">{user.name || 'Unbekannt'}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-600 mt-0.5">
+                              {user.role === 'admin' ? 'Admin' : 'Benutzer'}{user.registered ? '' : ' · nicht registriert'}
+                            </div>
+                          </div>
+                          <span className="text-slate-400 truncate text-xs">{user.email || '–'}</span>
+                          <span className="text-green-400 font-semibold">{user.userMessages || 0}</span>
+                          <span className="text-violet-300 font-semibold">{user.assistantMessages || 0}</span>
+                          <span className="text-blue-300 font-semibold">{user.totalMessages || 0}</span>
+                          <span className="text-slate-500 text-xs">{user.updatedAt ? formatDate(user.updatedAt) : '–'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="px-5 py-3 border-t border-white/10 text-xs text-slate-600">
+                    {chatStats.users.length} Benutzer · {chatStats.totals.totalMessages || 0} Nachrichten gesamt
                   </div>
                 </>
               )}
