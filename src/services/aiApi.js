@@ -33,8 +33,8 @@ const get = async (path, query) => {
 
 const identity = ({ userId, email } = {}) => ({ userId, email });
 
-export const sendAiChat = ({ messages, totalCaffeineToday, dailyLimit, logs }) =>
-  post('/api/ai/chat', { messages, totalCaffeineToday, dailyLimit, logs, clientTime: clientTime(), clientDate: clientDate() });
+export const sendAiChat = ({ messages, totalCaffeineToday, dailyLimit, logs, selectedDate }) =>
+  post('/api/ai/chat', { messages, totalCaffeineToday, dailyLimit, logs, selectedDate, clientTime: clientTime(), clientDate: clientDate() });
 
 export const fetchAiChatHistory = (user) =>
   get('/api/ai/chat-history', identity(user));
@@ -45,8 +45,8 @@ export const saveAiChatHistory = ({ userId, email, messages }) =>
 export const recognizeDrink = (description) =>
   post('/api/ai/recognize-drink', { description });
 
-export const fetchDailySummary = ({ logs, totalCaffeine, dailyLimit }) =>
-  post('/api/ai/daily-summary', { logs, totalCaffeine, dailyLimit, clientTime: clientTime(), clientDate: clientDate() });
+export const fetchDailySummary = ({ logs, totalCaffeine, dailyLimit, selectedDate }) =>
+  post('/api/ai/daily-summary', { logs, totalCaffeine, dailyLimit, selectedDate, clientTime: clientTime(), clientDate: clientDate() });
 
 export const scheduleDiscordMessage = (time, message) =>
   post('/api/ai/schedule-discord', { time, message });

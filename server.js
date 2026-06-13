@@ -2741,7 +2741,7 @@ app.post('/api/ai/chat-history', async (req, res) => {
 // ── AI Chat ──────────────────────────────────────────────────────────────────
 app.post('/api/ai/chat', async (req, res) => {
   try {
-    const { messages, totalCaffeineToday, dailyLimit, clientTime, clientDate, logs } = req.body || {};
+    const { messages, totalCaffeineToday, dailyLimit, clientTime, clientDate, selectedDate, logs } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0)
       return res.status(400).json({ error: 'messages ist erforderlich.' });
 
@@ -2753,21 +2753,21 @@ app.post('/api/ai/chat', async (req, res) => {
         return res.status(400).json({ error: 'Nachricht zu lang (max. 2000 Zeichen).' });
     }
 
-    const caffeineInfo = typeof totalCaffeineToday === 'number'
-      ? `Aktuelle Koffein-Einnahme heute: ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
-      : '';
-
     const today = /^\d{4}-\d{2}-\d{2}$/.test(String(clientDate || '')) ? clientDate : new Date().toISOString().split('T')[0];
-    const logsInfo = Array.isArray(logs) && logs.length > 0 ? `Getränke am aktuellen Tag (${today}) bisher:\n${logs.map(l => `- ID: ${l.id}, Name: ${l.name}, Menge: ${l.size}ml, Koffein: ${l.caffeine}mg`).join('\n')}\n` : `Bisher am aktuellen Tag (${today}) keine Getränke getrackt. `;
-    const timeInfo = `Das aktuelle Datum beim Nutzer ist ${today}${clientTime ? `, die aktuelle Uhrzeit ist ${clientTime}` : ''}. Berücksichtige Datum und Uhrzeit unbedingt bei deinen Empfehlungen (z.B. warne vor spätem Koffeinkonsum am Abend, oder gib morgens einen Energiekick-Tipp). `;
+    const selectedLogDate = /^\d{4}-\d{2}-\d{2}$/.test(String(selectedDate || '')) ? selectedDate : today;
+    const caffeineInfo = typeof totalCaffeineToday === 'number'
+      ? `Koffein am aktuell ausgewählten Tag (${selectedLogDate}): ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
+      : '';
+    const logsInfo = Array.isArray(logs) && logs.length > 0 ? `Getränke am aktuell ausgewählten Tag (${selectedLogDate}) bisher:\n${logs.map(l => `- ID: ${l.id}, Name: ${l.name}, Menge: ${l.size}ml, Koffein: ${l.caffeine}mg`).join('\n')}\n` : `Bisher am aktuell ausgewählten Tag (${selectedLogDate}) keine Getränke getrackt. `;
+    const timeInfo = `Das aktuelle Datum beim Nutzer ist ${today}${clientTime ? `, die aktuelle Uhrzeit ist ${clientTime}` : ''}. Der im Tracker ausgewählte Tag ist ${selectedLogDate}. Berücksichtige Datum und Uhrzeit unbedingt bei deinen Empfehlungen (z.B. warne vor spätem Koffeinkonsum am Abend, oder gib morgens einen Energiekick-Tipp). `;
 
     const systemPrompt = `Du bist ein hilfreicher Assistent für den Drink-Tracker (Version 2.0). Du beantwortest Fragen zu Hydration, Kalorien, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo}
 ${logsInfo}
 
 Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, nutze die zur Verfügung gestellten Tools (Funktionen), um die Aktion auszuführen.
-Wenn der Nutzer nach IDs, Eintrags-IDs oder einer Liste der heutigen Einträge fragt, antworte direkt mit den IDs aus der obigen Liste. Behaupte niemals, dass du keine Funktion zum Anzeigen der IDs hast.
-Für Hinzufügen (add_drink): Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks. Nutze ein passendes Emoji. Setze das Feld date immer als ISO-Datum YYYY-MM-DD. Wenn der Nutzer kein Datum nennt, nutze ${today}. Wenn der Nutzer relative vergangene Tage nennt (z.B. gestern, vorgestern, letzten Montag), berechne das Datum ausgehend von ${today}. Lege keine zukünftigen Log-Einträge an.
-Für Ändern/Löschen (update_drink/delete_drink): Nutze exakt die ID aus der Liste der Getränke am aktuellen Tag.
+Wenn der Nutzer nach IDs, Eintrags-IDs oder einer Liste der Einträge fragt, antworte direkt mit den IDs aus der obigen Liste für ${selectedLogDate}. Behaupte niemals, dass du keine Funktion zum Anzeigen der IDs hast.
+Für Hinzufügen (add_drink): Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks. Nutze ein passendes Emoji. Setze das Feld date immer als ISO-Datum YYYY-MM-DD. Wenn der Nutzer kein Datum nennt, nutze den aktuell ausgewählten Tag ${selectedLogDate}. Wenn der Nutzer relative Tage nennt (z.B. heute, gestern, vorgestern, letzten Montag), berechne das Datum ausgehend vom aktuellen Datum ${today}. Lege keine zukünftigen Log-Einträge an.
+Für Ändern/Löschen (update_drink/delete_drink): Nutze exakt die ID aus der Liste der Getränke für ${selectedLogDate}.
 Für geplante Discord-Nachrichten (schedule_discord_message): Nutze dieses Tool, um eine Nachricht zu einer bestimmten Uhrzeit in Discord (Admin Webhook) posten zu lassen.
 Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.`.trim();
 
@@ -2789,7 +2789,7 @@ Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.
               size: { type: "number", description: "Menge in ml" },
               caffeine: { type: "number", description: "Gesamtes Koffein in mg" },
               icon: { type: "string", description: "Passendes Emoji für das Getränk" },
-              date: { type: "string", description: `Datum des Eintrags im Format YYYY-MM-DD. Standard ist ${today}; vergangene relative Angaben vom Nutzer entsprechend umrechnen.` }
+              date: { type: "string", description: `Datum des Eintrags im Format YYYY-MM-DD. Standard ist der aktuell ausgewählte Tag ${selectedLogDate}; relative Angaben vom Nutzer ausgehend von ${today} umrechnen.` }
             },
             required: ["name", "size", "caffeine", "date"]
           }
@@ -3023,10 +3023,12 @@ Kein Markdown, nur das pure JSON-Array!`
 
 app.post('/api/ai/daily-summary', async (req, res) => {
   try {
-    const { logs, totalCaffeine, dailyLimit, clientTime, clientDate } = req.body || {};
+    const { logs, totalCaffeine, dailyLimit, clientTime, clientDate, selectedDate } = req.body || {};
     if (!Array.isArray(logs))
       return res.status(400).json({ error: 'logs ist erforderlich.' });
 
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(String(clientDate || '')) ? clientDate : new Date().toISOString().split('T')[0];
+    const selectedLogDate = /^\d{4}-\d{2}-\d{2}$/.test(String(selectedDate || '')) ? selectedDate : today;
     const limit = Number(dailyLimit) || 400;
     const total = Number(totalCaffeine) || 0;
     const remaining = Math.max(0, limit - total);
@@ -3034,7 +3036,7 @@ app.post('/api/ai/daily-summary', async (req, res) => {
 
     const logList = logs.slice(0, 30).map((l) =>
       `- ${l.name} (${l.caffeine}mg, ${l.sizeMl || l.size || '?'}ml)`
-    ).join('\n') || 'Keine Einträge heute.';
+    ).join('\n') || 'Keine Einträge an diesem Tag.';
 
     const messages = [
       {
@@ -3043,12 +3045,14 @@ app.post('/api/ai/daily-summary', async (req, res) => {
       },
       {
         role: 'user',
-        content: `Analysiere meine heutige Koffein-Aufnahme und gib mir eine persönliche Auswertung und Empfehlung.
+        content: `Analysiere meine Koffein-Aufnahme am ausgewählten Tag (${selectedLogDate}) und gib mir eine persönliche Auswertung und Empfehlung.
 
-${clientDate ? `Aktuelles Datum: ${clientDate}\n` : ''}${clientTime ? `Aktuelle Uhrzeit: ${clientTime}\n` : ''}Heutiger Verbrauch: ${total}mg von ${limit}mg Tageslimit (${percent}%)
+Aktuelles Datum: ${today}
+Ausgewählter Tag: ${selectedLogDate}
+${clientTime ? `Aktuelle Uhrzeit: ${clientTime}\n` : ''}Verbrauch am ausgewählten Tag: ${total}mg von ${limit}mg Tageslimit (${percent}%)
 Noch verfügbar: ${remaining}mg
 
-Einträge heute:
+Einträge am ausgewählten Tag:
 ${logList}
 
 Bitte: 1) kurze Bewertung, 2) ob ich noch Koffein trinken sollte, 3) ein praktischer Tipp.`,
@@ -3121,8 +3125,6 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
-
-
 
 
 

@@ -3,6 +3,7 @@ import Header from './components/Header';
 import ProgressBar from './components/ProgressBar';
 import ReminderSettings from './components/ReminderSettings';
 import AIAssistant from './components/AIAssistant';
+import CalendarWidget from './components/CalendarWidget';
 import DrinkHistory from './components/DrinkHistory';
 import LoginPage from './components/LoginPage';
 import { Zap, Loader2 } from 'lucide-react';
@@ -28,6 +29,12 @@ const isDateKey = (value) => {
   const [year, month, day] = String(value).split('-').map(Number);
   const parsed = new Date(year, month - 1, day);
   return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+};
+const formatDateLabel = (dateKey) => {
+  if (!isDateKey(dateKey)) return '';
+  const [year, month, day] = String(dateKey).split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 const VIEW_STATE_KEY = 'et:last-view-state';
 const userPayload = (session) => ({ userId: session?.id || null, email: session?.email });
@@ -142,28 +149,31 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [todayStats, setTodayStats] = useState(null);
   const [settings, setSettings] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(getTodayKey);
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
   const isFirstCheck = useRef(true);
+  const currentUser = useMemo(() => userPayload(session), [session?.id, session?.email]);
+  const isSelectedDateToday = selectedDate === getTodayKey();
 
   const refreshStats = useCallback(async () => {
-    if (session?.email) setTodayStats(await fetchTodayStats(userPayload(session)));
-  }, [session]);
+    if (session?.email) setTodayStats(await fetchTodayStats(currentUser));
+  }, [session?.email, currentUser]);
 
   const fetchAllData = useCallback(async () => {
     try {
-      const today = getTodayKey();
-      const [todayLogs, statsData, userSettings] = await Promise.all([
-        fetchTodayLogs(today, { userId: session?.id, email: session?.email }),
-        session?.email ? fetchTodayStats(userPayload(session)) : Promise.resolve(null),
-        session?.email ? fetchUserSettings(userPayload(session)) : Promise.resolve(null),
+      const [selectedLogs, statsData, userSettings] = await Promise.all([
+        fetchTodayLogs(selectedDate, currentUser),
+        session?.email ? fetchTodayStats(currentUser) : Promise.resolve(null),
+        session?.email ? fetchUserSettings(currentUser) : Promise.resolve(null),
       ]);
-      setLogs(todayLogs);
+      setLogs(selectedLogs);
       if (statsData) setTodayStats(statsData);
       if (userSettings) setSettings(userSettings);
     } catch (err) {
       console.error('Fehler beim Laden der Daten:', err);
       setError('Fehler beim Laden der Daten.');
     }
-  }, [session]);
+  }, [session?.email, currentUser, selectedDate]);
 
   useEffect(() => {
     let isMounted = true;
@@ -247,30 +257,36 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     return () => { isMounted = false; clearInterval(interval); };
   }, []);
 
-  const totalCaffeineToday = useMemo(
+  const selectedDateCaffeine = useMemo(
     () => logs.reduce((sum, log) => sum + (log.caffeine || 0), 0),
     [logs]
   );
+  const progressTitle = isSelectedDateToday ? 'Koffein heute' : `Koffein am ${formatDateLabel(selectedDate)}`;
 
   
   
   const handleUpdateLog = async (logId, data) => {
     try {
       const updated = await updateLog(logId, data);
-      setLogs(prev => prev.map(l => l.id === logId ? { ...l, ...updated } : l));
+      setLogs(prev => prev.map(l => String(l.id) === String(logId) ? { ...l, ...updated } : l));
+      setCalendarRefreshKey((key) => key + 1);
       await refreshStats();
+      return updated;
     } catch (err) {
       setError(err.message);
+      throw err;
     }
   };
   
   const handleDeleteLog = async (logId) => {
     try {
       await removeLog(logId);
-      setLogs(prev => prev.filter(l => l.id !== logId));
+      setLogs(prev => prev.filter(l => String(l.id) !== String(logId)));
+      setCalendarRefreshKey((key) => key + 1);
       await refreshStats();
     } catch (err) {
       setError(err.message);
+      throw err;
     }
   };
 
@@ -293,15 +309,18 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       const targetDate = isDateKey(drinkData?.date) ? drinkData.date : today;
       const payload = { ...drinkData, date: targetDate, ...userPayload(session) };
       const created = await addLog(payload);
-      if (created?.date === today) setLogs((prev) => [created, ...prev]);
+      setSelectedDate(targetDate);
+      if (targetDate === selectedDate) setLogs((prev) => [created, ...prev]);
+      setCalendarRefreshKey((key) => key + 1);
       await refreshStats();
       return created;
     } catch (err) {
       setError('Fehler beim Hinzufügen. Bitte versuche es erneut.');
+      throw err;
     } finally {
       setIsOperationLoading(false);
     }
-  }, [session, refreshStats]);
+  }, [session, refreshStats, selectedDate]);
 
   if (isAppLoading) {
     return (
@@ -361,14 +380,24 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
         {!showSettings && (
           <div className="space-y-6 animate-fade-in">
-            <ProgressBar currentCaffeine={totalCaffeineToday} />
+            <ProgressBar currentCaffeine={selectedDateCaffeine} title={progressTitle} isToday={isSelectedDateToday} />
             
-            {todayStats && settings && (
+            {isSelectedDateToday && todayStats && settings && (
               <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
             )}
 
-            <DrinkHistory logs={logs} onDeleteLog={handleDeleteLog} onToggleFavorite={handleToggleFavorite} isFavoriteLog={() => false} />
-            <AIAssistant key={session?.id || session?.email} session={session} totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} onDeleteDrink={handleDeleteLog} onUpdateDrink={handleUpdateLog} />
+            <CalendarWidget
+              selectedDate={selectedDate}
+              logs={logs}
+              userIdentity={currentUser}
+              onSelectDate={setSelectedDate}
+              onUpdateLog={handleUpdateLog}
+              onDeleteLog={handleDeleteLog}
+              refreshKey={calendarRefreshKey}
+              isLoading={isOperationLoading}
+            />
+            <DrinkHistory selectedDate={selectedDate} logs={logs} onDeleteLog={handleDeleteLog} onToggleFavorite={handleToggleFavorite} isFavoriteLog={() => false} />
+            <AIAssistant key={session?.id || session?.email} session={session} selectedDate={selectedDate} totalCaffeineToday={selectedDateCaffeine} logs={logs} onAddDrink={handleAddDrink} onDeleteDrink={handleDeleteLog} onUpdateDrink={handleUpdateLog} />
             
 
           </div>

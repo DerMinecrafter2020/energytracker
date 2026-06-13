@@ -34,12 +34,13 @@ const formatDateLabel = (date) => {
   const [year, month, day] = date.split('-').map(Number);
   return new Date(year, month - 1, day).toLocaleDateString('de-DE');
 };
-const formatTodayLogIds = (logs) => {
+const formatLogIds = (logs, selectedDate) => {
+  const dateLabel = formatDateLabel(selectedDate) || selectedDate || 'diesem Tag';
   if (!Array.isArray(logs) || logs.length === 0) {
-    return 'Heute sind noch keine Einträge vorhanden, daher gibt es aktuell keine IDs zum Löschen.';
+    return `Für ${dateLabel} sind keine Einträge vorhanden, daher gibt es aktuell keine IDs zum Löschen.`;
   }
 
-  return `Hier sind deine heutigen Einträge mit IDs:\n${logs.map((log) =>
+  return `Hier sind deine Einträge für ${dateLabel} mit IDs:\n${logs.map((log) =>
     `ID ${log.id}: ${log.name} (${log.size} ml, ${log.caffeine} mg Koffein)`
   ).join('\n')}`;
 };
@@ -68,7 +69,7 @@ const loadLocalMessages = (storageKey) => {
 
 const sameMessages = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
 
-const AIAssistant = ({ session, totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDrink, onUpdateDrink }) => {
+const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDrink, onUpdateDrink }) => {
   const storageKey = getStorageKey(session);
   const userIdentity = { userId: session?.id || null, email: session?.email || null };
   const [messages, setMessages] = useState(() => loadLocalMessages(storageKey));
@@ -169,7 +170,7 @@ const AIAssistant = ({ session, totalCaffeineToday = 0, logs = [], onAddDrink, o
     setMessages(prev => [...prev, userMsg]);
 
     try {
-      const data = await fetchDailySummary({ logs, totalCaffeine: totalCaffeineToday, dailyLimit: DAILY_LIMIT });
+      const data = await fetchDailySummary({ logs, totalCaffeine: totalCaffeineToday, dailyLimit: DAILY_LIMIT, selectedDate });
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         type: 'daily_summary', 
@@ -198,7 +199,7 @@ const AIAssistant = ({ session, totalCaffeineToday = 0, logs = [], onAddDrink, o
       setMessages((prev) => [
         ...prev,
         userMsg,
-        { role: 'assistant', type: 'text', content: formatTodayLogIds(logs) },
+        { role: 'assistant', type: 'text', content: formatLogIds(logs, selectedDate) },
       ]);
       return;
     }
@@ -215,6 +216,7 @@ const AIAssistant = ({ session, totalCaffeineToday = 0, logs = [], onAddDrink, o
         messages: historyForApi,
         totalCaffeineToday,
         logs,
+        selectedDate,
         dailyLimit: DAILY_LIMIT,
       });
 

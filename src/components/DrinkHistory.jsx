@@ -2,18 +2,29 @@
 import { History, Trash2, Coffee, Heart, HeartOff } from 'lucide-react';
 import { formatTime } from '../utils/caffeineUtils';
 
-const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLoading }) => {
+const formatDateTitle = (dateKey) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey || ''))) return 'Verlauf';
+  const [year, month, day] = String(dateKey).split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const today = new Date();
+  const todayKey = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  if (dateKey === todayKey) return 'Heutiger Verlauf';
+  return date.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
+};
+
+const DrinkHistory = ({ logs, selectedDate, onDeleteLog, onToggleFavorite, isFavoriteLog, isLoading }) => {
+  const title = formatDateTitle(selectedDate);
+
   if (logs.length === 0) {
     return (
       <div className="glass-card rounded-3xl p-6 animate-fade-in">
         <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
           <History className="w-5 h-5 text-slate-500" />
-          Heutiger Verlauf
+          {title}
         </h3>
         <div className="flex flex-col items-center justify-center py-10 text-slate-600">
           <Coffee className="w-10 h-10 mb-3 opacity-30" />
-          <p className="text-sm text-center">Noch keine Getränke heute protokolliert.</p>
-          <p className="text-xs text-center mt-1 text-slate-700">Füge dein erstes Getränk hinzu!</p>
+          <p className="text-sm text-center">Keine Getränke an diesem Tag protokolliert.</p>
         </div>
       </div>
     );
@@ -23,7 +34,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
     <div className="glass-card rounded-3xl p-6 animate-fade-in">
       <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
         <History className="w-5 h-5 text-blue-400" />
-        Heutiger Verlauf
+        {title}
         <span className="ml-auto text-xs font-normal text-slate-500">
           {logs.length} {logs.length === 1 ? 'Eintrag' : 'Einträge'}
         </span>

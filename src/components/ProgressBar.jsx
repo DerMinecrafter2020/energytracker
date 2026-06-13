@@ -7,9 +7,12 @@ import {
   DAILY_CAFFEINE_LIMIT,
 } from '../utils/caffeineUtils';
 
-const ProgressBar = ({ currentCaffeine }) => {
+const ProgressBar = ({ currentCaffeine, title = 'Koffein heute', isToday = true }) => {
   const percentage    = calculateProgress(currentCaffeine);
   const status        = getStatusMessage(currentCaffeine);
+  const statusText    = isToday
+    ? status.text
+    : status.text.replace('heute', 'an diesem Tag').replace('Heute', 'An diesem Tag');
 
   // Material 3 Solid colors
   const barColor =
@@ -33,7 +36,7 @@ const ProgressBar = ({ currentCaffeine }) => {
             <Zap className="w-6 h-6" fill="currentColor" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-[#e2e2e5]">Koffein heute</h2>
+            <h2 className="text-base font-bold text-[#e2e2e5]">{title}</h2>
             <p className="text-xs text-[#c4c6d0]">Limit: {DAILY_CAFFEINE_LIMIT} mg</p>
           </div>
         </div>
@@ -60,15 +63,13 @@ const ProgressBar = ({ currentCaffeine }) => {
 
       {/* Status Msg */}
       <div className={`px-4 py-3 rounded-2xl border ${statusBg}`}>
-        <p className="text-sm font-medium text-center">{status.text}</p>
+        <p className="text-sm font-medium text-center">{statusText}</p>
       </div>
     </div>
   );
 };
 
 export default ProgressBar;
-
-
 
 
 
