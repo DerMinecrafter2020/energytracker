@@ -2,7 +2,14 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 const authHeader = () => {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  let token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  if (!token) {
+    try {
+      token = JSON.parse(localStorage.getItem('et-session') || '{}')?.token;
+    } catch {
+      token = null;
+    }
+  }
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -17,7 +24,7 @@ const urlFor = (path, query = {}) => {
 const request = async (path, { method = 'GET', query, body, auth = false, fallback = 'API-Fehler' } = {}) => {
   const response = await fetch(urlFor(path, query), {
     method,
-    headers: { ...(body !== undefined ? JSON_HEADERS : {}), ...(auth ? authHeader() : {}) },
+    headers: { ...(body !== undefined ? JSON_HEADERS : {}), ...authHeader() },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   const data = await response.json().catch(() => ({}));

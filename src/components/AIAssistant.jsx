@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Trash2, Brain, RefreshCw, Zap, Activity, Clock } from 'lucide-react';
+import { Send, Bot, Trash2, Brain, RefreshCw, Zap, Activity, Clock, Sparkles } from 'lucide-react';
 import { sendAiChat, fetchDailySummary, scheduleDiscordMessage, fetchAiChatHistory, saveAiChatHistory } from '../services/aiApi';
 
 const DAILY_LIMIT = 400;
@@ -9,8 +9,16 @@ const DEFAULT_MESSAGES = [
 ];
 const legacyStorageKey = 'ai_chat_messages';
 
+const escapeHtml = (text) =>
+  String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
 const parseMarkdown = (text) => {
-  return text
+  return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/__(.*?)__/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -83,7 +91,17 @@ const loadLocalMessages = (storageKey) => {
 
 const sameMessages = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
 
-const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDrink, onUpdateDrink }) => {
+const AIAssistant = ({
+  session,
+  selectedDate,
+  totalCaffeineToday = 0,
+  logs = [],
+  onAddDrink,
+  onDeleteDrink,
+  onUpdateDrink,
+  primary = false,
+  contextSummary,
+}) => {
   const storageKey = getStorageKey(session);
   const userIdentity = { userId: session?.id || null, email: session?.email || null };
   const [messages, setMessages] = useState(() => loadLocalMessages(storageKey));
@@ -92,6 +110,7 @@ const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [],
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const scrollContainerRef = useRef(null);
+  const inputRef = useRef(null);
   const messagesRef = useRef(messages);
   const loadingRef = useRef(false);
   const remoteLoadedRef = useRef(false);
@@ -342,6 +361,18 @@ const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [],
     }
   };
 
+  const selectedDateLabel = formatDateLabel(selectedDate) || selectedDate || 'dem gewaehlten Tag';
+  const quickPrompts = [
+    `Analysiere ${selectedDateLabel} und sag mir, was ich verbessern kann.`,
+    `Zeig mir die IDs der Eintraege fuer ${selectedDateLabel}.`,
+    `Fuege fuer ${selectedDateLabel} einen Kaffee mit 250 ml und 100 mg Koffein hinzu.`,
+  ];
+
+  const usePrompt = (prompt) => {
+    setInput(prompt);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   const handleDeleteAddedDrink = async (drinkId, index) => {
     if (onDeleteDrink) {
       await onDeleteDrink(drinkId);
@@ -354,24 +385,32 @@ const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [],
   };
 
   return (
-    <div className="glass-card rounded-[2rem] overflow-hidden animate-fade-in flex flex-col mb-6 h-[650px] shadow-glass flex-shrink-0">
+    <div className={`glass-card overflow-hidden animate-fade-in flex flex-col shadow-glass flex-shrink-0 ${
+      primary
+        ? 'rounded-[1.5rem] min-h-[680px] h-[calc(100vh-10.5rem)] max-h-[860px]'
+        : 'rounded-[2rem] mb-6 h-[650px]'
+    }`}>
       
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-violet-600/30 to-purple-600/20 border-b border-white/10 shrink-0">
+      <div className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4 bg-gradient-to-r from-violet-600/30 to-purple-600/20 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center shadow-inner">
             <Bot className="w-5 h-5 text-violet-300" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white tracking-wide">KI-Assistent</h2>
-            <p className="text-xs text-violet-300/70">Powered by AI</p>
+            <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">
+              {primary ? 'AI Chat' : 'KI-Assistent'}
+            </h2>
+            <p className="text-xs text-violet-300/80 truncate max-w-[52vw] sm:max-w-none">
+              {contextSummary || 'Synchronisiert und aktionsfaehig'}
+            </p>
           </div>
         </div>
         
         <button 
           onClick={handleFetchSummary}
           disabled={summaryLoading}
-          className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-violet-300 text-sm font-medium transition-all shadow-sm border border-white/5"
+          className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-violet-300 text-sm font-medium transition-all shadow-sm border border-white/5 shrink-0"
         >
           {summaryLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
           <span className="hidden sm:inline">Tagesanalyse</span>
@@ -381,7 +420,7 @@ const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [],
 
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm custom-scrollbar bg-black/10" ref={scrollContainerRef}>
+      <div className={`${primary ? 'p-4 sm:p-6' : 'p-6'} flex-1 overflow-y-auto space-y-6 text-sm custom-scrollbar bg-black/10`} ref={scrollContainerRef}>
         {messages.map((msg, i) => {
           const isUser = msg.role === 'user';
           
@@ -457,7 +496,7 @@ const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [],
               >
                 <div 
                   className="whitespace-pre-wrap leading-relaxed" 
-                  dangerouslySetInnerHTML={{ __html: isUser ? msg.content : parseMarkdown(msg.content || '') }} 
+                  dangerouslySetInnerHTML={{ __html: isUser ? escapeHtml(msg.content) : parseMarkdown(msg.content || '') }}
                 />
               </div>
             </div>
@@ -485,12 +524,28 @@ const AIAssistant = ({ session, selectedDate, totalCaffeineToday = 0, logs = [],
 
       {/* Input Area */}
       <div className="p-4 bg-white/5 border-t border-white/10 shrink-0">
+        {primary && (
+          <div className="flex gap-2 overflow-x-auto pb-3 custom-scrollbar">
+            {quickPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => usePrompt(prompt)}
+                className="inline-flex items-center gap-1.5 shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-violet-300" />
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="relative flex items-center">
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="Kommando oder Frage eingeben..."
+            placeholder={primary ? 'Frag die KI oder lass sie Eintraege hinzufuegen, bearbeiten, loeschen, analysieren...' : 'Kommando oder Frage eingeben...'}
             className="w-full bg-black/20 border border-white/10 text-white placeholder-slate-500 rounded-2xl pl-5 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none custom-scrollbar"
             rows="1"
             style={{ minHeight: '56px', maxHeight: '120px' }}

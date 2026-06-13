@@ -13,7 +13,7 @@ import AchievementsPanel from './components/AchievementsPanel';
 import ExportPanel from './components/ExportPanel';
 import CalendarSuggestions from './components/CalendarSuggestions';
 import LoginPage from './components/LoginPage';
-import { Zap, Loader2 } from 'lucide-react';
+import { Zap, Loader2, Bot, CalendarDays, History, Target } from 'lucide-react';
 import AdminPanel from './components/AdminPanel';
 import RegisterPage from './components/RegisterPage';
 import SettingsPanel from './components/SettingsPanel';
@@ -302,6 +302,10 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     [logs]
   );
   const progressTitle = isSelectedDateToday ? 'Koffein heute' : `Koffein am ${formatDateLabel(selectedDate)}`;
+  const dailyLimit = settings?.dailyLimit || todayStats?.dailyLimit || 400;
+  const selectedDateLabel = isSelectedDateToday ? 'Heute' : formatDateLabel(selectedDate);
+  const remainingCaffeine = Math.max(0, dailyLimit - selectedDateCaffeine);
+  const aiContextSummary = `${selectedDateLabel}: ${selectedDateCaffeine} mg, ${logs.length} Eintraege, Limit ${dailyLimit} mg`;
 
   
   
@@ -410,10 +414,6 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   return (
     <>
       <div className="min-h-screen relative overflow-hidden bg-transparent">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-600/20 rounded-full blur-[120px] animate-float-slow pointer-events-none -z-10"></div>
-      <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-amber-500/15 rounded-full blur-[100px] animate-float-delayed pointer-events-none -z-10"></div>
-      <div className="absolute bottom-[-10%] left-[10%] w-[60vw] h-[60vw] bg-purple-600/15 rounded-full blur-[140px] animate-float pointer-events-none -z-10"></div>
-      
       <Header
         isAuthenticated={true}
         isLoading={isOperationLoading}
@@ -425,7 +425,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         onShowSettings={() => setShowSettings(true)}
       />
 
-      <main className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto px-4 pb-28">
+      <main className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6 pb-24">
         {latestVersion && latestVersion !== currentVersion && (
           <div className="glass-card border border-blue-500/30 bg-blue-500/10
             px-4 py-3 rounded-2xl mb-6 animate-fade-in">
@@ -448,47 +448,112 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         )}
 
         {!showSettings && (
-          <div className="space-y-6 animate-fade-in">
-            <ProgressBar currentCaffeine={selectedDateCaffeine} title={progressTitle} isToday={isSelectedDateToday} />
-            {overviewStats && <GoalOverview overview={overviewStats} />}
-            {isSelectedDateToday && (
-              <CaffeineDecayChart logs={logs} sleepTime={settings?.sleepTime || '23:00'} />
-            )}
-            
-            {isSelectedDateToday && todayStats && settings && (
-              <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
-            )}
+          <div className="space-y-5 animate-fade-in">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="glass-card rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                  <CalendarDays className="w-4 h-4 text-blue-300" />
+                  Kontext
+                </div>
+                <p className="text-lg font-bold text-white">{selectedDateLabel}</p>
+              </div>
+              <div className="glass-card rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                  <Zap className="w-4 h-4 text-amber-300" />
+                  Koffein
+                </div>
+                <p className="text-lg font-bold text-white">{selectedDateCaffeine} mg</p>
+              </div>
+              <div className="glass-card rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                  <Target className="w-4 h-4 text-emerald-300" />
+                  Restbudget
+                </div>
+                <p className="text-lg font-bold text-white">{remainingCaffeine} mg</p>
+              </div>
+              <div className="glass-card rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                  <History className="w-4 h-4 text-violet-300" />
+                  Eintraege
+                </div>
+                <p className="text-lg font-bold text-white">{logs.length}</p>
+              </div>
+            </div>
 
-            <FavoriteQuickActions
-              favorites={favorites}
-              onAddFavorite={handleAddFavoriteDrink}
-              onRemoveFavorite={handleRemoveFavorite}
-              isLoading={isOperationLoading}
-            />
-            {insights && <PatternInsights insights={insights} />}
-            {insights?.achievements && <AchievementsPanel achievements={insights.achievements} />}
-            <CalendarWidget
-              selectedDate={selectedDate}
-              logs={logs}
-              userIdentity={currentUser}
-              onSelectDate={setSelectedDate}
-              onUpdateLog={handleUpdateLog}
-              onDeleteLog={handleDeleteLog}
-              refreshKey={calendarRefreshKey}
-              isLoading={isOperationLoading}
-            />
-            <CalendarSuggestions
-              selectedDate={selectedDate}
-              logs={logs}
-              totalCaffeine={selectedDateCaffeine}
-              dailyLimit={settings?.dailyLimit || todayStats?.dailyLimit || 400}
-              insights={insights}
-            />
-            <DrinkHistory selectedDate={selectedDate} logs={logs} onDeleteLog={handleDeleteLog} onToggleFavorite={handleToggleFavorite} isFavoriteLog={(log) => favorites.some((favorite) => drinkKey(favorite) === drinkKey(log))} />
-            <AIAssistant key={session?.id || session?.email} session={session} selectedDate={selectedDate} totalCaffeineToday={selectedDateCaffeine} logs={logs} onAddDrink={handleAddDrink} onDeleteDrink={handleDeleteLog} onUpdateDrink={handleUpdateLog} />
-            <ExportPanel userIdentity={currentUser} />
-            
+            <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px] items-start">
+              <div className="min-w-0">
+                <AIAssistant
+                  key={session?.id || session?.email}
+                  session={session}
+                  selectedDate={selectedDate}
+                  totalCaffeineToday={selectedDateCaffeine}
+                  logs={logs}
+                  onAddDrink={handleAddDrink}
+                  onDeleteDrink={handleDeleteLog}
+                  onUpdateDrink={handleUpdateLog}
+                  primary
+                  contextSummary={aiContextSummary}
+                />
+              </div>
 
+              <aside className="space-y-4 xl:sticky xl:top-24">
+                <div className="flex items-center gap-2 px-1 text-sm font-semibold text-slate-300">
+                  <Bot className="w-4 h-4 text-violet-300" />
+                  KI-Kontext und Hilfsfunktionen
+                </div>
+
+                {isSelectedDateToday && todayStats && settings && (
+                  <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
+                )}
+
+                <ProgressBar currentCaffeine={selectedDateCaffeine} title={progressTitle} isToday={isSelectedDateToday} />
+                {overviewStats && <GoalOverview overview={overviewStats} />}
+                {isSelectedDateToday && (
+                  <CaffeineDecayChart logs={logs} sleepTime={settings?.sleepTime || '23:00'} />
+                )}
+
+                <FavoriteQuickActions
+                  favorites={favorites}
+                  onAddFavorite={handleAddFavoriteDrink}
+                  onRemoveFavorite={handleRemoveFavorite}
+                  isLoading={isOperationLoading}
+                />
+
+                <CalendarSuggestions
+                  selectedDate={selectedDate}
+                  logs={logs}
+                  totalCaffeine={selectedDateCaffeine}
+                  dailyLimit={dailyLimit}
+                  insights={insights}
+                />
+              </aside>
+            </section>
+
+            <section className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] items-start">
+              <CalendarWidget
+                selectedDate={selectedDate}
+                logs={logs}
+                userIdentity={currentUser}
+                onSelectDate={setSelectedDate}
+                onUpdateLog={handleUpdateLog}
+                onDeleteLog={handleDeleteLog}
+                refreshKey={calendarRefreshKey}
+                isLoading={isOperationLoading}
+              />
+
+              <div className="space-y-5">
+                <DrinkHistory
+                  selectedDate={selectedDate}
+                  logs={logs}
+                  onDeleteLog={handleDeleteLog}
+                  onToggleFavorite={handleToggleFavorite}
+                  isFavoriteLog={(log) => favorites.some((favorite) => drinkKey(favorite) === drinkKey(log))}
+                />
+                {insights && <PatternInsights insights={insights} />}
+                {insights?.achievements && <AchievementsPanel achievements={insights.achievements} />}
+                <ExportPanel userIdentity={currentUser} />
+              </div>
+            </section>
           </div>
         )}
 

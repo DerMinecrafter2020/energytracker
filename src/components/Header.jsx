@@ -11,7 +11,7 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
 
   return (
     <header className="bg-[#1a1c22] px-4 py-4 sm:py-5 mb-8 sticky top-0 z-30 shadow-sm border-b border-[#252830]">
-      <div className="max-w-lg md:max-w-2xl lg:max-w-4xl mx-auto flex items-center gap-4">
+      <div className="max-w-7xl mx-auto flex items-center gap-4">
         {/* Logo or Back Button */}
         {currentTab && currentTab !== 'home' ? (
           <button
@@ -88,7 +88,6 @@ const Header = ({ isAuthenticated, isLoading, session, onLogout, onShowAdminPane
 };
 
 export default Header;
-
 
 
 

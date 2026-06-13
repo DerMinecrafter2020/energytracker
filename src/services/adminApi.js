@@ -1,7 +1,20 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'et-admin-2024';
 
-const adminHeaders = () => ({ 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET });
+const authToken = () => {
+  let token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  if (!token) {
+    try {
+      token = JSON.parse(localStorage.getItem('et-session') || '{}')?.token;
+    } catch {
+      token = null;
+    }
+  }
+  return token;
+};
+const adminHeaders = (hasBody = true) => ({
+  ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+  ...(authToken() ? { Authorization: `Bearer ${authToken()}` } : {}),
+});
 const handle = async (resp) => {
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -17,12 +30,12 @@ const urlFor = (path, query = {}) => {
 const request = (path, { method = 'GET', body, admin = true } = {}) =>
   fetch(`${API_BASE}${path}`, {
     method,
-    headers: admin ? adminHeaders() : undefined,
+    headers: admin ? adminHeaders(body !== undefined) : undefined,
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   }).then(handle);
 const requestQuery = (path, query, { admin = true } = {}) =>
   fetch(urlFor(path, query), {
-    headers: admin ? adminHeaders() : undefined,
+    headers: admin ? adminHeaders(false) : undefined,
   }).then(handle);
 const post = (path, body) => request(path, { method: 'POST', body });
 

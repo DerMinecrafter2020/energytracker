@@ -1,5 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import hpp from 'hpp';
+import rateLimit from 'express-rate-limit';
 
 import dotenv from 'dotenv';
 import path from 'path';
@@ -27,8 +30,16 @@ const DB_TYPE = 'redis';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Admin secret – set ADMIN_SECRET in your .env
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'et-admin-2024';
+const readEnvValue = (value) => String(value || '').trim().replace(/^['\"]|['\"]$/g, '');
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex');
+const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS || 7 * 24 * 60 * 60 * 1000);
+if (!process.env.SESSION_SECRET) {
+  console.warn('[Security] SESSION_SECRET fehlt. Tokens werden bei jedem Serverstart invalidiert.');
+}
+const DEMO_ADMIN_EMAIL = readEnvValue(process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL) || 'admin@energytracker.de';
+const DEMO_ADMIN_PASSWORD = readEnvValue(process.env.ADMIN_PASSWORD) || 'Admin@2024!';
+const DEMO_USER_EMAIL = readEnvValue(process.env.USER_EMAIL || process.env.VITE_USER_EMAIL) || 'user@energytracker.de';
+const DEMO_USER_PASSWORD = readEnvValue(process.env.USER_PASSWORD) || 'User@2024!';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const hashPassword = (pw) => {
@@ -53,12 +64,96 @@ const createTransporter = (cfg) => {
   return nodemailer.createTransport(transport);
 };
 
-// ── Admin middleware ──────────────────────────────────────────────────────────
-const requireAdmin = (req, res, next) => {
-  if (req.headers['x-admin-secret'] !== ADMIN_SECRET)
-    return res.status(401).json({ error: 'Nicht autorisiert.' });
-  next();
+// ── Auth helpers ─────────────────────────────────────────────────────────────
+const encodeTokenPart = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const decodeTokenPart = (value) => JSON.parse(Buffer.from(String(value || ''), 'base64url').toString('utf8'));
+const signTokenValue = (value) => crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('base64url');
+const safeEqual = (a, b) => {
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
 };
+
+const createSessionToken = (user) => {
+  const now = Date.now();
+  const payload = {
+    sub: String(user.id),
+    email: String(user.email || '').toLowerCase(),
+    role: user.role === 'admin' ? 'admin' : 'user',
+    name: user.name || '',
+    iat: now,
+    exp: now + SESSION_TTL_MS,
+  };
+  const body = encodeTokenPart(payload);
+  return `${body}.${signTokenValue(body)}`;
+};
+
+const verifySessionToken = (token) => {
+  const [body, signature] = String(token || '').split('.');
+  if (!body || !signature || !safeEqual(signTokenValue(body), signature)) return null;
+  const payload = decodeTokenPart(body);
+  if (!payload?.sub || !payload?.email || Date.now() > Number(payload.exp || 0)) return null;
+  return payload;
+};
+
+const getBearerToken = (req) => {
+  const value = String(req.headers.authorization || '').trim();
+  const match = value.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : '';
+};
+
+const buildSessionUser = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role === 'admin' ? 'admin' : 'user',
+  token: createSessionToken(user),
+});
+
+const demoUserForCredentials = (email, password) => {
+  const safeEmail = String(email || '').toLowerCase().trim();
+  if (safeEmail === DEMO_ADMIN_EMAIL.toLowerCase() && password === DEMO_ADMIN_PASSWORD) {
+    return { id: 'demo-admin', name: 'Administrator', email: DEMO_ADMIN_EMAIL.toLowerCase(), role: 'admin', verified: true };
+  }
+  if (safeEmail === DEMO_USER_EMAIL.toLowerCase() && password === DEMO_USER_PASSWORD) {
+    return { id: 'demo-user', name: 'Benutzer', email: DEMO_USER_EMAIL.toLowerCase(), role: 'user', verified: true };
+  }
+  return null;
+};
+
+const requireAuth = (req, res, next) => {
+  try {
+    const payload = verifySessionToken(getBearerToken(req));
+    if (!payload) return res.status(401).json({ error: 'Nicht angemeldet.' });
+
+    const user = getUserByIdentity({ userId: payload.sub, email: payload.email });
+    const fallbackUser = String(payload.sub).startsWith('demo-')
+      ? { id: payload.sub, name: payload.name, email: payload.email, role: payload.role }
+      : null;
+    const effectiveUser = user || fallbackUser;
+    if (!effectiveUser) return res.status(401).json({ error: 'Sitzung ist ungueltig.' });
+
+    req.user = effectiveUser;
+    req.auth = {
+      userId: String(effectiveUser.id),
+      email: String(effectiveUser.email || '').toLowerCase(),
+      role: effectiveUser.role === 'admin' ? 'admin' : 'user',
+    };
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Sitzung ist ungueltig.' });
+  }
+};
+
+const requireAdmin = (req, res, next) => {
+  requireAuth(req, res, () => {
+    if (req.auth?.role !== 'admin') return res.status(403).json({ error: 'Admin-Rechte erforderlich.' });
+    next();
+  });
+};
+
+const authIdentity = (req) => ({ userId: req.auth.userId, email: req.auth.email });
+const canAccessLog = (req, log) => req.auth?.role === 'admin' || logMatchesUser(log, authIdentity(req));
 
 const CONTAINER_START = new Date(Date.now() - process.uptime() * 1000);
 
@@ -117,8 +212,41 @@ const cleanupAuthChallenges = () => {
   }
 };
 
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", ALLOWED_ORIGIN, 'https:'],
+      fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+      frameAncestors: ["'none'"],
+    },
+  },
+}));
 app.use(cors({ origin: ALLOWED_ORIGIN }));
-app.use(express.json({ limit: '10mb' }));
+app.use(hpp());
+app.use(express.json({ limit: '1mb' }));
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Zu viele Anfragen. Bitte spaeter erneut versuchen.' },
+});
+
+app.use('/api', apiLimiter);
+app.use(['/api/login', '/api/register', '/api/auth/forgot-password', '/api/auth/reset-password'], authLimiter);
 
 // Static Frontend
 const distPath = path.join(__dirname, 'dist');
@@ -1106,7 +1234,7 @@ const sanitizeSecurityOverview = (user) => {
 const completeLoginForUser = async (user) => {
   const dbPool = getPool();
   await dbPool.execute('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
-  return { id: user.id, name: user.name, email: user.email, role: user.role };
+  return buildSessionUser(user);
 };
 
 
@@ -1671,11 +1799,11 @@ app.get('/api/version', async (req, res) => {
 });
 
 // ── Docker Hub update check ───────────────────────────────────────────────
-app.get('/api/logs', async (req, res) => {
+app.get('/api/logs', requireAuth, async (req, res) => {
   try {
     const date = req.query.date;
-    const userId = req.query.userId || null;
-    const email = req.query.email || null;
+    const requestedUserId = String(req.query.userId || '').trim() || null;
+    const requestedEmail = String(req.query.email || '').toLowerCase().trim();
 
     if (!date) {
       return res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
@@ -1687,13 +1815,12 @@ app.get('/api/logs', async (req, res) => {
       [date]
     );
 
-    let filteredRows = rows;
-    if (userId || email) {
-      filteredRows = rows.filter(r => 
-        (userId && String(r.userId) === String(userId)) || 
-        (email && String(r.email).toLowerCase() === String(email).toLowerCase())
-      );
-    }
+    const identity = req.auth.role === 'admin' && (requestedUserId || requestedEmail)
+      ? { userId: requestedUserId, email: requestedEmail }
+      : authIdentity(req);
+    const filteredRows = req.auth.role === 'admin' && !requestedUserId && !requestedEmail
+      ? rows
+      : rows.filter((row) => logMatchesUser(row, identity));
 
     res.json(filteredRows);
   } catch (err) {
@@ -1702,9 +1829,10 @@ app.get('/api/logs', async (req, res) => {
   }
 });
 
-app.post('/api/logs', async (req, res) => {
+app.post('/api/logs', requireAuth, async (req, res) => {
   try {
-    const { name, size, caffeine, caffeinePerMl, icon, isPreset, date, userId, email } = req.body || {};
+    const { name, size, caffeine, caffeinePerMl, icon, isPreset, date } = req.body || {};
+    const { userId, email } = authIdentity(req);
     if (!name || !size || !caffeine) {
       return res.status(400).json({ error: 'name, size, caffeine are required' });
     }
@@ -1787,12 +1915,16 @@ app.post('/api/logs', async (req, res) => {
 });
 
 
-app.put('/api/logs/:id', async (req, res) => {
+app.put('/api/logs/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, size, caffeine, icon } = req.body;
     const dbPool = getPool();
-    // Assuming simple updates without strict user filtering for now since the app.delete didn't have it either.
+    const [existingRows] = await dbPool.execute('SELECT * FROM caffeine_logs WHERE id = ?', [id]);
+    const existingLog = existingRows[0];
+    if (!existingLog) return res.status(404).json({ error: 'Log nicht gefunden.' });
+    if (!canAccessLog(req, existingLog)) return res.status(403).json({ error: 'Kein Zugriff auf diesen Eintrag.' });
+
     const [result] = await dbPool.execute('UPDATE caffeine_logs SET name = ?, size = ?, caffeine = ?, icon = ? WHERE id = ?', [name, Number(size), Number(caffeine), icon, id]);
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Log nicht gefunden.' });
@@ -1803,16 +1935,47 @@ app.put('/api/logs/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/logs/:id', async (req, res) => {
+app.delete('/api/logs/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
     const dbPool = getPool();
+    const [existingRows] = await dbPool.execute('SELECT * FROM caffeine_logs WHERE id = ?', [id]);
+    const existingLog = existingRows[0];
+    if (!existingLog) return res.status(404).json({ error: 'Log nicht gefunden.' });
+    if (!canAccessLog(req, existingLog)) return res.status(403).json({ error: 'Kein Zugriff auf diesen Eintrag.' });
+
     await dbPool.execute('DELETE FROM caffeine_logs WHERE id = ?', [id]);
 
     res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/logs error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.put('/api/admin/logs/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, size, caffeine, icon } = req.body;
+    const dbPool = getPool();
+    const [result] = await dbPool.execute('UPDATE caffeine_logs SET name = ?, size = ?, caffeine = ?, icon = ? WHERE id = ?', [name, Number(size), Number(caffeine), icon, id]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Log nicht gefunden.' });
+    res.json({ id, name, size: Number(size), caffeine: Number(caffeine), icon });
+  } catch (err) {
+    console.error('PUT /api/admin/logs/:id error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.delete('/api/admin/logs/:id', requireAdmin, async (req, res) => {
+  try {
+    const dbPool = getPool();
+    const [result] = await dbPool.execute('DELETE FROM caffeine_logs WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Log nicht gefunden.' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/admin/logs/:id error:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
@@ -2189,12 +2352,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
 app.post('/api/admin/users/:id/impersonate', requireAdmin, (req, res) => {
   const user = dbState.users.find((u) => u.id === req.params.id);
   if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
-  res.json({
-    id:    user.id,
-    name:  user.name,
-    email: user.email,
-    role:  user.role,
-  });
+  res.json(buildSessionUser(user));
 });
 
 // ── Public settings (no auth required) ────────────────────────────────────────
@@ -2413,14 +2571,19 @@ app.post('/api/login', async (req, res) => {
       [email.toLowerCase()]
     );
     const user = rows[0];
-    if (!user) return res.status(401).json({ error: 'Ung\u00fcltige Zugangsdaten.' });
+    if (!user) {
+      const cfg = await loadSmtpConfig();
+      const demoUser = cfg?.demoEnabled !== false ? demoUserForCredentials(email, password) : null;
+      if (demoUser) return res.json({ success: true, user: buildSessionUser(demoUser) });
+      return res.status(401).json({ error: 'Ung\u00fcltige Zugangsdaten.' });
+    }
     if (!user.verified)
       return res.status(403).json({ error: 'E-Mail-Adresse noch nicht best\u00e4tigt. Bitte pr\u00fcfe dein Postfach.' });
     if (user.passwordHash !== hashPassword(password))
       return res.status(401).json({ error: 'Ung\u00fcltige Zugangsdaten.' });
 
     const fullUser = getUserByIdentity({ userId: user.id, email: user.email });
-    ensureUserSecurityFields(fullUser);
+    if (fullUser) ensureUserSecurityFields(fullUser);
 
     const hasTotp = !!fullUser?.totp_enabled && !!fullUser?.totp_secret;
     const hasPasskey = Array.isArray(fullUser?.passkeys) && fullUser.passkeys.length > 0;
@@ -2491,7 +2654,7 @@ app.post('/api/login/2fa/passkey/options', async (req, res) => {
 
     const options = await generateAuthenticationOptions({
       rpID: rpID,
-      userVerification: 'preferred',
+      userVerification: 'required',
       allowCredentials: user.passkeys.map((k) => ({
         id: k.id,
         transports: Array.isArray(k.transports) ? k.transports : [],
@@ -2544,7 +2707,7 @@ app.post('/api/login/2fa/passkey/verify', async (req, res) => {
         counter: Number(passkey.counter || 0),
         transports: Array.isArray(passkey.transports) ? passkey.transports : [],
       },
-      requireUserVerification: false,
+      requireUserVerification: true,
     });
 
     if (!verification.verified) return res.status(401).json({ error: 'Passkey-Überprüfung fehlgeschlagen.' });
@@ -2567,11 +2730,9 @@ app.post('/api/login/2fa/passkey/verify', async (req, res) => {
 });
 
 // ── User Reminder Settings ───────────────────────────────────────────────────
-app.get('/api/reminders/me', async (req, res) => {
+app.get('/api/reminders/me', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const reminder = getReminderForUser({ userId, email });
     res.json(reminder);
@@ -2581,13 +2742,11 @@ app.get('/api/reminders/me', async (req, res) => {
   }
 });
 
-app.post('/api/reminders/me', async (req, res) => {
+app.post('/api/reminders/me', requireAuth, async (req, res) => {
   try {
-    const { userId, email, enabled, time, mailEnabled, discordEnabled, discordWebhook } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
+    const { enabled, time, mailEnabled, discordEnabled, discordWebhook } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
 
-    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (!isValidReminderTime(time)) return res.status(400).json({ error: 'Uhrzeit muss im Format HH:MM sein.' });
 
 
@@ -2611,11 +2770,9 @@ app.post('/api/reminders/me', async (req, res) => {
 });
 
 // ── User Favorites ───────────────────────────────────────────────────────────
-app.get('/api/favorites/me', async (req, res) => {
+app.get('/api/favorites/me', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const favorites = getFavoritesForUser({ userId, email });
     res.json({ items: favorites.items });
@@ -2625,13 +2782,11 @@ app.get('/api/favorites/me', async (req, res) => {
   }
 });
 
-app.post('/api/favorites/me', async (req, res) => {
+app.post('/api/favorites/me', requireAuth, async (req, res) => {
   try {
-    const { userId, email, drink } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
+    const { drink } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
 
-    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (!drink || typeof drink !== 'object') return res.status(400).json({ error: 'drink ist erforderlich.' });
 
     const name = String(drink.name || '').trim();
@@ -2661,13 +2816,11 @@ app.post('/api/favorites/me', async (req, res) => {
   }
 });
 
-app.delete('/api/favorites/me', async (req, res) => {
+app.delete('/api/favorites/me', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
+    const { userId, email } = authIdentity(req);
     const favoriteId = String(req.query.favoriteId || '').trim();
 
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (!favoriteId) return res.status(400).json({ error: 'favoriteId ist erforderlich.' });
 
     const removed = removeFavoriteForUser({ userId, email, favoriteId });
@@ -2681,11 +2834,9 @@ app.delete('/api/favorites/me', async (req, res) => {
 });
 
 // ── USER SETTINGS ────────────────────────────────────────────────────────────
-app.get('/api/settings/me', async (req, res) => {
+app.get('/api/settings/me', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const settings = getUserSettings({ userId, email });
     res.json(settings);
@@ -2695,13 +2846,11 @@ app.get('/api/settings/me', async (req, res) => {
   }
 });
 
-app.post('/api/settings/me', async (req, res) => {
+app.post('/api/settings/me', requireAuth, async (req, res) => {
   try {
-    const { userId, email, dailyLimit, sleepTime, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
+    const { dailyLimit, sleepTime, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
 
-    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (dailyLimit !== undefined && (!Number.isFinite(dailyLimit) || dailyLimit < 0))
       return res.status(400).json({ error: 'dailyLimit muss eine positive Zahl sein.' });
     if (sleepTime !== undefined && !isValidTime(sleepTime))
@@ -2727,11 +2876,10 @@ app.post('/api/settings/me', async (req, res) => {
   }
 });
 
-app.post('/api/user/profile', async (req, res) => {
+app.post('/api/user/profile', requireAuth, async (req, res) => {
   try {
-    const { userId, email, currentPassword, newName, newEmail, newPassword } = req.body || {};
-    const safeUserId = String(userId || '').trim() || null;
-    const safeEmail  = String(email || '').toLowerCase().trim();
+    const { currentPassword, newName, newEmail, newPassword } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
 
     const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
@@ -2770,7 +2918,7 @@ app.post('/api/user/profile', async (req, res) => {
       [finalName, finalEmail, finalHash, user.id]
     );
 
-    res.json({ success: true, name: finalName, email: finalEmail });
+    res.json({ success: true, name: finalName, email: finalEmail, token: createSessionToken({ ...user, name: finalName, email: finalEmail }) });
   } catch (err) {
     console.error('POST /api/user/profile error:', err);
     res.status(500).json({ error: 'Database error' });
@@ -2778,17 +2926,9 @@ app.post('/api/user/profile', async (req, res) => {
 });
 
 // ── USER TEST ROUTES ────────────────────────────────────────────────────────
-app.post('/api/user/test-email', async (req, res) => {
+app.post('/api/user/test-email', requireAuth, async (req, res) => {
   try {
-    const { userId, email } = req.body || {};
-    
-    // Die E-Mail Adresse aus den Benutzerdaten auslesen
-    const user = dbState.users.find(u => (userId && String(u.id) === String(userId)) || (email && String(u.email).toLowerCase() === String(email).toLowerCase()));
-    
-    let targetEmail = user?.email || email;
-    if (!targetEmail) {
-      targetEmail = 'admin@fra03.de';
-    }
+    const targetEmail = req.auth.email;
 
     // Testemail senden
     const cfg = await loadSmtpConfig();
@@ -2826,11 +2966,9 @@ app.post('/api/user/test-email', async (req, res) => {
 });
 
 // ── USER SECURITY (2FA + PASSKEYS) ─────────────────────────────────────────
-app.get('/api/security/me', async (req, res) => {
+app.get('/api/security/me', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const user = getUserByIdentity({ userId, email });
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
@@ -2841,12 +2979,11 @@ app.get('/api/security/me', async (req, res) => {
   }
 });
 
-app.post('/api/security/totp/setup', async (req, res) => {
+app.post('/api/security/totp/setup', requireAuth, async (req, res) => {
   try {
-    const { userId, email, password } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
-    if (!safeEmail || !password) return res.status(400).json({ error: 'email und password sind erforderlich.' });
+    const { password } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
+    if (!password) return res.status(400).json({ error: 'password ist erforderlich.' });
 
     const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
@@ -2867,12 +3004,11 @@ app.post('/api/security/totp/setup', async (req, res) => {
   }
 });
 
-app.post('/api/security/totp/enable', async (req, res) => {
+app.post('/api/security/totp/enable', requireAuth, async (req, res) => {
   try {
-    const { userId, email, code } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
-    if (!safeEmail || !code) return res.status(400).json({ error: 'email und code sind erforderlich.' });
+    const { code } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
+    if (!code) return res.status(400).json({ error: 'code ist erforderlich.' });
 
     const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
@@ -2894,12 +3030,11 @@ app.post('/api/security/totp/enable', async (req, res) => {
   }
 });
 
-app.post('/api/security/totp/disable', async (req, res) => {
+app.post('/api/security/totp/disable', requireAuth, async (req, res) => {
   try {
-    const { userId, email, password } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
-    if (!safeEmail || !password) return res.status(400).json({ error: 'email und password sind erforderlich.' });
+    const { password } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
+    if (!password) return res.status(400).json({ error: 'password ist erforderlich.' });
 
     const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
@@ -2920,12 +3055,9 @@ app.post('/api/security/totp/disable', async (req, res) => {
   }
 });
 
-app.post('/api/security/passkeys/register/options', async (req, res) => {
+app.post('/api/security/passkeys/register/options', requireAuth, async (req, res) => {
   try {
-    const { userId, email } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
-    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
 
     const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
@@ -2948,7 +3080,7 @@ app.post('/api/security/passkeys/register/options', async (req, res) => {
       attestationType: 'none',
       authenticatorSelection: {
         residentKey: 'preferred',
-        userVerification: 'preferred',
+        userVerification: 'required',
       },
       excludeCredentials: user.passkeys.map((k) => ({ id: k.id, transports: k.transports || [] })),
     });
@@ -2968,13 +3100,12 @@ app.post('/api/security/passkeys/register/options', async (req, res) => {
   }
 });
 
-app.post('/api/security/passkeys/register/verify', async (req, res) => {
+app.post('/api/security/passkeys/register/verify', requireAuth, async (req, res) => {
   try {
-    const { userId, email, challengeToken, response, name } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
-    if (!safeEmail || !challengeToken || !response) {
-      return res.status(400).json({ error: 'email, challengeToken und response sind erforderlich.' });
+    const { challengeToken, response, name } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
+    if (!challengeToken || !response) {
+      return res.status(400).json({ error: 'challengeToken und response sind erforderlich.' });
     }
 
     const user = getUserByIdentity({ userId: safeUserId, email: safeEmail });
@@ -2991,7 +3122,7 @@ app.post('/api/security/passkeys/register/verify', async (req, res) => {
       expectedChallenge: challengeState.challenge,
       expectedOrigin: getWebAuthnConfig(req).origin,
       expectedRPID: getWebAuthnConfig(req).rpID,
-      requireUserVerification: false,
+      requireUserVerification: true,
     });
 
     if (!verification.verified || !verification.registrationInfo) {
@@ -3024,12 +3155,11 @@ app.post('/api/security/passkeys/register/verify', async (req, res) => {
   }
 });
 
-app.delete('/api/security/passkeys/:credentialId', async (req, res) => {
+app.delete('/api/security/passkeys/:credentialId', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
+    const { userId, email } = authIdentity(req);
     const credentialId = String(req.params.credentialId || '').trim();
-    if (!email || !credentialId) return res.status(400).json({ error: 'email und credentialId sind erforderlich.' });
+    if (!credentialId) return res.status(400).json({ error: 'credentialId ist erforderlich.' });
 
     const user = getUserByIdentity({ userId, email });
     if (!user) return res.status(404).json({ error: 'Benutzer nicht gefunden.' });
@@ -3050,11 +3180,9 @@ app.delete('/api/security/passkeys/:credentialId', async (req, res) => {
 });
 
 // ── CUSTOM DRINKS ───────────────────────────────────────────────────────────
-app.get('/api/custom-drinks/me', async (req, res) => {
+app.get('/api/custom-drinks/me', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const drinks = getCustomDrinksForUser({ userId, email });
     res.json({ items: drinks });
@@ -3064,13 +3192,11 @@ app.get('/api/custom-drinks/me', async (req, res) => {
   }
 });
 
-app.post('/api/custom-drinks/me', async (req, res) => {
+app.post('/api/custom-drinks/me', requireAuth, async (req, res) => {
   try {
-    const { userId, email, name, size, caffeine, icon } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
+    const { name, size, caffeine, icon } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
 
-    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name ist erforderlich.' });
     if (!Number.isFinite(size) || size <= 0) return res.status(400).json({ error: 'size muss positiv sein.' });
     if (!Number.isFinite(caffeine) || caffeine < 0) return res.status(400).json({ error: 'caffeine muss >= 0 sein.' });
@@ -3091,13 +3217,11 @@ app.post('/api/custom-drinks/me', async (req, res) => {
   }
 });
 
-app.delete('/api/custom-drinks/me', async (req, res) => {
+app.delete('/api/custom-drinks/me', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
+    const { userId, email } = authIdentity(req);
     const drinkId = String(req.query.drinkId || '').trim();
 
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (!drinkId) return res.status(400).json({ error: 'drinkId ist erforderlich.' });
 
     const removed = removeCustomDrink({ userId, email, drinkId });
@@ -3111,11 +3235,9 @@ app.delete('/api/custom-drinks/me', async (req, res) => {
 });
 
 // ── STATISTICS ───────────────────────────────────────────────────────────────
-app.get('/api/stats/today', async (req, res) => {
+app.get('/api/stats/today', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const stats = getTodayStats({ userId, email });
     res.json(stats);
@@ -3124,11 +3246,9 @@ app.get('/api/stats/today', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
-app.get('/api/stats/weekly', async (req, res) => {
+app.get('/api/stats/weekly', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const stats = getWeeklyStats({ userId, email });
     res.json({ items: stats });
@@ -3138,11 +3258,9 @@ app.get('/api/stats/weekly', async (req, res) => {
   }
 });
 
-app.get('/api/stats/overview', async (req, res) => {
+app.get('/api/stats/overview', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     res.json(getStatsOverview({ userId, email }));
   } catch (err) {
@@ -3151,11 +3269,9 @@ app.get('/api/stats/overview', async (req, res) => {
   }
 });
 
-app.get('/api/insights/me', async (req, res) => {
+app.get('/api/insights/me', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     res.json(getUserInsights({ userId, email }));
   } catch (err) {
@@ -3164,11 +3280,9 @@ app.get('/api/insights/me', async (req, res) => {
   }
 });
 
-app.get('/api/export/logs', async (req, res) => {
+app.get('/api/export/logs', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const { start, end } = getRangeFromQuery(req.query, 30);
     const format = String(req.query.format || 'json').toLowerCase();
@@ -3221,11 +3335,9 @@ app.post('/api/admin/ai', requireAdmin, (req, res) => {
 });
 
 // ── AI Chat History ──────────────────────────────────────────────────────────
-app.get('/api/ai/chat-history', async (req, res) => {
+app.get('/api/ai/chat-history', requireAuth, async (req, res) => {
   try {
-    const userId = String(req.query.userId || '').trim() || null;
-    const email = String(req.query.email || '').toLowerCase().trim();
-    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+    const { userId, email } = authIdentity(req);
 
     const history = getAiChatHistory({ userId, email });
     res.json({ messages: history.messages || [], updatedAt: history.updatedAt });
@@ -3235,13 +3347,11 @@ app.get('/api/ai/chat-history', async (req, res) => {
   }
 });
 
-app.post('/api/ai/chat-history', async (req, res) => {
+app.post('/api/ai/chat-history', requireAuth, async (req, res) => {
   try {
-    const { userId, email, messages } = req.body || {};
-    const safeEmail = String(email || '').toLowerCase().trim();
-    const safeUserId = String(userId || '').trim() || null;
+    const { messages } = req.body || {};
+    const { userId: safeUserId, email: safeEmail } = authIdentity(req);
 
-    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
     if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages ist erforderlich.' });
 
     const history = upsertAiChatHistory({ userId: safeUserId, email: safeEmail, messages });
@@ -3253,7 +3363,7 @@ app.post('/api/ai/chat-history', async (req, res) => {
 });
 
 // ── AI Chat ──────────────────────────────────────────────────────────────────
-app.post('/api/ai/chat', async (req, res) => {
+app.post('/api/ai/chat', requireAuth, async (req, res) => {
   try {
     const { messages, totalCaffeineToday, dailyLimit, clientTime, clientDate, selectedDate, logs } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0)
@@ -3394,7 +3504,7 @@ Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.
 });
 
 // ── AI Schedule Discord ──────────────────────────────────────────────────────
-app.post('/api/ai/schedule-discord', async (req, res) => {
+app.post('/api/ai/schedule-discord', requireAdmin, async (req, res) => {
   try {
     const { time, message } = req.body || {};
     if (!time || !message) return res.status(400).json({ error: 'time und message werden benötigt.' });
@@ -3426,7 +3536,7 @@ app.post('/api/ai/schedule-discord', async (req, res) => {
 });
 
 // ── AI Drink Recognition ─────────────────────────────────────────────────────
-app.post('/api/ai/recognize-drink', async (req, res) => {
+app.post('/api/ai/recognize-drink', requireAuth, async (req, res) => {
   try {
     const { description } = req.body || {};
     if (!description || typeof description !== 'string' || description.trim().length < 2)
@@ -3497,7 +3607,7 @@ Wichtig: caffeinePer100ml und sizeMl müssen Ganzzahlen sein. Bei widersprüchli
 
 // ── AI Daily Summary ─────────────────────────────────────────────────────────
 // ── AI Drink Search (Brave API) ─────────────────────────────────────────────
-app.get('/api/ai/search-drink', async (req, res) => {
+app.get('/api/ai/search-drink', requireAuth, async (req, res) => {
   try {
     const query = req.query.q;
     if (!query) return res.json([]);
@@ -3564,7 +3674,7 @@ Kein Markdown, nur das pure JSON-Array!`
   }
 });
 
-app.post('/api/ai/daily-summary', async (req, res) => {
+app.post('/api/ai/daily-summary', requireAuth, async (req, res) => {
   try {
     const { logs, totalCaffeine, dailyLimit, clientTime, clientDate, selectedDate } = req.body || {};
     if (!Array.isArray(logs))
@@ -3668,7 +3778,3 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
-
-
-
-

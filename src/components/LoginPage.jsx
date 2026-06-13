@@ -174,11 +174,10 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
   const fillDemo = (role) => {
     if (role === 'admin') {
       setEmail(import.meta.env.VITE_ADMIN_EMAIL || 'admin@energytracker.de');
-      setPassword(import.meta.env.VITE_ADMIN_PASSWORD || 'Admin@2024!');
     } else {
       setEmail(import.meta.env.VITE_USER_EMAIL || 'user@energytracker.de');
-      setPassword(import.meta.env.VITE_USER_PASSWORD || 'User@2024!');
     }
+    setPassword('');
     setError('');
   };
 
@@ -356,7 +355,6 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 };
 
 export default LoginPage;
-
 
 
 

@@ -23,7 +23,7 @@ Wichtige Werte in `.env.local`:
 
 - `DB_TYPE=file-json`
 - `DB_FILE=/app/data/database.json`
-- `ADMIN_SECRET=...`
+- `SESSION_SECRET=...`
 - `PASSWORD_SALT=...`
 - `CORS_ORIGIN=https://deine-domain.tld`
 

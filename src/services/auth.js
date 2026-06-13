@@ -1,17 +1,7 @@
 import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 
 const AUTH_KEY = 'et-session';
-
-// Credentials from env or fallback defaults
-const ADMIN_EMAIL    = import.meta.env.VITE_ADMIN_EMAIL    || 'admin@energytracker.de';
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'Admin@2024!';
-const USER_EMAIL     = import.meta.env.VITE_USER_EMAIL     || 'user@energytracker.de';
-const USER_PASSWORD  = import.meta.env.VITE_USER_PASSWORD  || 'User@2024!';
-
-const BUILTIN_USERS = [
-  { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, role: 'admin', name: 'Administrator' },
-  { email: USER_EMAIL,  password: USER_PASSWORD,  role: 'user',  name: 'Benutzer'       },
-];
+const TOKEN_KEY = 'token';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
@@ -30,6 +20,8 @@ const saveSession = (user) => {
   const { password, ...safeUser } = user;
   const session = { ...safeUser, loginAt: Date.now() };
   localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  if (session.token) localStorage.setItem(TOKEN_KEY, session.token);
+  else localStorage.removeItem(TOKEN_KEY);
   return session;
 };
 
@@ -50,35 +42,9 @@ export const isWebAuthnSupported = () => {
   }
 };
 
-/**
- * Attempt login. Checks built-in credentials first (if demo enabled), then server-registered users.
- * Returns session object on success, throws on failure.
- */
+/** Attempt login against the server. Returns session object on success, throws on failure. */
 export const login = async (email, password) => {
   const trimmed = email.trim().toLowerCase();
-
-  // 1. Check built-in admin/user credentials (only if demo access enabled)
-  const builtin = BUILTIN_USERS.find(
-    (u) => u.email.toLowerCase() === trimmed && u.password === password
-  );
-  if (builtin) {
-    // Verify demo is still enabled server-side
-    try {
-      const resp = await fetch(`${API_BASE}/api/settings/public`);
-      if (resp.ok) {
-        const settings = await resp.json();
-        if (settings.demoEnabled === false) {
-          throw new Error('Demo-Zugang ist deaktiviert.');
-        }
-      }
-    } catch (err) {
-      if (err.message === 'Demo-Zugang ist deaktiviert.') throw err;
-      // If server is unreachable, allow built-in login as fallback
-    }
-    return saveSession(builtin);
-  }
-
-  // 2. Check server-registered users
   const data = await postJson('/api/login', { email: trimmed, password }, 'Anmeldung fehlgeschlagen.');
 
   if (data.requiresSecondFactor) {
@@ -94,22 +60,7 @@ export const login = async (email, password) => {
 };
 
 export const loginRepairAdmin = async (email, password) => {
-  const trimmed = String(email || '').trim().toLowerCase();
-  const adminEmail = String(ADMIN_EMAIL || '').trim().toLowerCase();
-
-  if (!trimmed || !password) {
-    throw new Error('Bitte E-Mail und Passwort eingeben.');
-  }
-
-  if (trimmed !== adminEmail || password !== ADMIN_PASSWORD) {
-    throw new Error('Ungültiger Admin-Reparatur-Login.');
-  }
-
-  return saveSession({
-    email: ADMIN_EMAIL,
-    role: 'admin',
-    name: 'Administrator',
-  });
+  return login(email, password);
 };
 
 export const completeLoginWithTotp = async ({ loginToken, code }) => {
@@ -135,6 +86,7 @@ export const completeLoginWithPasskey = async ({ loginToken }) => {
 /** Clear the stored session. */
 export const logout = () => {
   localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(TOKEN_KEY);
 };
 
 /** Return current session object, or null if not logged in. */
@@ -154,6 +106,7 @@ export const startImpersonation = (targetUser) => {
   localStorage.setItem(IMPERSONATOR_KEY, JSON.stringify(adminSession));
   const session = { ...targetUser, loginAt: Date.now(), impersonated: true };
   localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  if (session.token) localStorage.setItem(TOKEN_KEY, session.token);
   return session;
 };
 
@@ -163,9 +116,13 @@ export const stopImpersonation = () => {
   localStorage.removeItem(IMPERSONATOR_KEY);
   if (adminSession) {
     localStorage.setItem(AUTH_KEY, adminSession);
-    return JSON.parse(adminSession);
+    const parsed = JSON.parse(adminSession);
+    if (parsed?.token) localStorage.setItem(TOKEN_KEY, parsed.token);
+    else localStorage.removeItem(TOKEN_KEY);
+    return parsed;
   }
   localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(TOKEN_KEY);
   return null;
 };
 

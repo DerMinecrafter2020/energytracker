@@ -12,11 +12,22 @@ const urlFor = (path, query = {}) => {
   });
   return url.toString();
 };
+const authHeader = () => {
+  let token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  if (!token) {
+    try {
+      token = JSON.parse(localStorage.getItem('et-session') || '{}')?.token;
+    } catch {
+      token = null;
+    }
+  }
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 const post = async (path, body) => {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -25,7 +36,7 @@ const post = async (path, body) => {
 };
 
 const get = async (path, query) => {
-  const res = await fetch(urlFor(path, query));
+  const res = await fetch(urlFor(path, query), { headers: authHeader() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'AI-Fehler');
   return data;

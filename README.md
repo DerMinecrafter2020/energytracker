@@ -20,6 +20,7 @@ Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen War
 - Admin-Panel fuer Benutzer, Rollen, manuelle Verifizierung, Loeschen und Impersonation
 - Demo-Login optional aktivierbar/deaktivierbar
 - Profil- und Sicherheitseinstellungen
+- Bearer-Token-Sessions, Security-Header und Rate-Limits fuer API/Auth
 - 2FA per TOTP und Passkey/YubiKey/WebAuthn
 - Erinnerungen per E-Mail und optional Discord
 - Discord-Webhook-Test und geplante KI-Discord-Nachrichten
@@ -78,8 +79,12 @@ NODE_ENV=production
 PORT=3001
 CORS_ORIGIN=http://localhost:3001
 
-ADMIN_SECRET=bitte-aendern
+SESSION_SECRET=bitte-aendern-langer-zufaelliger-wert
 PASSWORD_SALT=bitte-aendern
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=ein-sicheres-passwort
+USER_EMAIL=user@example.com
+USER_PASSWORD=ein-sicheres-passwort
 
 REDIS_HOST=redis
 REDIS_PORT=6379
@@ -88,10 +93,11 @@ WEBAUTHN_RP_NAME=Koffein-Tracker
 WEBAUTHN_ORIGIN=http://localhost:3001
 
 VITE_API_BASE_URL=http://localhost:3001
-VITE_ADMIN_SECRET=bitte-aendern
+VITE_ADMIN_EMAIL=admin@example.com
+VITE_USER_EMAIL=user@example.com
 ```
 
-Wichtig: `ADMIN_SECRET` und `VITE_ADMIN_SECRET` muessen denselben Wert haben. Bei Docker-Builds werden `VITE_*` Variablen in das Frontend eingebaut, deshalb muss `.env.local` bereits vor dem Build vorhanden sein.
+Wichtig: Nur `VITE_*` Variablen werden in das Frontend eingebaut. Secrets wie `SESSION_SECRET`, Demo-Passwoerter und `PASSWORD_SALT` muessen serverseitig ohne `VITE_` gesetzt werden.
 
 3. Container starten:
 
@@ -140,7 +146,7 @@ NODE_ENV=development
 PORT=3001
 CORS_ORIGIN=http://localhost:5173
 
-ADMIN_SECRET=et-admin-2024
+SESSION_SECRET=bitte-aendern-langer-zufaelliger-wert
 PASSWORD_SALT=et-caffeine-salt-2024
 
 REDIS_HOST=127.0.0.1
@@ -150,7 +156,8 @@ WEBAUTHN_ORIGIN=http://localhost:5173
 WEBAUTHN_RP_ID=localhost
 
 VITE_API_BASE_URL=http://localhost:3001
-VITE_ADMIN_SECRET=et-admin-2024
+VITE_ADMIN_EMAIL=admin@energytracker.de
+VITE_USER_EMAIL=user@energytracker.de
 ```
 
 4. Backend starten:
@@ -181,15 +188,17 @@ Solange Demo-Zugang aktiviert ist, stehen Standarddaten bereit:
 Die Demo-Zugangsdaten koennen per ENV angepasst werden:
 
 ```env
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=ein-sicheres-passwort
+USER_EMAIL=user@example.com
+USER_PASSWORD=ein-sicheres-passwort
 VITE_ADMIN_EMAIL=admin@example.com
-VITE_ADMIN_PASSWORD=ein-sicheres-passwort
 VITE_USER_EMAIL=user@example.com
-VITE_USER_PASSWORD=ein-sicheres-passwort
 ```
 
 Fuer produktive Installationen:
 
-- `ADMIN_SECRET` und `PASSWORD_SALT` aendern
+- `SESSION_SECRET`, Demo-Passwoerter und `PASSWORD_SALT` aendern
 - Demo-Zugang im Admin-Panel deaktivieren
 - SMTP konfigurieren, wenn Registrierung, Verifikation oder Passwort-Reset genutzt werden sollen
 - Erste echte Admin-Benutzer im Admin-Panel anlegen
@@ -200,8 +209,10 @@ Fuer produktive Installationen:
 |---|---|
 | `PORT` | Express-Port, Standard `3001` |
 | `CORS_ORIGIN` | erlaubte Frontend-Origin |
-| `ADMIN_SECRET` | Secret fuer Admin-API-Aufrufe |
-| `VITE_ADMIN_SECRET` | Frontend-Gegenstueck zu `ADMIN_SECRET` |
+| `SESSION_SECRET` | Signatur-Secret fuer Login-Sessions |
+| `SESSION_TTL_MS` | Lebensdauer eines Session-Tokens in Millisekunden |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | serverseitige Demo-Admin-Zugangsdaten |
+| `USER_EMAIL` / `USER_PASSWORD` | serverseitige Demo-Benutzer-Zugangsdaten |
 | `PASSWORD_SALT` | Salt fuer Passwort-Hashing |
 | `REDIS_URL` | vollstaendige Redis-URL, z.B. `redis://127.0.0.1:6379` |
 | `REDIS_HOST` / `REDIS_PORT` | Redis-Host und Port, falls keine `REDIS_URL` gesetzt ist |
@@ -209,6 +220,7 @@ Fuer produktive Installationen:
 | `WEBAUTHN_ORIGIN` | Origin fuer WebAuthn, z.B. `https://deine-domain.de` |
 | `WEBAUTHN_RP_ID` | Domain fuer WebAuthn, z.B. `deine-domain.de` |
 | `VITE_API_BASE_URL` | API-URL fuer das Frontend |
+| `VITE_ADMIN_EMAIL` / `VITE_USER_EMAIL` | optionale Demo-E-Mail-Hinweise im Login |
 
 SMTP, Registrierung, Demo-Zugang, Discord-Webhook und KI-Keys werden im Admin-Panel gespeichert.
 
@@ -288,7 +300,7 @@ Auszug der wichtigsten API-Bereiche:
 - `GET/POST /api/admin/ai`
 - `GET /api/admin/redis/health`
 
-Admin-Endpunkte erwarten den Header `X-Admin-Secret`.
+Geschuetzte Endpunkte erwarten `Authorization: Bearer <token>`. Admin-Endpunkte erfordern zusaetzlich eine Admin-Rolle.
 
 ## Projektstruktur
 
