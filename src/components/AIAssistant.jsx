@@ -34,6 +34,23 @@ const formatDateLabel = (date) => {
   const [year, month, day] = date.split('-').map(Number);
   return new Date(year, month - 1, day).toLocaleDateString('de-DE');
 };
+const formatTodayLogIds = (logs) => {
+  if (!Array.isArray(logs) || logs.length === 0) {
+    return 'Heute sind noch keine Einträge vorhanden, daher gibt es aktuell keine IDs zum Löschen.';
+  }
+
+  return `Hier sind deine heutigen Einträge mit IDs:\n${logs.map((log) =>
+    `ID ${log.id}: ${log.name} (${log.size} ml, ${log.caffeine} mg Koffein)`
+  ).join('\n')}`;
+};
+const isTodayLogIdsRequest = (text) => {
+  const value = String(text || '').toLowerCase();
+  const asksForIds = /\bids?\b/.test(value) || value.includes('identifikationsnummer');
+  const asksToShow = /(zeig|zeige|anzeigen|liste|auflisten|welche|nenn|gib mir|was sind)/.test(value);
+  const mentionsLogs = /(einträg|eintrag|logs?|getränk|getraenk|drinks?|heutig|heute)/.test(value);
+  const mentionsAccount = /(user|benutzer|konto|account|profil)/.test(value);
+  return asksForIds && asksToShow && (mentionsLogs || !mentionsAccount);
+};
 
 const loadLocalMessages = (storageKey) => {
   try {
@@ -177,6 +194,15 @@ const AIAssistant = ({ session, totalCaffeineToday = 0, logs = [], onAddDrink, o
     setError('');
 
     const userMsg = { role: 'user', type: 'text', content: text };
+    if (isTodayLogIdsRequest(text)) {
+      setMessages((prev) => [
+        ...prev,
+        userMsg,
+        { role: 'assistant', type: 'text', content: formatTodayLogIds(logs) },
+      ]);
+      return;
+    }
+
     const historyForApi = [...messages.filter((m) => m.role !== 'assistant' || messages.indexOf(m) > 0), userMsg]
       .filter(m => m.type !== 'drink_added') // AI expects text history
       .map(({ role, content }) => ({ role, content: content || '' }));

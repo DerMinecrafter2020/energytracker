@@ -2765,6 +2765,7 @@ app.post('/api/ai/chat', async (req, res) => {
 ${logsInfo}
 
 Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, nutze die zur Verfügung gestellten Tools (Funktionen), um die Aktion auszuführen.
+Wenn der Nutzer nach IDs, Eintrags-IDs oder einer Liste der heutigen Einträge fragt, antworte direkt mit den IDs aus der obigen Liste. Behaupte niemals, dass du keine Funktion zum Anzeigen der IDs hast.
 Für Hinzufügen (add_drink): Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks. Nutze ein passendes Emoji. Setze das Feld date immer als ISO-Datum YYYY-MM-DD. Wenn der Nutzer kein Datum nennt, nutze ${today}. Wenn der Nutzer relative vergangene Tage nennt (z.B. gestern, vorgestern, letzten Montag), berechne das Datum ausgehend von ${today}. Lege keine zukünftigen Log-Einträge an.
 Für Ändern/Löschen (update_drink/delete_drink): Nutze exakt die ID aus der Liste der Getränke am aktuellen Tag.
 Für geplante Discord-Nachrichten (schedule_discord_message): Nutze dieses Tool, um eine Nachricht zu einer bestimmten Uhrzeit in Discord (Admin Webhook) posten zu lassen.
@@ -3120,7 +3121,6 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
-
 
 
 

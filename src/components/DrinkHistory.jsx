@@ -51,7 +51,7 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-white text-sm truncate">{log.name}</h4>
               <p className="text-xs text-slate-500">
-                {log.size} ml • {formatTime(log.createdAt)}
+                ID {log.id} • {log.size} ml • {formatTime(log.createdAt)}
               </p>
             </div>
 
@@ -96,4 +96,3 @@ const DrinkHistory = ({ logs, onDeleteLog, onToggleFavorite, isFavoriteLog, isLo
 };
 
 export default DrinkHistory;
-
