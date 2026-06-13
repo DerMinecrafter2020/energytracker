@@ -28,26 +28,26 @@ const ProgressBar = ({ currentCaffeine, title = 'Koffein heute', isToday = true 
                                 'bg-white/5 border-white/10 text-slate-300';
 
   return (
-    <div className="glass-card rounded-[2rem] p-6 mb-6 animate-fade-in">
+    <div className="glass-card rounded-2xl sm:rounded-[2rem] p-4 sm:p-6 animate-fade-in">
       {/* Header row */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${barColor}`}>
-            <Zap className="w-6 h-6" fill="currentColor" />
+      <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shrink-0 ${barColor}`}>
+            <Zap className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-[#e2e2e5]">{title}</h2>
+          <div className="min-w-0">
+            <h2 className="text-sm sm:text-base font-bold text-[#e2e2e5] truncate">{title}</h2>
             <p className="text-xs text-[#c4c6d0]">Limit: {DAILY_CAFFEINE_LIMIT} mg</p>
           </div>
         </div>
-        <div className="text-right">
-          <span className="text-3xl font-bold text-[#e2e2e5]">{currentCaffeine}</span>
-          <span className="text-lg text-[#8e9099] ml-1">mg</span>
+        <div className="text-right shrink-0">
+          <span className="text-2xl sm:text-3xl font-bold text-[#e2e2e5]">{currentCaffeine}</span>
+          <span className="text-base sm:text-lg text-[#8e9099] ml-1">mg</span>
         </div>
       </div>
 
       {/* Track */}
-      <div className="relative h-4 bg-[#2c2f38] rounded-full overflow-hidden mb-3">
+      <div className="relative h-3 sm:h-4 bg-[#2c2f38] rounded-full overflow-hidden mb-3">
         <div
           className={`absolute inset-y-0 left-0 ${barColor.split(' ')[0]} rounded-full transition-all duration-700 ease-out`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -62,14 +62,13 @@ const ProgressBar = ({ currentCaffeine, title = 'Koffein heute', isToday = true 
       </div>
 
       {/* Status Msg */}
-      <div className={`px-4 py-3 rounded-2xl border ${statusBg}`}>
-        <p className="text-sm font-medium text-center">{statusText}</p>
+      <div className={`px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl border ${statusBg}`}>
+        <p className="text-xs sm:text-sm font-medium text-center">{statusText}</p>
       </div>
     </div>
   );
 };
 
 export default ProgressBar;
-
 
 

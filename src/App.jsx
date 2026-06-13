@@ -425,7 +425,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         onShowSettings={() => setShowSettings(true)}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6 pb-24">
+      <main className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 pb-20 sm:pb-24">
         {latestVersion && latestVersion !== currentVersion && (
           <div className="glass-card border border-blue-500/30 bg-blue-500/10
             px-4 py-3 rounded-2xl mb-6 animate-fade-in">
@@ -448,39 +448,39 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         )}
 
         {!showSettings && (
-          <div className="space-y-5 animate-fade-in">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="glass-card rounded-2xl p-4">
-                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
-                  <CalendarDays className="w-4 h-4 text-blue-300" />
+          <div className="space-y-4 sm:space-y-5 animate-fade-in">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
+              <div className="glass-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-2 min-w-0">
+                  <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-300 shrink-0" />
                   Kontext
                 </div>
-                <p className="text-lg font-bold text-white">{selectedDateLabel}</p>
+                <p className="text-sm sm:text-lg font-bold text-white truncate">{selectedDateLabel}</p>
               </div>
-              <div className="glass-card rounded-2xl p-4">
-                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
-                  <Zap className="w-4 h-4 text-amber-300" />
+              <div className="glass-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-2 min-w-0">
+                  <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300 shrink-0" />
                   Koffein
                 </div>
-                <p className="text-lg font-bold text-white">{selectedDateCaffeine} mg</p>
+                <p className="text-sm sm:text-lg font-bold text-white truncate">{selectedDateCaffeine} mg</p>
               </div>
-              <div className="glass-card rounded-2xl p-4">
-                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
-                  <Target className="w-4 h-4 text-emerald-300" />
-                  Restbudget
+              <div className="glass-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-2 min-w-0">
+                  <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-300 shrink-0" />
+                  <span className="truncate">Rest</span>
                 </div>
-                <p className="text-lg font-bold text-white">{remainingCaffeine} mg</p>
+                <p className="text-sm sm:text-lg font-bold text-white truncate">{remainingCaffeine} mg</p>
               </div>
-              <div className="glass-card rounded-2xl p-4">
-                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
-                  <History className="w-4 h-4 text-violet-300" />
+              <div className="glass-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-2 min-w-0">
+                  <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-300 shrink-0" />
                   Eintraege
                 </div>
-                <p className="text-lg font-bold text-white">{logs.length}</p>
+                <p className="text-sm sm:text-lg font-bold text-white truncate">{logs.length}</p>
               </div>
             </div>
 
-            <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px] items-start">
+            <section className="grid gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_390px] items-start">
               <div className="min-w-0">
                 <AIAssistant
                   key={session?.id || session?.email}
@@ -496,7 +496,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
                 />
               </div>
 
-              <aside className="space-y-4 xl:sticky xl:top-24">
+              <aside className="space-y-3 sm:space-y-4 xl:sticky xl:top-24">
                 <div className="flex items-center gap-2 px-1 text-sm font-semibold text-slate-300">
                   <Bot className="w-4 h-4 text-violet-300" />
                   KI-Kontext und Hilfsfunktionen
@@ -529,7 +529,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
               </aside>
             </section>
 
-            <section className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] items-start">
+            <section className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] items-start">
               <CalendarWidget
                 selectedDate={selectedDate}
                 logs={logs}
@@ -541,7 +541,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
                 isLoading={isOperationLoading}
               />
 
-              <div className="space-y-5">
+              <div className="space-y-4 sm:space-y-5">
                 <DrinkHistory
                   selectedDate={selectedDate}
                   logs={logs}

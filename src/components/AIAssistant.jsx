@@ -387,17 +387,17 @@ const AIAssistant = ({
   return (
     <div className={`glass-card overflow-hidden animate-fade-in flex flex-col shadow-glass flex-shrink-0 ${
       primary
-        ? 'rounded-[1.5rem] min-h-[680px] h-[calc(100vh-10.5rem)] max-h-[860px]'
-        : 'rounded-[2rem] mb-6 h-[650px]'
+        ? 'rounded-[1.25rem] sm:rounded-[1.5rem] min-h-[460px] h-[72svh] sm:min-h-[620px] sm:h-[calc(100vh-10.5rem)] max-h-[860px]'
+        : 'rounded-[1.5rem] sm:rounded-[2rem] mb-6 h-[560px] sm:h-[650px]'
     }`}>
       
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4 bg-gradient-to-r from-violet-600/30 to-purple-600/20 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center shadow-inner">
-            <Bot className="w-5 h-5 text-violet-300" />
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-violet-600/30 to-purple-600/20 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-violet-500/20 flex items-center justify-center shadow-inner shrink-0">
+            <Bot className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-violet-300" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-bold text-white tracking-wide">
               {primary ? 'AI Chat' : 'KI-Assistent'}
             </h2>
@@ -410,7 +410,8 @@ const AIAssistant = ({
         <button 
           onClick={handleFetchSummary}
           disabled={summaryLoading}
-          className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-violet-300 text-sm font-medium transition-all shadow-sm border border-white/5 shrink-0"
+          className="flex items-center gap-2 px-2.5 sm:px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-violet-300 text-sm font-medium transition-all shadow-sm border border-white/5 shrink-0"
+          aria-label="Tagesanalyse erstellen"
         >
           {summaryLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
           <span className="hidden sm:inline">Tagesanalyse</span>
@@ -420,21 +421,21 @@ const AIAssistant = ({
 
 
       {/* Chat Messages */}
-      <div className={`${primary ? 'p-4 sm:p-6' : 'p-6'} flex-1 overflow-y-auto space-y-6 text-sm custom-scrollbar bg-black/10`} ref={scrollContainerRef}>
+      <div className={`${primary ? 'p-3 sm:p-6' : 'p-4 sm:p-6'} flex-1 overflow-y-auto space-y-4 sm:space-y-6 text-sm custom-scrollbar bg-black/10`} ref={scrollContainerRef}>
         {messages.map((msg, i) => {
           const isUser = msg.role === 'user';
           
           if (msg.type === 'drink_added' && msg.drink) {
             return (
               <div key={i} className="flex justify-start w-full animate-fade-in">
-                <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-2xl p-4 max-w-[85%] sm:max-w-[75%] shadow-sm">
+                <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-2xl p-3 sm:p-4 max-w-[94%] sm:max-w-[75%] shadow-sm">
                   <div className="text-xs font-semibold text-indigo-400 mb-2 flex items-center gap-1">
                     <Zap className="w-3 h-3" /> KI hat ein Getränk hinzugefügt
                   </div>
-                  <div className="flex items-center justify-between gap-4 bg-black/20 rounded-xl p-3">
-                    <div className="flex items-center gap-3">
-                      <div className="text-2xl">{msg.drink.icon}</div>
-                      <div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-black/20 rounded-xl p-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="text-2xl shrink-0">{msg.drink.icon}</div>
+                      <div className="min-w-0">
                         <div className="font-bold text-white text-base">{msg.drink.name}</div>
                         <div className="text-xs text-slate-400">{msg.drink.size} ml • {msg.drink.caffeine} mg Koffein</div>
                         {msg.date && (
@@ -444,7 +445,7 @@ const AIAssistant = ({
                     </div>
                     <button
                       onClick={() => handleDeleteAddedDrink(msg.drink.id, i)}
-                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                      className="self-end sm:self-auto p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
                       title="Eintrag löschen"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -458,7 +459,7 @@ const AIAssistant = ({
           if (msg.type === 'daily_summary' && msg.summary) {
             return (
               <div key={i} className="flex justify-start w-full animate-fade-in">
-                <div className="bg-gradient-to-br from-violet-600/20 to-purple-600/20 border border-violet-500/30 rounded-2xl p-5 max-w-[90%] sm:max-w-[85%] shadow-sm">
+                <div className="bg-gradient-to-br from-violet-600/20 to-purple-600/20 border border-violet-500/30 rounded-2xl p-4 sm:p-5 max-w-[94%] sm:max-w-[85%] shadow-sm">
                   <div className="text-sm font-bold text-violet-300 mb-3 flex items-center gap-2">
                     <Activity className="w-4 h-4" /> Deine KI-Tagesauswertung
                   </div>
@@ -473,7 +474,7 @@ const AIAssistant = ({
           if (msg.type === 'discord_scheduled' && msg.time && msg.message) {
             return (
               <div key={i} className="flex justify-start w-full animate-fade-in">
-                <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-2xl p-4 max-w-[85%] sm:max-w-[75%] shadow-sm">
+                <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-2xl p-3 sm:p-4 max-w-[94%] sm:max-w-[75%] shadow-sm">
                   <div className="text-xs font-semibold text-blue-400 mb-2 flex items-center gap-1">
                     <Clock className="w-3 h-3" /> Discord-Nachricht geplant für {msg.time} Uhr
                   </div>
@@ -489,7 +490,7 @@ const AIAssistant = ({
 
           return (
             <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} w-full`}>
-              <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-3.5 shadow-sm
+              <div className={`max-w-[92%] sm:max-w-[75%] rounded-2xl px-4 sm:px-5 py-3 sm:py-3.5 shadow-sm
                 ${isUser 
                   ? 'bg-violet-600 text-white rounded-br-sm' 
                   : 'bg-white/5 border border-white/10 text-slate-200 rounded-bl-sm'}`}
@@ -523,7 +524,7 @@ const AIAssistant = ({
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white/5 border-t border-white/10 shrink-0">
+      <div className="p-3 sm:p-4 bg-white/5 border-t border-white/10 shrink-0">
         {primary && (
           <div className="flex gap-2 overflow-x-auto pb-3 custom-scrollbar">
             {quickPrompts.map((prompt) => (
@@ -531,10 +532,10 @@ const AIAssistant = ({
                 key={prompt}
                 type="button"
                 onClick={() => usePrompt(prompt)}
-                className="inline-flex items-center gap-1.5 shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
+                className="inline-flex items-center gap-1.5 shrink-0 max-w-[78vw] sm:max-w-none rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
               >
                 <Sparkles className="w-3.5 h-3.5 text-violet-300" />
-                {prompt}
+                <span className="truncate">{prompt}</span>
               </button>
             ))}
           </div>
@@ -545,10 +546,10 @@ const AIAssistant = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder={primary ? 'Frag die KI oder lass sie Eintraege hinzufuegen, bearbeiten, loeschen, analysieren...' : 'Kommando oder Frage eingeben...'}
-            className="w-full bg-black/20 border border-white/10 text-white placeholder-slate-500 rounded-2xl pl-5 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none custom-scrollbar"
+            placeholder={primary ? 'Frag die KI oder steuere deine Eintraege...' : 'Kommando oder Frage eingeben...'}
+            className="w-full bg-black/20 border border-white/10 text-white placeholder-slate-500 rounded-2xl pl-4 sm:pl-5 pr-14 py-3.5 sm:py-4 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none custom-scrollbar"
             rows="1"
-            style={{ minHeight: '56px', maxHeight: '120px' }}
+            style={{ minHeight: '52px', maxHeight: '112px' }}
           />
           <button
             onClick={handleSend}
