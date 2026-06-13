@@ -45,6 +45,8 @@ Voraussetzungen:
 - Docker
 - Docker Compose oder `docker compose`
 
+### Automatische Installation
+
 1. Repository klonen:
 
 ```bash
@@ -52,13 +54,24 @@ git clone <repo-url> koffein-tracker
 cd koffein-tracker
 ```
 
-2. `.env.local` im Projekt anlegen:
+2. Installationsscript starten:
+
+```bash
+chmod +x install-docker.sh
+./install-docker.sh
+```
+
+Das Script prueft Docker und Docker Compose, erstellt bei Bedarf `.env.local`, baut die Container, startet App/Redis/Mailpit und fuehrt einen Health-Check aus.
+
+### Manuelle Installation
+
+1. `.env.local` im Projekt anlegen:
 
 ```bash
 cp .env.example .env.local
 ```
 
-3. Werte in `.env.local` fuer Produktion anpassen:
+2. Werte in `.env.local` fuer Produktion anpassen:
 
 ```env
 NODE_ENV=production
@@ -78,28 +91,15 @@ VITE_API_BASE_URL=http://localhost:3001
 VITE_ADMIN_SECRET=bitte-aendern
 ```
 
-Wichtig: `ADMIN_SECRET` und `VITE_ADMIN_SECRET` muessen denselben Wert haben. Bei Docker-Builds werden `VITE_*` Variablen in das Frontend eingebaut, deshalb muss `.env.local` bereits vor `docker compose up --build` vorhanden sein.
+Wichtig: `ADMIN_SECRET` und `VITE_ADMIN_SECRET` muessen denselben Wert haben. Bei Docker-Builds werden `VITE_*` Variablen in das Frontend eingebaut, deshalb muss `.env.local` bereits vor dem Build vorhanden sein.
 
-Die aktuelle `docker-compose.yml` mountet zusaetzlich diese Datei in den Container:
-
-```text
-/root/energytracker/.env.local:/app/.env.local:ro
-```
-
-Lege die Datei dort an oder passe den Volume-Pfad in `docker-compose.yml` auf dein Projekt an, z.B.:
-
-```yaml
-volumes:
-  - ./.env.local:/app/.env.local:ro
-```
-
-4. Container starten:
+3. Container starten:
 
 ```bash
-docker compose up -d --build
+docker compose --env-file .env.local up -d --build
 ```
 
-5. App oeffnen:
+4. App oeffnen:
 
 ```text
 http://localhost:3001
@@ -295,6 +295,7 @@ Admin-Endpunkte erwarten den Header `X-Admin-Secret`.
 ```text
 .
 ├── server.js                  # Express API, Redis-Persistenz, Auth, KI, Reminder
+├── install-docker.sh          # Docker-Compose-Installationsscript
 ├── docker-compose.yml         # App + Redis + Mailpit
 ├── Dockerfile                 # Production Image
 ├── src/
@@ -334,6 +335,7 @@ Admin-Endpunkte erwarten den Header `X-Admin-Secret`.
 | `npm run build` | baut das Frontend fuer Produktion |
 | `npm run preview` | Vorschau des Production Builds |
 | `npm run migrate:legacy:mysql` | Legacy-Migration fuer alte Daten |
+| `./install-docker.sh` | erstellt `.env.local`, baut und startet Docker Compose |
 
 Hinweis: `npm run build` fuehrt vorher `npm run version:auto` aus und erhoeht die Version in `package.json` und `package-lock.json`.
 
