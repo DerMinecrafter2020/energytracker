@@ -18,7 +18,17 @@ import {
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
 
-const getTodayKey = () => new Date().toISOString().split('T')[0];
+const getTodayKey = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+const isDateKey = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false;
+  const [year, month, day] = String(value).split('-').map(Number);
+  const parsed = new Date(year, month - 1, day);
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+};
 const VIEW_STATE_KEY = 'et:last-view-state';
 const userPayload = (session) => ({ userId: session?.id || null, email: session?.email });
 
@@ -279,9 +289,11 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     setIsOperationLoading(true);
     setError(null);
     try {
-      const payload = { ...drinkData, date: getTodayKey(), ...userPayload(session) };
+      const today = getTodayKey();
+      const targetDate = isDateKey(drinkData?.date) ? drinkData.date : today;
+      const payload = { ...drinkData, date: targetDate, ...userPayload(session) };
       const created = await addLog(payload);
-      setLogs((prev) => [created, ...prev]);
+      if (created?.date === today) setLogs((prev) => [created, ...prev]);
       await refreshStats();
       return created;
     } catch (err) {

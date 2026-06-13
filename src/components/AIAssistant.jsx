@@ -18,6 +18,22 @@ const parseMarkdown = (text) => {
 };
 
 const getStorageKey = (session) => `ai_chat_messages:${String(session?.email || 'anonymous').toLowerCase().trim()}`;
+const getLocalDateKey = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+const isDateKey = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false;
+  const [year, month, day] = String(value).split('-').map(Number);
+  const parsed = new Date(year, month - 1, day);
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+};
+const formatDateLabel = (date) => {
+  if (!isDateKey(date)) return '';
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('de-DE');
+};
 
 const loadLocalMessages = (storageKey) => {
   try {
@@ -184,17 +200,19 @@ const AIAssistant = ({ session, totalCaffeineToday = 0, logs = [], onAddDrink, o
             try {
               const args = JSON.parse(call.function.arguments);
               if (onAddDrink) {
+                const targetDate = isDateKey(args.date) ? args.date : getLocalDateKey();
                 const addedDrink = await onAddDrink({
                   name: args.name || 'AI Drink',
                   size: Number(args.size) || 0,
                   caffeine: Number(args.caffeine) || 0,
-                  icon: args.icon || '🤖'
+                  icon: args.icon || '🤖',
+                  date: targetDate,
                 });
                 
                 if (addedDrink) {
-                  actionsPerformed.push({ type: 'drink_added', drink: addedDrink });
+                  actionsPerformed.push({ type: 'drink_added', drink: addedDrink, date: addedDrink.date || targetDate });
                 } else {
-                  actionsPerformed.push({ type: 'text', content: 'Getränk hinzugefügt.' });
+                  actionsPerformed.push({ type: 'text', content: `Getränk für ${formatDateLabel(targetDate) || targetDate} hinzugefügt.` });
                 }
               }
             } catch (e) {
@@ -335,6 +353,9 @@ const AIAssistant = ({ session, totalCaffeineToday = 0, logs = [], onAddDrink, o
                       <div>
                         <div className="font-bold text-white text-base">{msg.drink.name}</div>
                         <div className="text-xs text-slate-400">{msg.drink.size} ml • {msg.drink.caffeine} mg Koffein</div>
+                        {msg.date && (
+                          <div className="text-[11px] text-slate-500 mt-0.5">{formatDateLabel(msg.date) || msg.date}</div>
+                        )}
                       </div>
                     </div>
                     <button

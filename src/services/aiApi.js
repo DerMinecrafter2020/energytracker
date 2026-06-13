@@ -1,5 +1,10 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const clientTime = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+const clientDate = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
 const urlFor = (path, query = {}) => {
   const url = new URL(path, API_BASE);
   Object.entries(query).forEach(([key, value]) => {
@@ -29,7 +34,7 @@ const get = async (path, query) => {
 const identity = ({ userId, email } = {}) => ({ userId, email });
 
 export const sendAiChat = ({ messages, totalCaffeineToday, dailyLimit, logs }) =>
-  post('/api/ai/chat', { messages, totalCaffeineToday, dailyLimit, logs, clientTime: clientTime() });
+  post('/api/ai/chat', { messages, totalCaffeineToday, dailyLimit, logs, clientTime: clientTime(), clientDate: clientDate() });
 
 export const fetchAiChatHistory = (user) =>
   get('/api/ai/chat-history', identity(user));
@@ -41,7 +46,7 @@ export const recognizeDrink = (description) =>
   post('/api/ai/recognize-drink', { description });
 
 export const fetchDailySummary = ({ logs, totalCaffeine, dailyLimit }) =>
-  post('/api/ai/daily-summary', { logs, totalCaffeine, dailyLimit, clientTime: clientTime() });
+  post('/api/ai/daily-summary', { logs, totalCaffeine, dailyLimit, clientTime: clientTime(), clientDate: clientDate() });
 
 export const scheduleDiscordMessage = (time, message) =>
   post('/api/ai/schedule-discord', { time, message });
