@@ -118,7 +118,7 @@ const cleanupAuthChallenges = () => {
 };
 
 app.use(cors({ origin: ALLOWED_ORIGIN }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Static Frontend
 const distPath = path.join(__dirname, 'dist');
@@ -187,6 +187,7 @@ const REDIS_KEYS = {
   ai_config:     'koffein:ai_config',
   user_settings: 'koffein:user_settings',
   custom_drinks: 'koffein:custom_drinks',
+  ai_chat_messages: 'koffein:ai_chat_messages',
   app_name:      'koffein:app_name',
   discord_schedules: 'koffein:discord_schedules',
 };
@@ -202,6 +203,7 @@ let dbState = {
   ai_config: { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '' },
   user_settings: [], // [{userId/email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid}]
   custom_drinks: [], // [{id, ownerKey, name, size, caffeine, icon}]
+  ai_chat_messages: [], // [{ownerKey, userId/email, messages, updatedAt}]
   discord_schedules: [], // [{id, time, message, sent, date}]
 };
 
@@ -219,7 +221,7 @@ const loadDbState = async () => {
       return;
     }
 
-    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, appName, discordSchedules] = await redis.mget(
+    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, chatMessages, appName, discordSchedules] = await redis.mget(
       REDIS_KEYS.caffeine_logs,
       REDIS_KEYS.users,
       REDIS_KEYS.smtp_settings,
@@ -229,6 +231,7 @@ const loadDbState = async () => {
       REDIS_KEYS.ai_config,
       REDIS_KEYS.user_settings,
       REDIS_KEYS.custom_drinks,
+      REDIS_KEYS.ai_chat_messages,
       REDIS_KEYS.app_name,
       REDIS_KEYS.discord_schedules,
     );
@@ -247,6 +250,7 @@ const loadDbState = async () => {
       },
       user_settings: safeParse(settings, []),
       custom_drinks: safeParse(drinks, []),
+      ai_chat_messages: safeParse(chatMessages, []),
       discord_schedules: safeParse(discordSchedules, []),
     };
   } catch (err) {
@@ -266,6 +270,7 @@ const persistDbState = () => {
     REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
     REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
     REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
+    REDIS_KEYS.ai_chat_messages, JSON.stringify(dbState.ai_chat_messages),
     REDIS_KEYS.discord_schedules, JSON.stringify(dbState.discord_schedules),
   ).catch((err) => console.error('[DB] Redis Speicherfehler:', err.message));
 };
@@ -983,6 +988,57 @@ const removeCustomDrink = ({ userId, email, drinkId }) => {
   dbState.custom_drinks.splice(idx, 1);
   persistDbState();
   return true;
+};
+
+const sanitizeAiChatMessage = (message) => {
+  const role = ['user', 'assistant', 'system'].includes(message?.role) ? message.role : 'assistant';
+  const type = typeof message?.type === 'string' && message.type.trim() ? message.type.trim() : 'text';
+  const safe = { role, type };
+
+  if (message?.content !== undefined) safe.content = String(message.content);
+  if (message?.summary !== undefined) safe.summary = typeof message.summary === 'string' ? message.summary : message.summary;
+  if (message?.time !== undefined) safe.time = String(message.time);
+  if (message?.message !== undefined) safe.message = String(message.message);
+  if (message?.drink && typeof message.drink === 'object') {
+    safe.drink = {
+      id: message.drink.id,
+      name: String(message.drink.name || ''),
+      size: Number(message.drink.size) || 0,
+      caffeine: Number(message.drink.caffeine) || 0,
+      icon: String(message.drink.icon || '🥤'),
+    };
+  }
+
+  return safe;
+};
+
+const getAiChatHistory = ({ userId, email }) => {
+  const ownerKey = getSettingsOwnerKey({ userId, email });
+  const found = dbState.ai_chat_messages.find((entry) => entry.ownerKey === ownerKey);
+  return found || {
+    ownerKey,
+    userId: userId || null,
+    email: String(email || '').toLowerCase().trim(),
+    messages: [],
+    updatedAt: null,
+  };
+};
+
+const upsertAiChatHistory = ({ userId, email, messages }) => {
+  const ownerKey = getSettingsOwnerKey({ userId, email });
+  const idx = dbState.ai_chat_messages.findIndex((entry) => entry.ownerKey === ownerKey);
+  const updated = {
+    ownerKey,
+    userId: userId || null,
+    email: String(email || '').toLowerCase().trim(),
+    messages: Array.isArray(messages) ? messages.map(sanitizeAiChatMessage) : [],
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (idx >= 0) dbState.ai_chat_messages[idx] = updated;
+  else dbState.ai_chat_messages.push(updated);
+  persistDbState();
+  return updated;
 };
 
 const getUserByIdentity = ({ userId, email }) => {
@@ -2650,14 +2706,44 @@ app.post('/api/admin/ai', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// ── AI Chat History ──────────────────────────────────────────────────────────
+app.get('/api/ai/chat-history', async (req, res) => {
+  try {
+    const userId = String(req.query.userId || '').trim() || null;
+    const email = String(req.query.email || '').toLowerCase().trim();
+    if (!email) return res.status(400).json({ error: 'email ist erforderlich.' });
+
+    const history = getAiChatHistory({ userId, email });
+    res.json({ messages: history.messages || [], updatedAt: history.updatedAt });
+  } catch (err) {
+    console.error('GET /api/ai/chat-history error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/ai/chat-history', async (req, res) => {
+  try {
+    const { userId, email, messages } = req.body || {};
+    const safeEmail = String(email || '').toLowerCase().trim();
+    const safeUserId = String(userId || '').trim() || null;
+
+    if (!safeEmail) return res.status(400).json({ error: 'email ist erforderlich.' });
+    if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages ist erforderlich.' });
+
+    const history = upsertAiChatHistory({ userId: safeUserId, email: safeEmail, messages });
+    res.json({ success: true, updatedAt: history.updatedAt });
+  } catch (err) {
+    console.error('POST /api/ai/chat-history error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // ── AI Chat ──────────────────────────────────────────────────────────────────
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { messages, totalCaffeineToday, dailyLimit, clientTime, logs } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0)
       return res.status(400).json({ error: 'messages ist erforderlich.' });
-    if (messages.length > 40)
-      return res.status(400).json({ error: 'Zu viele Nachrichten (max. 40).' });
 
     // Validate message structure
     for (const m of messages) {
@@ -3032,9 +3118,6 @@ initDb()
     console.error('Failed to initialize server:', err);
     process.exit(1);
   });
-
-
-
 
 
 

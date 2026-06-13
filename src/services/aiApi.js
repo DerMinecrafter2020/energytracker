@@ -1,5 +1,12 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const clientTime = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+const urlFor = (path, query = {}) => {
+  const url = new URL(path, API_BASE);
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
+  });
+  return url.toString();
+};
 
 const post = async (path, body) => {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -12,8 +19,23 @@ const post = async (path, body) => {
   return data;
 };
 
+const get = async (path, query) => {
+  const res = await fetch(urlFor(path, query));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'AI-Fehler');
+  return data;
+};
+
+const identity = ({ userId, email } = {}) => ({ userId, email });
+
 export const sendAiChat = ({ messages, totalCaffeineToday, dailyLimit, logs }) =>
   post('/api/ai/chat', { messages, totalCaffeineToday, dailyLimit, logs, clientTime: clientTime() });
+
+export const fetchAiChatHistory = (user) =>
+  get('/api/ai/chat-history', identity(user));
+
+export const saveAiChatHistory = ({ userId, email, messages }) =>
+  post('/api/ai/chat-history', { userId, email, messages });
 
 export const recognizeDrink = (description) =>
   post('/api/ai/recognize-drink', { description });

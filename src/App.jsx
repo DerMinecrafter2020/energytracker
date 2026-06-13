@@ -356,7 +356,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
             )}
 
             <DrinkHistory logs={logs} onDeleteLog={handleDeleteLog} onToggleFavorite={handleToggleFavorite} isFavoriteLog={() => false} />
-            <AIAssistant totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} onDeleteDrink={handleDeleteLog} onUpdateDrink={handleUpdateLog} />
+            <AIAssistant key={session?.id || session?.email} session={session} totalCaffeineToday={totalCaffeineToday} logs={logs} onAddDrink={handleAddDrink} onDeleteDrink={handleDeleteLog} onUpdateDrink={handleUpdateLog} />
             
 
           </div>

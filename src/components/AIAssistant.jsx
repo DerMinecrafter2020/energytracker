@@ -1,8 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Trash2, Brain, RefreshCw, Zap, Activity, ChevronDown, ChevronUp, Clock } from 'lucide-react';
-import { sendAiChat, fetchDailySummary, scheduleDiscordMessage } from '../services/aiApi';
+import { Send, Bot, Trash2, Brain, RefreshCw, Zap, Activity, Clock } from 'lucide-react';
+import { sendAiChat, fetchDailySummary, scheduleDiscordMessage, fetchAiChatHistory, saveAiChatHistory } from '../services/aiApi';
 
 const DAILY_LIMIT = 400;
+const CHAT_SYNC_INTERVAL_MS = 5000;
+const DEFAULT_MESSAGES = [
+  { role: 'assistant', type: 'text', content: 'Hallo! Ich bin dein Koffein-Assistent. Wie kann ich dir heute helfen?' },
+];
+const legacyStorageKey = 'ai_chat_messages';
 
 const parseMarkdown = (text) => {
   return text
@@ -12,28 +17,48 @@ const parseMarkdown = (text) => {
     .replace(/_(.*?)_/g, '<em>$1</em>');
 };
 
-const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDrink, onUpdateDrink }) => {
-  const [messages, setMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ai_chat_messages');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.error('Error loading chat messages:', e);
+const getStorageKey = (session) => `ai_chat_messages:${String(session?.email || 'anonymous').toLowerCase().trim()}`;
+
+const loadLocalMessages = (storageKey) => {
+  try {
+    for (const key of [storageKey, legacyStorageKey]) {
+      const saved = localStorage.getItem(key);
+      if (!saved) continue;
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-    return [
-      { role: 'assistant', type: 'text', content: 'Hallo! Ich bin dein Koffein-Assistent. Wie kann ich dir heute helfen?' },
-    ];
-  });
+  } catch (e) {
+    console.error('Error loading chat messages:', e);
+  }
+  return DEFAULT_MESSAGES;
+};
+
+const sameMessages = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+
+const AIAssistant = ({ session, totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDrink, onUpdateDrink }) => {
+  const storageKey = getStorageKey(session);
+  const userIdentity = { userId: session?.id || null, email: session?.email || null };
+  const [messages, setMessages] = useState(() => loadLocalMessages(storageKey));
   
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const scrollContainerRef = useRef(null);
+  const messagesRef = useRef(messages);
+  const loadingRef = useRef(false);
+  const remoteLoadedRef = useRef(false);
+  const skipNextRemoteSaveRef = useRef(false);
+  const lastRemoteUpdatedAtRef = useRef(null);
 
   const [summaryLoading, setSummaryLoading] = useState(false);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
 
   useEffect(() => {
     if (scrollContainerRef.current) {
@@ -43,11 +68,65 @@ const AIAssistant = ({ totalCaffeineToday = 0, logs = [], onAddDrink, onDeleteDr
 
   useEffect(() => {
     try {
-      localStorage.setItem('ai_chat_messages', JSON.stringify(messages));
+      localStorage.setItem(storageKey, JSON.stringify(messages));
+      localStorage.removeItem(legacyStorageKey);
     } catch (e) {
       console.error('Error saving chat messages:', e);
     }
-  }, [messages]);
+
+    if (!userIdentity.email || !remoteLoadedRef.current) return undefined;
+    if (skipNextRemoteSaveRef.current) {
+      skipNextRemoteSaveRef.current = false;
+      return undefined;
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await saveAiChatHistory({ ...userIdentity, messages });
+        if (data?.updatedAt) lastRemoteUpdatedAtRef.current = data.updatedAt;
+      } catch (e) {
+        console.error('Error syncing chat messages:', e);
+      }
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [messages, storageKey, userIdentity.userId, userIdentity.email]);
+
+  useEffect(() => {
+    if (!userIdentity.email) return undefined;
+    let cancelled = false;
+
+    const syncFromServer = async ({ initial = false } = {}) => {
+      if (!initial && loadingRef.current) return;
+      try {
+        const data = await fetchAiChatHistory(userIdentity);
+        if (cancelled) return;
+
+        if (data?.updatedAt && data.updatedAt !== lastRemoteUpdatedAtRef.current) {
+          const remoteMessages = Array.isArray(data.messages) && data.messages.length > 0 ? data.messages : DEFAULT_MESSAGES;
+          lastRemoteUpdatedAtRef.current = data.updatedAt;
+          if (!sameMessages(remoteMessages, messagesRef.current)) {
+            skipNextRemoteSaveRef.current = true;
+            setMessages(remoteMessages);
+          }
+        } else if (initial && !data?.updatedAt) {
+          const saved = await saveAiChatHistory({ ...userIdentity, messages: messagesRef.current });
+          if (saved?.updatedAt) lastRemoteUpdatedAtRef.current = saved.updatedAt;
+        }
+      } catch (e) {
+        console.error('Error loading synced chat messages:', e);
+      } finally {
+        if (!cancelled) remoteLoadedRef.current = true;
+      }
+    };
+
+    syncFromServer({ initial: true });
+    const interval = window.setInterval(() => syncFromServer(), CHAT_SYNC_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [userIdentity.userId, userIdentity.email]);
 
   const handleFetchSummary = async () => {
     setSummaryLoading(true);

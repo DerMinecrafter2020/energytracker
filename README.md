@@ -1,240 +1,393 @@
-# Koffein-Tracker ⚡
+# Koffein-Tracker
 
-Eine moderne Web-Anwendung zum Protokollieren des täglichen Koffeinkonsums durch Energy Drinks.
+Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen Warnungen. Die App bringt Benutzerverwaltung, Admin-Panel, Redis-Persistenz, 2FA, Erinnerungen, Discord-Integration und einen KI-Assistenten mit synchronisiertem Chatverlauf mit.
 
-![Version](https://img.shields.io/badge/version-1.0-blue)
+![Version](https://img.shields.io/badge/version-2.1.8-blue)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
-![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?logo=tailwindcss&logoColor=white)
-![Firebase](https://img.shields.io/badge/Firebase-10-FFCA28?logo=firebase&logoColor=black)
 
-## 🎯 Features
+## Funktionen
 
-- 📊 **Dashboard mit Fortschrittsbalken** - Visualisiere deinen Tageskonsum
-- ⚡ **Schnelles Hinzufügen** - Preset-Buttons für gängige Getränke
-- 🧮 **Manueller Rechner** - Berechne Koffein für beliebige Getränke
-- 📝 **Verlaufsprotokoll** - Sieh alle heutigen Einträge
-- ☁️ **Cloud-Sync** - Deine Daten werden sicher in Firebase gespeichert
-- 📱 **Mobile-First** - Optimiert für Smartphones
+- Tagesuebersicht mit Fortschrittsbalken, Warnungen und Tageslimit
+- Drink-Logs mit Name, Menge, Koffein, Icon, Datum, Bearbeiten und Loeschen
+- KI-Assistent fuer Fragen, Tagesanalyse und Drink-Aktionen
+- Unbegrenzter KI-Chatverlauf ohne 40-Nachrichten-Limit
+- Synchronisierter KI-Chat zwischen mehreren Geraeten pro Benutzer
+- Benutzerkonten mit Registrierung, E-Mail-Verifikation und Passwort-Reset
+- Admin-Panel fuer Benutzer, Rollen, manuelle Verifizierung, Loeschen und Impersonation
+- Demo-Login optional aktivierbar/deaktivierbar
+- Profil- und Sicherheitseinstellungen
+- 2FA per TOTP und Passkey/YubiKey/WebAuthn
+- Erinnerungen per E-Mail und optional Discord
+- Discord-Webhook-Test und geplante KI-Discord-Nachrichten
+- SMTP-Konfiguration im Admin-Panel
+- OpenRouter-KI-Konfiguration und optional Brave Search API
+- Redis-Health-Check im Admin-Panel
+- Themes: Standard Dark, Light, OLED, Neon, Forest
+- Docker-Compose-Setup mit Redis und Mailpit
 
-## 🛠️ Technologie-Stack
+## Tech-Stack
 
-- **Frontend:** React 18 + Vite
-- **Styling:** Tailwind CSS
-- **Backend:** Firebase (Auth & Firestore)
-- **Icons:** Lucide React
+- Frontend: React 19, Vite 8, Tailwind CSS, Lucide Icons
+- Backend: Node.js 20+, Express 5
+- Persistenz: Redis ueber `ioredis`
+- Auth/Security: lokale Benutzer, PBKDF2-Hashing, TOTP, WebAuthn/Passkeys
+- Mail: Nodemailer, SMTP-Konfiguration im Admin-Panel
+- KI: OpenRouter-kompatible Chat Completions API
 
-## 🚀 Installation
+## Schnellstart mit Docker Compose
 
-1. **Repository klonen und Dependencies installieren:**
-   ```bash
-   npm install
-   ```
+Voraussetzungen:
 
-2. **Firebase-Projekt einrichten:**
-   - Erstelle ein neues Projekt auf [Firebase Console](https://console.firebase.google.com/)
-   - Aktiviere "Anonymous Authentication"
-   - Erstelle eine Firestore-Datenbank
-   - Kopiere deine Firebase-Konfiguration
+- Docker
+- Docker Compose oder `docker compose`
 
-3. **Umgebungsvariablen konfigurieren:**
-   ```bash
-   cp .env.example .env.local
-   ```
-   Fülle dann die Werte in `.env.local` aus:
-   ```
-   VITE_FIREBASE_API_KEY=dein_api_key
-   VITE_FIREBASE_AUTH_DOMAIN=dein_projekt.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID=dein_projekt_id
-   VITE_FIREBASE_STORAGE_BUCKET=dein_projekt.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=deine_sender_id
-   VITE_FIREBASE_APP_ID=deine_app_id
-   ```
-
-4. **Firestore-Regeln einrichten:**
-   ```javascript
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /artifacts/{appId}/users/{userId}/{document=**} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
-       }
-     }
-   }
-   ```
-
-5. **Entwicklungsserver starten:**
-   ```bash
-   npm run dev
-   ```
-
-## 🖥️ Server-Installation (Produktivbetrieb)
-
-### Voraussetzungen
-
-- Node.js 18+ und npm
-- MySQL/MariaDB Datenbank
-- (Optional) Nginx als Reverse Proxy
-
-### 1) Abhängigkeiten installieren
+1. Repository klonen:
 
 ```bash
-npm install
+git clone <repo-url> koffein-tracker
+cd koffein-tracker
 ```
 
-### 2) Datenbank anlegen
-
-```sql
-CREATE DATABASE caffeine_tracker CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-### 3) Umgebungsvariablen setzen
+2. `.env.local` im Projekt anlegen:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Trage die Werte in `.env.local` ein (Beispiel):
+3. Werte in `.env.local` fuer Produktion anpassen:
 
-```
-VITE_API_BASE_URL=https://dein-server.de
-MYSQL_HOST=127.0.0.1
-MYSQL_PORT=3306
-MYSQL_USER=caffeine
-MYSQL_PASSWORD=geheim
-MYSQL_DATABASE=caffeine_tracker
-CORS_ORIGIN=https://dein-frontend.de
+```env
+NODE_ENV=production
 PORT=3001
+CORS_ORIGIN=http://localhost:3001
+
+ADMIN_SECRET=bitte-aendern
+PASSWORD_SALT=bitte-aendern
+
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+WEBAUTHN_RP_NAME=Koffein-Tracker
+WEBAUTHN_ORIGIN=http://localhost:3001
+
+VITE_API_BASE_URL=http://localhost:3001
+VITE_ADMIN_SECRET=bitte-aendern
 ```
 
-### 4) Backend (API) starten
+Wichtig: `ADMIN_SECRET` und `VITE_ADMIN_SECRET` muessen denselben Wert haben. Bei Docker-Builds werden `VITE_*` Variablen in das Frontend eingebaut, deshalb muss `.env.local` bereits vor `docker compose up --build` vorhanden sein.
+
+Die aktuelle `docker-compose.yml` mountet zusaetzlich diese Datei in den Container:
+
+```text
+/root/energytracker/.env.local:/app/.env.local:ro
+```
+
+Lege die Datei dort an oder passe den Volume-Pfad in `docker-compose.yml` auf dein Projekt an, z.B.:
+
+```yaml
+volumes:
+  - ./.env.local:/app/.env.local:ro
+```
+
+4. Container starten:
+
+```bash
+docker compose up -d --build
+```
+
+5. App oeffnen:
+
+```text
+http://localhost:3001
+```
+
+Docker Compose startet:
+
+- `app` auf Port `3001`
+- `redis` mit persistentem Volume `redis-data`
+- `mailpit` auf `http://localhost:8025` fuer lokale Mailtests
+
+## Lokale Entwicklung
+
+Voraussetzungen:
+
+- Node.js 20+
+- npm
+- Redis 7+
+
+1. Dependencies installieren:
+
+```bash
+npm install
+```
+
+2. Redis lokal starten:
+
+```bash
+docker run --name koffein-redis -p 6379:6379 -d redis:7-alpine
+```
+
+Alternativ einen vorhandenen Redis nutzen und `REDIS_URL`, `REDIS_HOST` oder `REDIS_PORT` setzen.
+
+3. `.env.local` anlegen:
+
+```env
+NODE_ENV=development
+PORT=3001
+CORS_ORIGIN=http://localhost:5173
+
+ADMIN_SECRET=et-admin-2024
+PASSWORD_SALT=et-caffeine-salt-2024
+
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+WEBAUTHN_ORIGIN=http://localhost:5173
+WEBAUTHN_RP_ID=localhost
+
+VITE_API_BASE_URL=http://localhost:3001
+VITE_ADMIN_SECRET=et-admin-2024
+```
+
+4. Backend starten:
 
 ```bash
 npm run server
 ```
 
-Der Server erstellt die Tabelle automatisch beim Start.
-
-### 5) Frontend bauen
+5. Frontend in einem zweiten Terminal starten:
 
 ```bash
-npm run build
+npm run dev
 ```
 
-Die fertigen Dateien liegen in `dist/` und können über Nginx oder einen Static-Server ausgeliefert werden.
+Frontend: `http://localhost:5173`
 
-### 6) Nginx (Beispiel)
+API: `http://localhost:3001`
+
+## Erste Anmeldung
+
+Solange Demo-Zugang aktiviert ist, stehen Standarddaten bereit:
+
+| Rolle | E-Mail | Passwort |
+|---|---|---|
+| Admin | `admin@energytracker.de` | `Admin@2024!` |
+| Benutzer | `user@energytracker.de` | `User@2024!` |
+
+Die Demo-Zugangsdaten koennen per ENV angepasst werden:
+
+```env
+VITE_ADMIN_EMAIL=admin@example.com
+VITE_ADMIN_PASSWORD=ein-sicheres-passwort
+VITE_USER_EMAIL=user@example.com
+VITE_USER_PASSWORD=ein-sicheres-passwort
+```
+
+Fuer produktive Installationen:
+
+- `ADMIN_SECRET` und `PASSWORD_SALT` aendern
+- Demo-Zugang im Admin-Panel deaktivieren
+- SMTP konfigurieren, wenn Registrierung, Verifikation oder Passwort-Reset genutzt werden sollen
+- Erste echte Admin-Benutzer im Admin-Panel anlegen
+
+## Wichtige Umgebungsvariablen
+
+| Variable | Zweck |
+|---|---|
+| `PORT` | Express-Port, Standard `3001` |
+| `CORS_ORIGIN` | erlaubte Frontend-Origin |
+| `ADMIN_SECRET` | Secret fuer Admin-API-Aufrufe |
+| `VITE_ADMIN_SECRET` | Frontend-Gegenstueck zu `ADMIN_SECRET` |
+| `PASSWORD_SALT` | Salt fuer Passwort-Hashing |
+| `REDIS_URL` | vollstaendige Redis-URL, z.B. `redis://127.0.0.1:6379` |
+| `REDIS_HOST` / `REDIS_PORT` | Redis-Host und Port, falls keine `REDIS_URL` gesetzt ist |
+| `WEBAUTHN_RP_NAME` | Anzeigename fuer Passkeys/TOTP-Issuer |
+| `WEBAUTHN_ORIGIN` | Origin fuer WebAuthn, z.B. `https://deine-domain.de` |
+| `WEBAUTHN_RP_ID` | Domain fuer WebAuthn, z.B. `deine-domain.de` |
+| `VITE_API_BASE_URL` | API-URL fuer das Frontend |
+
+SMTP, Registrierung, Demo-Zugang, Discord-Webhook und KI-Keys werden im Admin-Panel gespeichert.
+
+## KI-Assistent
+
+Der KI-Assistent nutzt die im Admin-Panel konfigurierte OpenRouter API.
+
+Funktionen:
+
+- Chat auf Deutsch
+- Tagesanalyse
+- Drinks per KI hinzufuegen, bearbeiten und loeschen
+- geplante Discord-Nachrichten
+- optional Brave Search API fuer bessere Drink-Recherche
+- Chatverlauf wird in Redis pro Benutzer gespeichert
+- mehrere Geraete synchronisieren den Chat automatisch
+- kein 40-Nachrichten-Limit mehr
+
+## Admin-Panel
+
+Admins koennen:
+
+- alle Logs der letzten 30 Tage ansehen, filtern, sortieren und als CSV exportieren
+- Logs bearbeiten oder loeschen
+- Benutzer erstellen, verifizieren, loeschen und Rollen aendern
+- als Benutzer wechseln und wieder ins Admin-Panel zurueckkehren
+- SMTP speichern und testen
+- Registrierung und Demo-Zugang umschalten
+- Discord-Webhook testen
+- OpenRouter- und Brave-Keys speichern
+- Redis-Persistenz pruefen
+
+## Sicherheit
+
+Unter Einstellungen kann jeder Benutzer:
+
+- Name, E-Mail und Passwort aktualisieren
+- TOTP/Authenticator-App aktivieren oder deaktivieren
+- Passkeys/YubiKey/WebAuthn registrieren oder entfernen
+- Warn- und Discord-Benachrichtigungen konfigurieren
+- Theme auswaehlen
+
+## Erinnerungen und Benachrichtigungen
+
+Benutzer koennen taegliche Reminder konfigurieren:
+
+- Uhrzeit
+- E-Mail-Versand
+- Discord-Versand
+
+Weitere Warnungen:
+
+- Tageslimit ueberschritten
+- spaetes Koffein
+- schnelle Folge mehrerer Drinks
+
+## API-Endpunkte
+
+Auszug der wichtigsten API-Bereiche:
+
+- `GET /api/health`
+- `GET /api/version`
+- `GET/POST /api/logs`
+- `PUT/DELETE /api/logs/:id`
+- `POST /api/login`
+- `POST /api/register`
+- `GET/POST /api/settings/me`
+- `GET/POST /api/reminders/me`
+- `GET/POST/DELETE /api/favorites/me`
+- `GET/POST/DELETE /api/custom-drinks/me`
+- `GET/POST /api/ai/chat-history`
+- `POST /api/ai/chat`
+- `POST /api/ai/daily-summary`
+- `POST /api/ai/recognize-drink`
+- `GET /api/admin/users`
+- `GET/POST /api/admin/smtp`
+- `GET/POST /api/admin/ai`
+- `GET /api/admin/redis/health`
+
+Admin-Endpunkte erwarten den Header `X-Admin-Secret`.
+
+## Projektstruktur
+
+```text
+.
+├── server.js                  # Express API, Redis-Persistenz, Auth, KI, Reminder
+├── docker-compose.yml         # App + Redis + Mailpit
+├── Dockerfile                 # Production Image
+├── src/
+│   ├── App.jsx                # Haupt-App, Routing zwischen Login/Admin/User
+│   ├── main.jsx               # React Entry Point
+│   ├── components/
+│   │   ├── AIAssistant.jsx    # KI-Chat und synchronisierte History
+│   │   ├── AdminPanel.jsx     # Admin-Oberflaeche
+│   │   ├── LoginPage.jsx      # Login, Reset, 2FA
+│   │   ├── RegisterPage.jsx   # Registrierung
+│   │   ├── SettingsPanel.jsx  # Profil, Theme, 2FA, Passkeys
+│   │   ├── ReminderSettings.jsx
+│   │   ├── DrinkHistory.jsx
+│   │   ├── ProgressBar.jsx
+│   │   └── WarningAlert.jsx
+│   ├── services/
+│   │   ├── api.js             # App API Client
+│   │   ├── adminApi.js        # Admin API Client
+│   │   ├── aiApi.js           # KI API Client
+│   │   └── auth.js            # Login, Session, Impersonation
+│   └── utils/
+│       └── caffeineUtils.js
+├── tests/
+│   ├── api.test.js
+│   └── ai.test.js
+└── scripts/
+    ├── bump-version.mjs
+    └── migrate-legacy-json-to-mysql.mjs
+```
+
+## Scripts
+
+| Script | Beschreibung |
+|---|---|
+| `npm run dev` | startet Vite fuer lokale Entwicklung |
+| `npm run server` | startet Express API |
+| `npm run build` | baut das Frontend fuer Produktion |
+| `npm run preview` | Vorschau des Production Builds |
+| `npm run migrate:legacy:mysql` | Legacy-Migration fuer alte Daten |
+
+Hinweis: `npm run build` fuehrt vorher `npm run version:auto` aus und erhoeht die Version in `package.json` und `package-lock.json`.
+
+## Tests
+
+Die vorhandenen Tests nutzen Node Test Runner und erwarten eine laufende API:
+
+```bash
+npm run server
+node --test tests/*.test.js
+```
+
+Optional kann die API-URL gesetzt werden:
+
+```bash
+TEST_API_URL=http://localhost:3001/api node --test tests/*.test.js
+```
+
+## Deployment-Hinweise
+
+Empfohlener Produktionsbetrieb:
+
+1. Docker Compose verwenden
+2. Redis-Volume sichern
+3. Reverse Proxy mit HTTPS davor setzen
+4. `CORS_ORIGIN`, `WEBAUTHN_ORIGIN` und `WEBAUTHN_RP_ID` auf die echte Domain setzen
+5. SMTP im Admin-Panel konfigurieren
+6. Demo-Zugang deaktivieren
+
+Beispiel fuer Reverse Proxy:
 
 ```nginx
 server {
-   listen 80;
-   server_name dein-frontend.de;
+  listen 80;
+  server_name deine-domain.de;
 
-   root /pfad/zur/app/dist;
-   index index.html;
-
-   location / {
-      try_files $uri /index.html;
-   }
-
-   location /api/ {
-      proxy_pass http://127.0.0.1:3001/;
-      proxy_http_version 1.1;
-      proxy_set_header Host $host;
-      proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
-   }
+  location / {
+    proxy_pass http://127.0.0.1:3001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
 }
 ```
 
-## 📤 Upload auf den Server
+## Koffein-Hinweis
 
-```bash
-git clone <repo-url> /opt/koffein-tracker
-```
+Die App dient zur Orientierung und ersetzt keine medizinische Beratung. Das haeufig genannte Tageslimit fuer gesunde Erwachsene liegt bei ca. 400 mg Koffein, individuelle Grenzen koennen aber abweichen.
 
-### Danach ausführen
-
-```bash
-cd /opt/koffein-tracker
-chmod +x deploy.sh
-./deploy.sh
-```
-
-## ⚙️ systemd (Empfohlen für Server)
-
-1) Projekt auf den Server kopieren (z. B. nach `/opt/koffein-tracker`).
-
-2) Service installieren und starten:
-
-```bash
-sudo ./install_systemd.sh
-```
-
-3) Status prüfen:
-
-```bash
-systemctl status energy-tracker.service
-```
-
-Der Service startet automatisch nach einem Neustart.
-
-
-## 📁 Projektstruktur
-
-```
-src/
-├── components/
-│   ├── Header.jsx         # App-Header mit Datum
-│   ├── ProgressBar.jsx    # Fortschrittsbalken & Status
-│   ├── PresetDrinks.jsx   # Schnell-Buttons für Getränke
-│   ├── ManualCalculator.jsx # Manueller Koffein-Rechner
-│   └── DrinkHistory.jsx   # Verlaufsliste
-├── services/
-│   └── caffeineService.js # Firebase Firestore-Operationen
-├── utils/
-│   └── caffeineUtils.js   # Hilfsfunktionen & Konstanten
-├── firebase.js            # Firebase-Konfiguration
-├── App.jsx                # Haupt-App-Komponente
-├── main.jsx               # Entry Point
-└── index.css              # Globale Styles
-```
-
-## 🚦 Koffein-Grenzwerte
-
-- **Grün (0-74%):** Sicherer Bereich
-- **Orange (75-99%):** Nähert sich dem Limit
-- **Rot (100%+):** Tageslimit überschritten
-
-Das empfohlene Tageslimit beträgt **400 mg Koffein** für gesunde Erwachsene.
-
-## 🥤 Verfügbare Presets
-
-| Getränk | Größe | Koffein |
-|---------|-------|---------|
-| Red Bull | 250 ml | 80 mg |
-| Monster Energy | 500 ml | 160 mg |
-| Kaffee | 200 ml | 80 mg |
-| Espresso | 30 ml | 63 mg |
-| Rockstar | 500 ml | 160 mg |
-| Club Mate | 500 ml | 100 mg |
-
-## 📜 Scripts
-
-- `npm run dev` - Startet den Entwicklungsserver
-- `npm run build` - Erstellt einen Production Build
-- `npm run preview` - Vorschau des Production Builds
-
-## ⚠️ Disclaimer
-
-Diese App dient nur zu Informationszwecken. Die Koffeindaten basieren auf Herstellerangaben und können variieren. Bei gesundheitlichen Bedenken konsultiere bitte einen Arzt.
-
-## 📄 Lizenz
+## Lizenz
 
 MIT License
 
 ---
 
-**Made with ⚡ by Cornelius**  
-**Version 1.1.5** | **Februar 2026**
+Made by Cornelius
