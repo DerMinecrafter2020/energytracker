@@ -3,11 +3,11 @@ import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Search, ChevronDown, ChevronUp, Coffee,
-  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle, Globe,
+  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
   CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash, Edit3,
 } from 'lucide-react';
 import { logout } from '../services/auth';
-import { fetchLogs, deleteLog as deleteApiLog } from '../services/api';
+import { fetchLogs, deleteLog as deleteApiLog, adminUpdateLog } from '../services/api';
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
@@ -55,6 +55,40 @@ const StatCard = ({ icon: Icon, label, value, sub, color = 'blue' }) => {
   );
 };
 
+const Spinner = ({ className = 'w-4 h-4 border-2 border-white/30 border-t-white', block = false }) =>
+  <span className={`${className} rounded-full animate-spin ${block ? 'block' : ''}`} />;
+
+const ToggleSwitch = ({ checked, onClick, onColor = 'bg-green-500' }) => (
+  <button type="button" onClick={onClick}
+    className={`relative w-12 h-6 rounded-full transition-all duration-300 ${checked ? onColor : 'bg-white/10'}`}>
+    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-300 ${checked ? 'left-7' : 'left-1'}`} />
+  </button>
+);
+
+const Field = ({ label, icon: Icon, children, className = '', inputClass = '', ...props }) => (
+  <div className={className}>
+    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{label}</label>
+    <div className="relative">
+      {Icon && <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />}
+      <input {...props} className={`input-dark ${Icon ? 'pl-10' : ''} ${children ? 'pr-10' : ''} ${inputClass}`} />
+      {children}
+    </div>
+  </div>
+);
+
+const MessageBox = ({ message, iconSize = 'w-4 h-4', onClose, className = 'glass-card rounded-2xl p-3' }) => message && (
+  <div className={`${className} flex items-center gap-2 text-sm border animate-slide-in
+    ${message.type === 'success'
+      ? 'bg-green-500/10 border-green-500/30 text-green-300'
+      : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+    {message.type === 'success'
+      ? <CheckCircle className={`${iconSize} shrink-0`} />
+      : <AlertTriangle className={`${iconSize} shrink-0`} />}
+    <span>{message.text}</span>
+    {onClose && <button onClick={onClose} className="ml-auto text-xs opacity-60 hover:opacity-100">×</button>}
+  </div>
+);
+
 // â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initialActiveTab = 'overview', onActiveTabChange }) => {
     const [allLogs, setAllLogs]     = useState([]);
@@ -65,8 +99,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [sortField, setSortField] = useState('createdAt');
   const [sortDir, setSortDir]     = useState('desc');
   const [activeTab, setActiveTab] = useState(initialActiveTab);
-
-    const [msg, setMsg] = useState(null);
 
   // Edit Log modal state
   const [editingLog, setEditingLog] = useState(null);
@@ -392,7 +424,6 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     if (!editingLog) return;
     setEditLogSaving(true);
     try {
-      const { adminUpdateLog } = await import('../services/api');
       await adminUpdateLog(editingLog.id, editLogData);
       setAllLogs(prev => prev.map(l => l.id === editingLog.id ? { ...l, ...editLogData } : l));
       setEditingLog(null);
@@ -402,6 +433,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       setEditLogSaving(false);
     }
   };
+  const setEditLogField = (field, value) => setEditLogData((prev) => ({ ...prev, [field]: value }));
   
   const handleDelete = async (id) => {
     if (!window.confirm('Diesen Eintrag wirklich löschen?')) return;
@@ -723,7 +755,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                           aria-label="Löschen"
                         >
                           {deleting === log.id
-                            ? <span className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin block" />
+                            ? <Spinner className="w-4 h-4 border-2 border-red-400/30 border-t-red-400" block />
                             : <Trash2 className="w-4 h-4" />
                           }
                         </button>
@@ -777,38 +809,21 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     Neuen Benutzer erstellen
                   </h3>
                   <form onSubmit={handleCreateUser} className="space-y-4">
-                    {/* Name */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'Name'}</label>
-                      <input type="text" required value={createForm.name}
-                        onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
-                        placeholder={'Max Mustermann'} className="input-dark" />
-                    </div>
-                    {/* Email */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'E-Mail'}</label>
-                      <div className="relative">
-                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input type="email" required value={createForm.email}
-                          onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))}
-                          placeholder="user@example.com" className="input-dark pl-10" />
-                      </div>
-                    </div>
-                    {/* Password */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'Passwort / App-Token'}</label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input type={showCreatePw ? 'text' : 'password'} required minLength={8}
-                          value={createForm.password}
-                          onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
-                          placeholder="Min. 8 Zeichen" className="input-dark pl-10 pr-10" />
-                        <button type="button" onClick={() => setShowCreatePw((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
-                          {showCreatePw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
+                    <Field label="Name" type="text" required value={createForm.name}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="Max Mustermann" inputClass="pl-0" />
+                    <Field label="E-Mail" icon={Mail} type="email" required value={createForm.email}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))}
+                      placeholder="user@example.com" />
+                    <Field label="Passwort / App-Token" icon={Lock} type={showCreatePw ? 'text' : 'password'} required minLength={8}
+                      value={createForm.password}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
+                      placeholder="Min. 8 Zeichen">
+                      <button type="button" onClick={() => setShowCreatePw((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+                        {showCreatePw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </Field>
                     {/* Role */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Rolle</label>
@@ -834,13 +849,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                         <p className="text-sm text-white font-medium">Sofort verifizieren</p>
                         <p className="text-xs text-slate-500">Benutzer kann sich direkt anmelden</p>
                       </div>
-                      <button type="button"
-                        onClick={() => setCreateForm((p) => ({ ...p, verified: !p.verified }))}
-                        className={`relative w-12 h-6 rounded-full transition-all duration-300
-                          ${createForm.verified ? 'bg-green-500' : 'bg-white/10'}`}>
-                        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-300
-                          ${createForm.verified ? 'left-7' : 'left-1'}`} />
-                      </button>
+                      <ToggleSwitch checked={createForm.verified} onClick={() => setCreateForm((p) => ({ ...p, verified: !p.verified }))} />
                     </div>
                     {/* Actions */}
                     <div className="flex gap-3 pt-1">
@@ -854,7 +863,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                           bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
                           disabled:opacity-60 transition-all flex items-center justify-center gap-2">
                         {createUserLoading
-                          ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ? <Spinner />
                           : <UserCheck className="w-4 h-4" />}
                         Erstellen
                       </button>
@@ -864,17 +873,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               </div>
             )}
 
-            {usersMsg && (
-              <div className={`glass-card rounded-2xl p-3 flex items-center gap-2 text-sm border animate-slide-in
-                ${usersMsg.type === 'success'
-                  ? 'bg-green-500/10 border-green-500/30 text-green-300'
-                  : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
-                {usersMsg.type === 'success'
-                  ? <CheckCircle className="w-4 h-4 shrink-0" />
-                  : <AlertTriangle className="w-4 h-4 shrink-0" />}
-                {usersMsg.text}
-              </div>
-            )}
+            <MessageBox message={usersMsg} />
 
             <div className="glass-card rounded-2xl overflow-hidden">
               {usersLoading ? (
@@ -960,7 +959,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                                 hover:bg-blue-500/10 transition-all disabled:opacity-50"
                               title={`Als ${u.name} anmelden`}>
                               {impersonatingId === u.id
-                                ? <span className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin block" />
+                                ? <Spinner className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400" block />
                                 : <Eye className="w-4 h-4" />}
                             </button>
                           )}
@@ -1000,27 +999,10 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
               {/* Host + Port */}
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Server-Host
-                  </label>
-                  <div className="relative">
-                    <Server className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="text" value={smtp.host} onChange={(e) => handleSmtpChange('host', e.target.value)}
-                      placeholder="smtp.gmail.com" className="input-dark pl-9" />
-                  </div>
-                </div>
-                <div className="w-24">
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Port
-                  </label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="number" value={smtp.port} min="1" max="65535"
-                      onChange={(e) => handleSmtpChange('port', Number(e.target.value))}
-                      className="input-dark pl-9" />
-                  </div>
-                </div>
+                <Field label="Server-Host" icon={Server} type="text" value={smtp.host}
+                  onChange={(e) => handleSmtpChange('host', e.target.value)} placeholder="smtp.gmail.com" />
+                <Field label="Port" icon={Hash} type="number" value={smtp.port} min="1" max="65535"
+                  onChange={(e) => handleSmtpChange('port', Number(e.target.value))} className="w-24" />
               </div>
 
               {/* Security */}
@@ -1049,72 +1031,34 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
               {/* Auth */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Benutzername
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="email" value={smtp.auth.user}
-                      onChange={(e) => handleSmtpChange('auth.user', e.target.value)}
-                      placeholder="user@gmail.com" className="input-dark pl-10" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Passwort / App-Token
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type={showSmtpPw ? 'text' : 'password'} value={smtp.auth.pass}
-                      onChange={(e) => handleSmtpChange('auth.pass', e.target.value)}
-                      placeholder="••••••••" className="input-dark pl-10 pr-10" />
-                    <button type="button" onClick={() => setShowSmtpPw(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
-                      {showSmtpPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
+                <Field label="Benutzername" icon={Mail} type="email" value={smtp.auth.user}
+                  onChange={(e) => handleSmtpChange('auth.user', e.target.value)} placeholder="user@gmail.com" />
+                <Field label="Passwort / App-Token" icon={Lock} type={showSmtpPw ? 'text' : 'password'} value={smtp.auth.pass}
+                  onChange={(e) => handleSmtpChange('auth.pass', e.target.value)} placeholder="••••••••">
+                  <button type="button" onClick={() => setShowSmtpPw(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+                    {showSmtpPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </Field>
               </div>
 
               {/* From name + email */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Absender-Name
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="text" value={smtp.fromName}
-                      onChange={(e) => handleSmtpChange('fromName', e.target.value)}
-                      placeholder="Koffein-Tracker" className="input-dark pl-9" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                    Absender-E-Mail
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input type="email" value={smtp.fromEmail}
-                      onChange={(e) => handleSmtpChange('fromEmail', e.target.value)}
-                      placeholder="noreply@deine-domain.de" className="input-dark pl-9" />
-                  </div>
-                </div>
+                <Field label="Absender-Name" icon={User} type="text" value={smtp.fromName}
+                  onChange={(e) => handleSmtpChange('fromName', e.target.value)} placeholder="Koffein-Tracker" />
+                <Field label="Absender-E-Mail" icon={Mail} type="email" value={smtp.fromEmail}
+                  onChange={(e) => handleSmtpChange('fromEmail', e.target.value)} placeholder="noreply@deine-domain.de" />
               </div>
 
               {/* Base URL */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  App-URL <span className="normal-case font-normal text-slate-600">(für Bestätigungslinks in E-Mails)</span>
-                </label>
-                <div className="relative">
-                  <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input type="url" value={smtp.baseUrl}
-                    onChange={(e) => handleSmtpChange('baseUrl', e.target.value)}
-                    placeholder="https://deine-app.de" className="input-dark pl-9" />
-                </div>
-              </div>
+              <Field
+                label={<>App-URL <span className="normal-case font-normal text-slate-600">(für Bestätigungslinks in E-Mails)</span></>}
+                icon={Link}
+                type="url"
+                value={smtp.baseUrl}
+                onChange={(e) => handleSmtpChange('baseUrl', e.target.value)}
+                placeholder="https://deine-app.de"
+              />
 
               {/* Save button */}
               <button onClick={handleSmtpSave} disabled={smtpSaving}
@@ -1122,7 +1066,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
                   disabled:opacity-60 transition-all shadow-glow-blue flex items-center justify-center gap-2">
                 {smtpSaving
-                  ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ? <Spinner />
                   : <Server className="w-4 h-4" />}
                 Einstellungen speichern
               </button>
@@ -1141,13 +1085,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     Erlaubt neuen Benutzern, sich selbst zu registrieren.
                   </p>
                 </div>
-                <button type="button"
-                  onClick={() => handleSmtpChange('registrationEnabled', !smtp.registrationEnabled)}
-                  className={`relative w-12 h-6 rounded-full transition-all duration-300
-                    ${smtp.registrationEnabled ? 'bg-green-500' : 'bg-white/10'}`}>
-                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-300
-                    ${smtp.registrationEnabled ? 'left-7' : 'left-1'}`} />
-                </button>
+                <ToggleSwitch checked={smtp.registrationEnabled} onClick={() => handleSmtpChange('registrationEnabled', !smtp.registrationEnabled)} />
               </div>
             </div>
 
@@ -1163,13 +1101,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     Zeigt Demo-Login-Buttons auf der Anmeldeseite (Admin + Benutzer).
                   </p>
                 </div>
-                <button type="button"
-                  onClick={() => handleSmtpChange('demoEnabled', !smtp.demoEnabled)}
-                  className={`relative w-12 h-6 rounded-full transition-all duration-300
-                    ${smtp.demoEnabled !== false ? 'bg-amber-500' : 'bg-white/10'}`}>
-                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-300
-                    ${smtp.demoEnabled !== false ? 'left-7' : 'left-1'}`} />
-                </button>
+                <ToggleSwitch checked={smtp.demoEnabled !== false} onColor="bg-amber-500" onClick={() => handleSmtpChange('demoEnabled', !smtp.demoEnabled)} />
               </div>
             </div>
 
@@ -1190,7 +1122,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     bg-amber-500/20 border border-amber-500/30 text-amber-300
                     hover:bg-amber-500/30 transition-all text-sm disabled:opacity-50 shrink-0">
                   {smtpTesting
-                    ? <span className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                    ? <Spinner className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400" />
                     : <Send className="w-4 h-4" />}
                   Test senden
                 </button>
@@ -1214,7 +1146,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     bg-indigo-500/20 border border-indigo-500/30 text-indigo-300
                     hover:bg-indigo-500/30 transition-all text-sm disabled:opacity-50 shrink-0">
                   {discordTesting
-                    ? <span className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                    ? <Spinner className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400" />
                     : <MessageCircle className="w-4 h-4" />}
                   Test senden
                 </button>
@@ -1279,18 +1211,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   bg-violet-500/20 border border-violet-500/30 text-violet-300
                   hover:bg-violet-500/30 transition-all text-sm disabled:opacity-50">
                 {aiSaving
-                  ? <span className="w-4 h-4 border-2 border-violet-400/30 border-t-violet-400 rounded-full animate-spin" />
+                  ? <Spinner className="w-4 h-4 border-2 border-violet-400/30 border-t-violet-400" />
                   : <Bot className="w-4 h-4" />}
                 Speichern
               </button>
-              {aiMsg && (
-                <div className={`rounded-xl p-3 flex items-center gap-2 text-sm
-                  ${aiMsg.type === 'success' ? 'bg-green-500/10 border border-green-500/30 text-green-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}>
-                  {aiMsg.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-                  {aiMsg.text}
-                  <button onClick={() => setAiMsg(null)} className="ml-auto text-xs opacity-60 hover:opacity-100">×</button>
-                </div>
-              )}
+              <MessageBox message={aiMsg} onClose={() => setAiMsg(null)} className="rounded-xl p-3" />
             </div>
 
             {/* Redis Health card */}
@@ -1307,7 +1232,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                     bg-white/5 border border-white/10 text-slate-300
                     hover:bg-white/10 transition-all disabled:opacity-50">
                   {redisChecking
-                    ? <span className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
+                    ? <Spinner className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400" />
                     : <RefreshCw className="w-3 h-3" />}
                   Prüfen
                 </button>
@@ -1374,20 +1299,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             </div>
 
             {/* Feedback message */}
-            {smtpMsg && (
-              <div className={`glass-card rounded-2xl p-4 flex items-center gap-3 border animate-slide-in
-                ${smtpMsg.type === 'success'
-                  ? 'bg-green-500/10 border-green-500/30 text-green-300'
-                  : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
-                {smtpMsg.type === 'success'
-                  ? <CheckCircle className="w-5 h-5 shrink-0" />
-                  : <AlertTriangle className="w-5 h-5 shrink-0" />}
-                <span className="text-sm">{smtpMsg.text}</span>
-                <button onClick={() => setSmtpMsg(null)} className="ml-auto text-xs underline opacity-60 hover:opacity-100">
-                  ×
-                </button>
-              </div>
-            )}
+            <MessageBox message={smtpMsg} iconSize="w-5 h-5" onClose={() => setSmtpMsg(null)} className="glass-card rounded-2xl p-4 gap-3" />
           </div>
         )}
 
@@ -1397,24 +1309,12 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           <div className="glass-card w-full max-w-md rounded-2xl p-6 shadow-2xl animate-scale-up">
             <h3 className="text-xl font-bold text-white mb-6">Log bearbeiten</h3>
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Name</label>
-                <input type="text" value={editLogData.name} onChange={e => setEditLogData({...editLogData, name: e.target.value})} className="input-dark w-full" />
-              </div>
+              <Field label="Name" type="text" value={editLogData.name} onChange={(e) => setEditLogField('name', e.target.value)} inputClass="w-full pl-0" />
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Größe (ml)</label>
-                  <input type="number" value={editLogData.size} onChange={e => setEditLogData({...editLogData, size: e.target.value})} className="input-dark w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Koffein (mg)</label>
-                  <input type="number" value={editLogData.caffeine} onChange={e => setEditLogData({...editLogData, caffeine: e.target.value})} className="input-dark w-full" />
-                </div>
+                <Field label="Größe (ml)" type="number" value={editLogData.size} onChange={(e) => setEditLogField('size', e.target.value)} inputClass="w-full pl-0" />
+                <Field label="Koffein (mg)" type="number" value={editLogData.caffeine} onChange={(e) => setEditLogField('caffeine', e.target.value)} inputClass="w-full pl-0" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Icon (Emoji)</label>
-                <input type="text" value={editLogData.icon} onChange={e => setEditLogData({...editLogData, icon: e.target.value})} className="input-dark w-full" maxLength={2} />
-              </div>
+              <Field label="Icon (Emoji)" type="text" value={editLogData.icon} onChange={(e) => setEditLogField('icon', e.target.value)} inputClass="w-full pl-0" maxLength={2} />
             </div>
             <div className="flex justify-end gap-3 mt-8">
               <button onClick={() => setEditingLog(null)} className="px-4 py-2 text-slate-400 hover:text-white transition-colors text-sm font-medium">Abbrechen</button>
@@ -1432,12 +1332,3 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 };
 
 export default AdminPanel;
-
-
-
-
-
-
-
-
-

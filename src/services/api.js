@@ -1,377 +1,122 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-export const fetchLogs = async (date, { userId, email } = {}) => {
-  const url = new URL('/api/logs', API_BASE_URL);
-  url.searchParams.set('date', date);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error('Fehler beim Laden der Logs');
-  }
-  return response.json();
-};
-
-export const createLog = async (logData) => {
-  const response = await fetch(`${API_BASE_URL}/api/logs`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(logData),
-  });
-
-  if (!response.ok) {
-    throw new Error('Fehler beim Speichern des Logs');
-  }
-
-  return response.json();
-};
-
-export const deleteLog = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/api/logs/${id}`, {
-    method: 'DELETE',
-  });
-
-  if (!response.ok) {
-    throw new Error('Fehler beim LÃ¶schen des Logs');
-  }
-
-  return response.json();
-};
-
-export const fetchReminderSettings = async ({ userId, email }) => {
-  const url = new URL('/api/reminders/me', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Fehler beim Laden der Erinnerungen');
-  }
-  return data;
-};
-
-export const saveReminderSettings = async (payload) => {
-  const response = await fetch(`${API_BASE_URL}/api/reminders/me`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Fehler beim Speichern der Erinnerungen');
-  }
-
-  return data;
-};
-
-export const fetchFavorites = async ({ userId, email }) => {
-  const url = new URL('/api/favorites/me', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Fehler beim Laden der Favoriten');
-  }
-  return data;
-};
-
-export const testDiscordWebhook = async (webhookUrl) => {
-  const response = await fetch(`${API_BASE_URL}/api/admin/test-discord`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ webhookUrl }),
-  });
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || 'Fehler beim Discord Test');
-  }
-  return response.json();
-};
-
-export const testUserEmail = async ({ userId, email }) => {
-  const response = await fetch(`${API_BASE_URL}/api/user/test-email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email }),
-  });
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || 'Fehler beim E-Mail Test');
-  }
-  return response.json();
-};
-
-export const addFavorite = async (payload) => {
-  const response = await fetch(`${API_BASE_URL}/api/favorites/me`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Fehler beim Speichern des Favoriten');
-  }
-
-  return data;
-};
-
-export const removeFavorite = async ({ userId, email, favoriteId }) => {
-  const url = new URL('/api/favorites/me', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-  if (favoriteId) url.searchParams.set('favoriteId', favoriteId);
-
-  const response = await fetch(url.toString(), {
-    method: 'DELETE',
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Fehler beim Entfernen des Favoriten');
-  }
-
-  return data;
-};
-
-// â”€â”€ USER SETTINGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export const fetchUserSettings = async ({ userId, email }) => {
-  const url = new URL('/api/settings/me', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Einstellungen');
-  return data;
-};
-
-export const updateUserSettings = async ({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme, language }) => {
-  const response = await fetch(`${API_BASE_URL}/api/settings/me`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid, discordNotifyAtLimit, discordNotifyLate, discordNotifyRapid, theme, language }),
-  });
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Speichern der Einstellungen');
-  return data;
-};
-
-export const updateUserProfile = async ({ userId, email, currentPassword, newName, newEmail, newPassword }) => {
-  const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, currentPassword, newName, newEmail, newPassword }),
-  });
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Aktualisieren des Profils');
-  return data;
-};
-
-// â”€â”€ CUSTOM DRINKS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export const fetchCustomDrinks = async ({ userId, email }) => {
-  const url = new URL('/api/custom-drinks/me', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der GetrÃ¤nke');
-  return data.items || [];
-};
-
-export const addCustomDrink = async ({ userId, email, name, size, caffeine, icon }) => {
-  const response = await fetch(new URL('/api/custom-drinks/me', API_BASE_URL).toString(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, name, size, caffeine, icon }),
-  });
-
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim HinzufÃ¼gen des GetrÃ¤nks');
-  return data.item;
-};
-
-export const removeCustomDrink = async ({ userId, email, drinkId }) => {
-  const url = new URL('/api/custom-drinks/me', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-  if (drinkId) url.searchParams.set('drinkId', drinkId);
-
-  const response = await fetch(url.toString(), { method: 'DELETE' });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim LÃ¶schen des GetrÃ¤nks');
-  return data;
-};
-
-// â”€â”€ STATISTICS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export const fetchTodayStats = async ({ userId, email }) => {
-  const url = new URL('/api/stats/today', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Statistiken');
-  return data;
-};
-
-export const fetchWeeklyStats = async ({ userId, email }) => {
-  const url = new URL('/api/stats/weekly', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Wochenstatistiken');
-  return data.items || [];
-};
-
-// â”€â”€ SECURITY (2FA / PASSKEYS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export const fetchSecurityStatus = async ({ userId, email }) => {
-  const url = new URL('/api/security/me', API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString());
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Fehler beim Abrufen der Sicherheitseinstellungen');
-  return data;
-};
-
-export const setupTotp = async ({ userId, email, password }) => {
-  const response = await fetch(`${API_BASE_URL}/api/security/totp/setup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, password }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'TOTP-Setup fehlgeschlagen');
-  return data;
-};
-
-export const enableTotp = async ({ userId, email, code }) => {
-  const response = await fetch(`${API_BASE_URL}/api/security/totp/enable`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, code }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'TOTP-Aktivierung fehlgeschlagen');
-  return data;
-};
-
-export const disableTotp = async ({ userId, email, password }) => {
-  const response = await fetch(`${API_BASE_URL}/api/security/totp/disable`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, password }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'TOTP-Deaktivierung fehlgeschlagen');
-  return data;
-};
-
-export const fetchPasskeyRegistrationOptions = async ({ userId, email }) => {
-  const response = await fetch(`${API_BASE_URL}/api/security/passkeys/register/options`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Passkey-Optionen konnten nicht geladen werden');
-  return data;
-};
-
-export const verifyPasskeyRegistration = async ({ userId, email, challengeToken, response, name }) => {
-  const apiResponse = await fetch(`${API_BASE_URL}/api/security/passkeys/register/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, challengeToken, response, name }),
-  });
-  const data = await apiResponse.json();
-  if (!apiResponse.ok) throw new Error(data.error || 'Passkey-Registrierung fehlgeschlagen');
-  return data;
-};
-
-export const removePasskey = async ({ userId, email, credentialId }) => {
-  const url = new URL(`/api/security/passkeys/${encodeURIComponent(credentialId)}`, API_BASE_URL);
-  if (userId) url.searchParams.set('userId', userId);
-  if (email) url.searchParams.set('email', email);
-
-  const response = await fetch(url.toString(), { method: 'DELETE' });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'SicherheitsschlÃ¼ssel konnte nicht gelÃ¶scht werden');
-  return data;
-};
-
-
-
-
-
-
-export const fetchPublicSettings = async () => {
-  const res = await fetch(`${API_BASE}/api/public/settings`);
-  if (!res.ok) throw new Error('Fehler beim Laden der öffentlichen Einstellungen');
-  return res.json();
-};
-
-export const updateAppName = async (appName) => {
+const authHeader = () => {
   const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  const res = await fetch(`${API_BASE}/api/admin/app-name`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ appName }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || 'Fehler beim Speichern');
-  }
-  return res.json();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-
-export const updateLog = async (id, data) => {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  const res = await fetch(`${API_BASE}/api/logs/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(data),
+const urlFor = (path, query = {}) => {
+  const url = new URL(path, API_BASE);
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
   });
-  if (!res.ok) throw new Error('Fehler beim Aktualisieren des Logs');
-  return res.json();
+  return url.toString();
 };
 
-export const adminUpdateLog = async (id, data) => {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  const res = await fetch(`${API_BASE}/api/admin/logs/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(data),
+const request = async (path, { method = 'GET', query, body, auth = false, fallback = 'API-Fehler' } = {}) => {
+  const response = await fetch(urlFor(path, query), {
+    method,
+    headers: { ...(body !== undefined ? JSON_HEADERS : {}), ...(auth ? authHeader() : {}) },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
-  if (!res.ok) throw new Error('Fehler beim Aktualisieren');
-  return res.json();
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || fallback);
+  return data;
 };
 
-export const adminDeleteLog = async (id) => {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  const res = await fetch(`${API_BASE}/api/admin/logs/${id}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error('Fehler beim Löschen');
-  return res.json();
-};
+const get = (path, query, fallback) => request(path, { query, fallback });
+const post = (path, body, fallback, auth = false) => request(path, { method: 'POST', body, fallback, auth });
+const put = (path, body, fallback, auth = false) => request(path, { method: 'PUT', body, fallback, auth });
+const del = (path, query, fallback, auth = false) => request(path, { method: 'DELETE', query, fallback, auth });
+const identity = ({ userId, email } = {}) => ({ userId, email });
+
+export const fetchLogs = (date, user = {}) =>
+  get('/api/logs', { date, ...identity(user) }, 'Fehler beim Laden der Logs');
+
+export const createLog = (logData) =>
+  post('/api/logs', logData, 'Fehler beim Speichern des Logs');
+
+export const deleteLog = (id) =>
+  del(`/api/logs/${id}`, undefined, 'Fehler beim Loeschen des Logs');
+
+export const fetchReminderSettings = (user) =>
+  get('/api/reminders/me', identity(user), 'Fehler beim Laden der Erinnerungen');
+
+export const saveReminderSettings = (payload) =>
+  post('/api/reminders/me', payload, 'Fehler beim Speichern der Erinnerungen');
+
+export const fetchFavorites = (user) =>
+  get('/api/favorites/me', identity(user), 'Fehler beim Laden der Favoriten');
+
+export const addFavorite = (payload) =>
+  post('/api/favorites/me', payload, 'Fehler beim Speichern des Favoriten');
+
+export const removeFavorite = ({ userId, email, favoriteId }) =>
+  del('/api/favorites/me', { userId, email, favoriteId }, 'Fehler beim Entfernen des Favoriten');
+
+export const fetchUserSettings = (user) =>
+  get('/api/settings/me', identity(user), 'Fehler beim Abrufen der Einstellungen');
+
+export const updateUserSettings = (payload) =>
+  post('/api/settings/me', payload, 'Fehler beim Speichern der Einstellungen');
+
+export const updateUserProfile = (payload) =>
+  post('/api/user/profile', payload, 'Fehler beim Aktualisieren des Profils');
+
+export const fetchCustomDrinks = async (user) =>
+  (await get('/api/custom-drinks/me', identity(user), 'Fehler beim Abrufen der Getraenke')).items || [];
+
+export const addCustomDrink = async (payload) =>
+  (await post('/api/custom-drinks/me', payload, 'Fehler beim Hinzufuegen des Getraenks')).item;
+
+export const removeCustomDrink = ({ userId, email, drinkId }) =>
+  del('/api/custom-drinks/me', { userId, email, drinkId }, 'Fehler beim Loeschen des Getraenks');
+
+export const fetchTodayStats = (user) =>
+  get('/api/stats/today', identity(user), 'Fehler beim Abrufen der Statistiken');
+
+export const fetchWeeklyStats = async (user) =>
+  (await get('/api/stats/weekly', identity(user), 'Fehler beim Abrufen der Wochenstatistiken')).items || [];
+
+export const fetchSecurityStatus = (user) =>
+  get('/api/security/me', identity(user), 'Fehler beim Abrufen der Sicherheitseinstellungen');
+
+export const setupTotp = (payload) =>
+  post('/api/security/totp/setup', payload, 'TOTP-Setup fehlgeschlagen');
+
+export const enableTotp = (payload) =>
+  post('/api/security/totp/enable', payload, 'TOTP-Aktivierung fehlgeschlagen');
+
+export const disableTotp = (payload) =>
+  post('/api/security/totp/disable', payload, 'TOTP-Deaktivierung fehlgeschlagen');
+
+export const fetchPasskeyRegistrationOptions = (payload) =>
+  post('/api/security/passkeys/register/options', payload, 'Passkey-Optionen konnten nicht geladen werden');
+
+export const verifyPasskeyRegistration = (payload) =>
+  post('/api/security/passkeys/register/verify', payload, 'Passkey-Registrierung fehlgeschlagen');
+
+export const removePasskey = ({ userId, email, credentialId }) =>
+  del(`/api/security/passkeys/${encodeURIComponent(credentialId)}`, { userId, email }, 'Sicherheitsschluessel konnte nicht geloescht werden');
+
+export const fetchPublicSettings = () =>
+  get('/api/settings/public', undefined, 'Fehler beim Laden der oeffentlichen Einstellungen');
+
+export const updateAppName = (appName) =>
+  post('/api/admin/app-name', { appName }, 'Fehler beim Speichern', true);
+
+export const updateLog = (id, data) =>
+  put(`/api/logs/${id}`, data, 'Fehler beim Aktualisieren des Logs', true);
+
+export const adminUpdateLog = (id, data) =>
+  put(`/api/admin/logs/${id}`, data, 'Fehler beim Aktualisieren', true);
+
+export const adminDeleteLog = (id) =>
+  del(`/api/admin/logs/${id}`, undefined, 'Fehler beim Loeschen', true);
+
+export const testDiscordWebhook = (webhookUrl) =>
+  post('/api/admin/discord/test', { webhookUrl }, 'Fehler beim Discord Test');
+
+export const testUserEmail = (payload) =>
+  post('/api/user/test-email', payload, 'Fehler beim E-Mail Test');

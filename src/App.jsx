@@ -17,10 +17,10 @@ import {
 } from './services/api';
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
-import { fetchPublicSettings } from './services/adminApi';
 
 const getTodayKey = () => new Date().toISOString().split('T')[0];
 const VIEW_STATE_KEY = 'et:last-view-state';
+const userPayload = (session) => ({ userId: session?.id || null, email: session?.email });
 
 const loadViewState = () => {
   try {
@@ -41,7 +41,6 @@ const saveViewState = (nextState) => {
 function App() {
   const initialViewState = loadViewState();
   const [session, setSession]     = useState(() => getSession());
-  const [publicSettings, setPublicSettings] = useState({ authMode: 'local', setupRequired: false });
   const [authView, setAuthView]   = useState(initialViewState.authView || 'login'); 
   const [adminView, setAdminView] = useState('admin'); 
   const [adminTab, setAdminTab]   = useState(initialViewState.adminTab || 'overview');
@@ -57,18 +56,6 @@ function App() {
     const current = loadViewState();
     saveViewState({ ...current, authView, adminTab });
   }, [authView, adminTab]);
-
-  useEffect(() => {
-    let isMounted = true;
-    fetchPublicSettings()
-      .then((settings) => {
-        if (isMounted) setPublicSettings(settings || { authMode: 'local', setupRequired: false });
-      })
-      .catch(() => {});
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const handleImpersonate = (userData) => {
     const newSession = startImpersonation(userData);
@@ -147,13 +134,17 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [showSettings, setShowSettings] = useState(false);
   const isFirstCheck = useRef(true);
 
+  const refreshStats = useCallback(async () => {
+    if (session?.email) setTodayStats(await fetchTodayStats(userPayload(session)));
+  }, [session]);
+
   const fetchAllData = useCallback(async () => {
     try {
       const today = getTodayKey();
       const [todayLogs, statsData, userSettings] = await Promise.all([
         fetchTodayLogs(today, { userId: session?.id, email: session?.email }),
-        session?.email ? fetchTodayStats({ userId: session?.id || null, email: session?.email }) : Promise.resolve(null),
-        session?.email ? fetchUserSettings({ userId: session?.id || null, email: session?.email }) : Promise.resolve(null),
+        session?.email ? fetchTodayStats(userPayload(session)) : Promise.resolve(null),
+        session?.email ? fetchUserSettings(userPayload(session)) : Promise.resolve(null),
       ]);
       setLogs(todayLogs);
       if (statsData) setTodayStats(statsData);
@@ -162,7 +153,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       console.error('Fehler beim Laden der Daten:', err);
       setError('Fehler beim Laden der Daten.');
     }
-  }, [session?.id, session?.email]);
+  }, [session]);
 
   useEffect(() => {
     let isMounted = true;
@@ -180,11 +171,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     window.addEventListener('focus', handleVisibilityChange);
 
     const interval = setInterval(() => {
-      if (session?.email) {
-        fetchTodayStats({ userId: session?.id || null, email: session?.email })
-          .then(stats => setTodayStats(stats))
-          .catch(console.error);
-      }
+      refreshStats().catch(console.error);
     }, 60000);
 
     return () => {
@@ -193,7 +180,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       window.removeEventListener('focus', handleVisibilityChange);
       clearInterval(interval);
     };
-  }, [fetchAllData, session?.id, session?.email]);
+  }, [fetchAllData, refreshStats]);
 
   useEffect(() => {
     if (typeof initialScrollY === 'number' && initialScrollY > 0) {
@@ -261,13 +248,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     try {
       const updated = await updateLog(logId, data);
       setLogs(prev => prev.map(l => l.id === logId ? { ...l, ...updated } : l));
-      if (session?.email) {
-        const stats = await fetchTodayStats({
-          userId: session?.id || null,
-          email: session?.email,
-        });
-        setTodayStats(stats);
-      }
+      await refreshStats();
     } catch (err) {
       setError(err.message);
     }
@@ -277,13 +258,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     try {
       await removeLog(logId);
       setLogs(prev => prev.filter(l => l.id !== logId));
-      if (session?.email) {
-        const stats = await fetchTodayStats({
-          userId: session?.id || null,
-          email: session?.email,
-        });
-        setTodayStats(stats);
-      }
+      await refreshStats();
     } catch (err) {
       setError(err.message);
     }
@@ -304,24 +279,17 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     setIsOperationLoading(true);
     setError(null);
     try {
-      const payload = { ...drinkData, date: getTodayKey(), userId: session?.id || null, email: session?.email || null };
+      const payload = { ...drinkData, date: getTodayKey(), ...userPayload(session) };
       const created = await addLog(payload);
       setLogs((prev) => [created, ...prev]);
-
-      if (session?.email) {
-        const stats = await fetchTodayStats({
-          userId: session?.id || null,
-          email: session?.email,
-        });
-        setTodayStats(stats);
-      }
+      await refreshStats();
       return created;
     } catch (err) {
       setError('Fehler beim Hinzufügen. Bitte versuche es erneut.');
     } finally {
       setIsOperationLoading(false);
     }
-  }, [session?.id, session?.email]);
+  }, [session, refreshStats]);
 
   if (isAppLoading) {
     return (

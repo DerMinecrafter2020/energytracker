@@ -15,7 +15,32 @@ const BUILTIN_USERS = [
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
+const postJson = async (path, body, fallback) => {
+  const resp = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || fallback);
+  return data;
+};
 
+const saveSession = (user) => {
+  const { password, ...safeUser } = user;
+  const session = { ...safeUser, loginAt: Date.now() };
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  return session;
+};
+
+const readJsonStorage = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
 
 export const isWebAuthnSupported = () => {
   try {
@@ -50,24 +75,11 @@ export const login = async (email, password) => {
       if (err.message === 'Demo-Zugang ist deaktiviert.') throw err;
       // If server is unreachable, allow built-in login as fallback
     }
-    const session = {
-      email:   builtin.email,
-      role:    builtin.role,
-      name:    builtin.name,
-      loginAt: Date.now(),
-    };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-    return session;
+    return saveSession(builtin);
   }
 
   // 2. Check server-registered users
-  const resp = await fetch(`${API_BASE}/api/login`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ email: trimmed, password }),
-  });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data.error || 'Anmeldung fehlgeschlagen.');
+  const data = await postJson('/api/login', { email: trimmed, password }, 'Anmeldung fehlgeschlagen.');
 
   if (data.requiresSecondFactor) {
     return {
@@ -78,9 +90,7 @@ export const login = async (email, password) => {
     };
   }
 
-  const session = { ...data.user, loginAt: Date.now() };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-  return session;
+  return saveSession(data.user);
 };
 
 export const loginRepairAdmin = async (email, password) => {
@@ -95,29 +105,16 @@ export const loginRepairAdmin = async (email, password) => {
     throw new Error('Ungültiger Admin-Reparatur-Login.');
   }
 
-  const session = {
+  return saveSession({
     email: ADMIN_EMAIL,
     role: 'admin',
     name: 'Administrator',
-    loginAt: Date.now(),
-  };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-  return session;
+  });
 };
 
 export const completeLoginWithTotp = async ({ loginToken, code }) => {
-  const resp = await fetch(`${API_BASE}/api/login/2fa/totp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ loginToken, code }),
-  });
-
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data.error || '2FA-Code ungültig.');
-
-  const session = { ...data.user, loginAt: Date.now() };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-  return session;
+  const data = await postJson('/api/login/2fa/totp', { loginToken, code }, '2FA-Code ungültig.');
+  return saveSession(data.user);
 };
 
 export const completeLoginWithPasskey = async ({ loginToken }) => {
@@ -125,29 +122,14 @@ export const completeLoginWithPasskey = async ({ loginToken }) => {
     throw new Error('WebAuthn wird von diesem Browser nicht unterstützt. Bitte nutze den 2FA-Code.');
   }
 
-  const optionsResp = await fetch(`${API_BASE}/api/login/2fa/passkey/options`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ loginToken }),
-  });
-  const optionsData = await optionsResp.json();
-  if (!optionsResp.ok) throw new Error(optionsData.error || 'Passkey-Optionen konnten nicht geladen werden.');
+  const optionsData = await postJson('/api/login/2fa/passkey/options', { loginToken }, 'Passkey-Optionen konnten nicht geladen werden.');
 
   const credential = await startAuthentication({
     optionsJSON: optionsData.options,
   });
 
-  const verifyResp = await fetch(`${API_BASE}/api/login/2fa/passkey/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ loginToken, response: credential }),
-  });
-  const verifyData = await verifyResp.json();
-  if (!verifyResp.ok) throw new Error(verifyData.error || 'Passkey-Verifikation fehlgeschlagen.');
-
-  const session = { ...verifyData.user, loginAt: Date.now() };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-  return session;
+  const verifyData = await postJson('/api/login/2fa/passkey/verify', { loginToken, response: credential }, 'Passkey-Verifikation fehlgeschlagen.');
+  return saveSession(verifyData.user);
 };
 
 /** Clear the stored session. */
@@ -157,12 +139,7 @@ export const logout = () => {
 
 /** Return current session object, or null if not logged in. */
 export const getSession = () => {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return readJsonStorage(AUTH_KEY);
 };
 
 /** True when the current user has the admin role. */
@@ -194,11 +171,5 @@ export const stopImpersonation = () => {
 
 /** Return the original admin session if currently impersonating, otherwise null. */
 export const getImpersonatorSession = () => {
-  try {
-    const raw = localStorage.getItem(IMPERSONATOR_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return readJsonStorage(IMPERSONATOR_KEY);
 };
-

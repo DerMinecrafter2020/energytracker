@@ -3,30 +3,84 @@ import { Zap, Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, CheckCircle, AlertCir
 import {
   isWebAuthnSupported,
   login,
-  loginRepairAdmin,
   completeLoginWithTotp,
   completeLoginWithPasskey,
 
 } from '../services/auth';
 import { fetchPublicSettings } from '../services/adminApi';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const alertStyles = {
+  success: 'bg-green-500/10 border-green-500/30 text-green-300',
+  warning: 'bg-orange-500/10 border-orange-500/30 text-orange-300',
+  error: 'bg-red-500/10 border-red-500/30 text-red-300',
+};
+const alertIcons = { success: CheckCircle, warning: Clock, error: AlertCircle };
+
+const Spinner = ({ className = 'w-5 h-5 border-2 border-white/30 border-t-white' }) =>
+  <span className={`${className} rounded-full animate-spin`} />;
+
+const AlertBox = ({ type = 'error', children }) => {
+  const Icon = alertIcons[type] || AlertCircle;
+  return (
+    <div className={`mb-6 px-4 py-3 rounded-xl border flex gap-3 text-sm animate-fade-in ${alertStyles[type]}`}>
+      <Icon className="w-5 h-5 shrink-0" />
+      <p>{children}</p>
+    </div>
+  );
+};
+
+const ErrorMessage = ({ children }) => (
+  <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
+    {children}
+  </div>
+);
+
+const AuthField = ({ label, icon: Icon, passwordToggle, showPassword, onTogglePassword, inputClass = '', ...props }) => (
+  <div>
+    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{label}</label>
+    <div className="relative">
+      <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+      <input {...props} className={`input-dark pl-12 ${passwordToggle ? 'pr-12' : ''} ${inputClass}`} />
+      {passwordToggle && (
+        <button type="button" onClick={onTogglePassword} tabIndex={-1}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      )}
+    </div>
+  </div>
+);
+
+const SubmitButton = ({ loading, children, className = '' }) => (
+  <button type="submit" disabled={loading}
+    className={`w-full py-3.5 transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2 ${className}`}>
+    {loading ? <Spinner /> : children}
+  </button>
+);
+
+const authRequest = async (path, body, fallback) => {
+  const resp = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || fallback);
+  return data;
+};
+
 const LoginPage = ({ onLogin, onShowRegister }) => {
-    const [email, setEmail]       = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
   const [error, setError]       = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [verifiedBanner, setVerifiedBanner] = useState(null);
-  const [publicSettings, setPublicSettings] = useState({
-    demoEnabled: true,
-    registrationEnabled: true,
-    authMode: 'local',
-    authentikEnabled: false,
-  });
+  const [publicSettings, setPublicSettings] = useState({ demoEnabled: true, registrationEnabled: true });
   const [pending2FA, setPending2FA] = useState(null);
   const [totpCode, setTotpCode] = useState('');
   const [webauthnSupported, setWebauthnSupported] = useState(false);
-  const [showRepairLogin, setShowRepairLogin] = useState(false);
   const [view, setView] = useState('login');
   const [resetToken, setResetToken] = useState(null);
   const [msg, setMsg] = useState(null);
@@ -58,10 +112,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
     if (!email) return setError('Bitte gib deine E-Mail ein.');
     setIsLoading(true); setError(''); setMsg(null);
     try {
-      const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/auth/forgot-password`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
-      });
-      if (!resp.ok) throw new Error('Fehler beim Senden.');
+      await authRequest('/api/auth/forgot-password', { email }, 'Fehler beim Senden.');
       setMsg({ type: 'success', text: 'Falls ein Konto existiert, wurde eine E-Mail mit dem Reset-Link gesendet.' });
     } catch (err) { setError(err.message); } finally { setIsLoading(false); }
   };
@@ -71,11 +122,7 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
     if (password.length < 8) return setError('Passwort muss mindestens 8 Zeichen lang sein.');
     setIsLoading(true); setError(''); setMsg(null);
     try {
-      const resp = await fetch(`${import.meta.env.VITE_API_BASE_URL || window.location.origin}/api/auth/reset-password`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: resetToken, newPassword: password })
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Fehler beim Zurcksetzen.');
+      await authRequest('/api/auth/reset-password', { token: resetToken, newPassword: password }, 'Fehler beim Zurcksetzen.');
       setMsg({ type: 'success', text: 'Dein Passwort wurde erfolgreich gendert. Du kannst dich jetzt anmelden.' });
       setView('login'); setPassword('');
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -101,21 +148,11 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
     }
   };
 
-  const handleTotpVerify = async () => {
-    if (!pending2FA?.loginToken) return;
-    if (!totpCode.trim()) {
-      setError('Bitte gib deinen 2FA-Code ein.');
-      return;
-    }
-
+  const runLoginStep = async (action) => {
     setIsLoading(true);
     setError('');
     try {
-      const session = await completeLoginWithTotp({
-        loginToken: pending2FA.loginToken,
-        code: totpCode,
-      });
-      onLogin(session);
+      onLogin(await action());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -123,18 +160,15 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
     }
   };
 
+  const handleTotpVerify = async () => {
+    if (!pending2FA?.loginToken) return;
+    if (!totpCode.trim()) return setError('Bitte gib deinen 2FA-Code ein.');
+    runLoginStep(() => completeLoginWithTotp({ loginToken: pending2FA.loginToken, code: totpCode }));
+  };
+
   const handlePasskeyVerify = async () => {
     if (!pending2FA?.loginToken) return;
-    setIsLoading(true);
-    setError('');
-    try {
-      const session = await completeLoginWithPasskey({ loginToken: pending2FA.loginToken });
-      onLogin(session);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
+    runLoginStep(() => completeLoginWithPasskey({ loginToken: pending2FA.loginToken }));
   };
 
   const fillDemo = (role) => {
@@ -147,29 +181,6 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
     }
     setError('');
   };
-
-  const fillRepairAdmin = () => {
-    setEmail(import.meta.env.VITE_ADMIN_EMAIL || 'admin@energytracker.de');
-    setPassword(import.meta.env.VITE_ADMIN_PASSWORD || 'Admin@2024!');
-    setError('');
-  };
-
-  const handleRepairAdminLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-    try {
-      const session = await loginRepairAdmin(email, password);
-      onLogin(session);
-    } catch (err) {
-      setError(err.message || 'Admin-Reparatur-Login fehlgeschlagen.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const BannerIcon = verifiedBanner?.type === 'success' ? CheckCircle
-    : verifiedBanner?.type === 'warning' ? Clock : AlertCircle;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-transparent">
@@ -193,42 +204,17 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
             <p className="text-slate-400 text-sm mt-1">Bitte melde dich an, um fortzufahren.</p>
           </div>
 
-        {verifiedBanner && (
-          <div className={`mb-6 px-4 py-3 rounded-xl border flex gap-3 text-sm animate-fade-in
-            ${verifiedBanner.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-300' :
-              verifiedBanner.type === 'warning' ? 'bg-orange-500/10 border-orange-500/30 text-orange-300' :
-              'bg-red-500/10 border-red-500/30 text-red-300'}`}>
-            <BannerIcon className="w-5 h-5 shrink-0" />
-            <p>{verifiedBanner.text}</p>
-          </div>
-        )}
+        {verifiedBanner && <AlertBox type={verifiedBanner.type}>{verifiedBanner.text}</AlertBox>}
 
-        {msg && (
-          <div className="mb-6 px-4 py-3 rounded-xl border flex gap-3 text-sm animate-fade-in bg-green-500/10 border-green-500/30 text-green-300">
-            <CheckCircle className="w-5 h-5 shrink-0" />
-            <p>{msg.text}</p>
-          </div>
-        )}
+        {msg && <AlertBox type={msg.type || 'success'}>{msg.text}</AlertBox>}
 
         {view === 'forgot' ? (
           <form onSubmit={handleForgot} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'E-Mail'}</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder={'name@example.com'} autoComplete="email" className="input-dark pl-12" />
-              </div>
-            </div>
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
-                {error}
-              </div>
-            )}
-            <button type="submit" disabled={isLoading}
-              className="w-full py-3.5 rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
-              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort zurücksetzen'}
-            </button>
+            <AuthField label="E-Mail" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" autoComplete="email" />
+            {error && <ErrorMessage>{error}</ErrorMessage>}
+            <SubmitButton loading={isLoading} className="rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd]">
+              Passwort zurücksetzen
+            </SubmitButton>
             <div className="text-center mt-4">
               <button type="button" onClick={() => { setView('login'); setError(''); setMsg(null); }} className="text-sm text-slate-400 hover:text-white transition-colors">
                 Zurück zur Anmeldung
@@ -237,54 +223,20 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
           </form>
         ) : view === 'reset' ? (
           <form onSubmit={handleReset} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Neues Passwort</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mind. 8 Zeichen" className="input-dark pl-12 pr-12" />
-                <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
-                {error}
-              </div>
-            )}
-            <button type="submit" disabled={isLoading}
-              className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-200
-                bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
-                disabled:opacity-60 shadow-glow-blue flex items-center justify-center gap-2 mt-2">
-              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Passwort speichern'}
-            </button>
+            <AuthField label="Neues Passwort" icon={Lock} type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mind. 8 Zeichen" passwordToggle showPassword={showPw} onTogglePassword={() => setShowPw(v => !v)} />
+            {error && <ErrorMessage>{error}</ErrorMessage>}
+            <SubmitButton loading={isLoading} className="rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-glow-blue">
+              Passwort speichern
+            </SubmitButton>
           </form>
         ) : !pending2FA ? (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'E-Mail'}</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder={'name@example.com'} autoComplete="email" className="input-dark pl-12" />
-              </div>
-            </div>
+            <AuthField label="E-Mail" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" autoComplete="email" />
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{'Passwort / App-Token'}</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type={showPw ? 'text' : 'password'} value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" autoComplete="current-password"
-                  className="input-dark pl-12 pr-12" />
-                <button type="button" onClick={() => setShowPw(v => !v)} tabIndex={-1}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+              <AuthField label="Passwort / App-Token" icon={Lock} type={showPw ? 'text' : 'password'} value={password}
+                onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password"
+                passwordToggle showPassword={showPw} onTogglePassword={() => setShowPw(v => !v)} />
               <div className="text-right mt-1">
                 <button type="button" onClick={() => { setView('forgot'); setError(''); setMsg(null); }} tabIndex={-1} className="text-xs text-slate-400 hover:text-blue-400 transition-colors">
                   Passwort vergessen?
@@ -292,19 +244,11 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
               </div>
             </div>
 
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm animate-slide-in">
-                {error}
-              </div>
-            )}
+            {error && <ErrorMessage>{error}</ErrorMessage>}
 
-            <button type="submit" disabled={isLoading}
-              className="w-full py-3.5 rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd] transition-all duration-200 disabled:opacity-60 flex items-center justify-center gap-2 mt-2">
-              {isLoading
-                ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <><LogIn className="w-4 h-4" />{'Einloggen'}</>
-              }
-            </button>
+            <SubmitButton loading={isLoading} className="rounded-full font-bold text-[#062e6f] bg-[#a8c7fa] hover:bg-[#d3e3fd]">
+              <><LogIn className="w-4 h-4" />Einloggen</>
+            </SubmitButton>
           </form>
           ) : (
           <div className="space-y-4">
@@ -315,18 +259,9 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 
             {pending2FA.methods?.totp && (
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">2FA Code</label>
-                <div className="relative">
-                  <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    value={totpCode}
-                    onChange={(e) => setTotpCode(e.target.value.replace(/\s+/g, ''))}
-                    placeholder="123456"
-                    className="input-dark pl-12"
-                    maxLength={8}
-                  />
-                </div>
+                <AuthField label="2FA Code" icon={KeyRound} type="text" value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\s+/g, ''))}
+                  placeholder="123456" maxLength={8} />
                 <button
                   type="button"
                   onClick={handleTotpVerify}
@@ -421,10 +356,6 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 };
 
 export default LoginPage;
-
-
-
-
 
 
 

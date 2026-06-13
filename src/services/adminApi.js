@@ -1,93 +1,33 @@
-const API_BASE     = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || 'et-admin-2024';
 
-const adminHeaders = () => ({
-  'Content-Type': 'application/json',
-  'X-Admin-Secret': ADMIN_SECRET,
-});
-
+const adminHeaders = () => ({ 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET });
 const handle = async (resp) => {
-  const data = await resp.json();
+  const data = await resp.json().catch(() => ({}));
   if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
   return data;
 };
-
-// ── SMTP ─────────────────────────────────────────────────────────────────
-export const fetchSmtpConfig = () =>
-  fetch(`${API_BASE}/api/admin/smtp`, { headers: adminHeaders() }).then(handle);
-
-export const saveSmtpConfig = (config) =>
-  fetch(`${API_BASE}/api/admin/smtp`, {
-    method:  'POST',
-    headers: adminHeaders(),
-    body:    JSON.stringify(config),
+const request = (path, { method = 'GET', body, admin = true } = {}) =>
+  fetch(`${API_BASE}${path}`, {
+    method,
+    headers: admin ? adminHeaders() : undefined,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   }).then(handle);
+const post = (path, body) => request(path, { method: 'POST', body });
 
-export const testSmtpConfig = (testEmail) =>
-  fetch(`${API_BASE}/api/admin/smtp/test`, {
-    method:  'POST',
-    headers: adminHeaders(),
-    body:    JSON.stringify({ testEmail }),
-  }).then(handle);
-
-export const testDiscordWebhook = (webhookUrl) =>
-  fetch(`${API_BASE}/api/admin/discord/test`, {
-    method:  'POST',
-    headers: adminHeaders(),
-    body:    JSON.stringify({ webhookUrl }),
-  }).then(handle);
-
-// ── AI Config ──────────────────────────────────────────────────────────────
-export const fetchAiConfig = () =>
-  fetch(`${API_BASE}/api/admin/ai`, { headers: adminHeaders() }).then(handle);
-
+export const fetchSmtpConfig = () => request('/api/admin/smtp');
+export const saveSmtpConfig = (config) => post('/api/admin/smtp', config);
+export const testSmtpConfig = (testEmail) => post('/api/admin/smtp/test', { testEmail });
+export const testDiscordWebhook = (webhookUrl) => post('/api/admin/discord/test', { webhookUrl });
+export const fetchAiConfig = () => request('/api/admin/ai');
 export const saveAiConfig = ({ apiKey, model, braveSearchKey }) =>
-  fetch(`${API_BASE}/api/admin/ai`, {
-    method:  'POST',
-    headers: adminHeaders(),
-    body:    JSON.stringify({ apiKey, model, braveSearchKey }),
-  }).then(handle);
-
-// ── Users ─────────────────────────────────────────────────────────────────
-export const fetchAdminUsers = () =>
-  fetch(`${API_BASE}/api/admin/users`, { headers: adminHeaders() }).then(handle);
-
-export const verifyAdminUser = (id) =>
-  fetch(`${API_BASE}/api/admin/users/${id}/verify`, {
-    method:  'POST',
-    headers: adminHeaders(),
-  }).then(handle);
-
-export const deleteAdminUser = (id) =>
-  fetch(`${API_BASE}/api/admin/users/${id}`, {
-    method:  'DELETE',
-    headers: adminHeaders(),
-  }).then(handle);
-
-export const setUserRole = (id, role) =>
-  fetch(`${API_BASE}/api/admin/users/${id}/role`, {
-    method:  'POST',
-    headers: adminHeaders(),
-    body:    JSON.stringify({ role }),
-  }).then(handle);
-
+  post('/api/admin/ai', { apiKey, model, braveSearchKey });
+export const fetchAdminUsers = () => request('/api/admin/users');
+export const verifyAdminUser = (id) => post(`/api/admin/users/${id}/verify`);
+export const deleteAdminUser = (id) => request(`/api/admin/users/${id}`, { method: 'DELETE' });
+export const setUserRole = (id, role) => post(`/api/admin/users/${id}/role`, { role });
 export const createAdminUser = ({ name, email, password, role, verified }) =>
-  fetch(`${API_BASE}/api/admin/users`, {
-    method:  'POST',
-    headers: adminHeaders(),
-    body:    JSON.stringify({ name, email, password, role, verified }),
-  }).then(handle);
-
-export const impersonateUser = (id) =>
-  fetch(`${API_BASE}/api/admin/users/${id}/impersonate`, {
-    method:  'POST',
-    headers: adminHeaders(),
-  }).then(handle);
-
-export const fetchPublicSettings = () =>
-  fetch(`${API_BASE}/api/settings/public`).then(handle);
-
-
-
-export const fetchRedisHealth = () =>
-  fetch(`${API_BASE}/api/admin/redis/health`, { headers: adminHeaders() }).then(handle);
+  post('/api/admin/users', { name, email, password, role, verified });
+export const impersonateUser = (id) => post(`/api/admin/users/${id}/impersonate`);
+export const fetchPublicSettings = () => request('/api/settings/public', { admin: false });
+export const fetchRedisHealth = () => request('/api/admin/redis/health');

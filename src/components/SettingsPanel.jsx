@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Zap, Clock, AlertCircle, Shield, KeyRound, Trash2, User, Mail, Lock } from 'lucide-react';
+import { Settings, Zap, Shield, KeyRound, Trash2, User, Mail, Lock } from 'lucide-react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import {
   fetchUserSettings,
@@ -14,6 +14,62 @@ import {
   updateUserProfile,
 } from '../services/api';
 
+const userPayload = (session, extra = {}) => ({ userId: session?.id || null, email: session?.email, ...extra });
+const notifyStyles = {
+  red: 'checked:bg-red-500 checked:border-red-400 group-hover:text-red-300',
+  blue: 'checked:bg-blue-500 checked:border-blue-400 group-hover:text-blue-300',
+  amber: 'checked:bg-amber-500 checked:border-amber-400 group-hover:text-amber-300',
+};
+
+const TextField = ({ label, icon: Icon, iconClass = 'text-slate-400', inputClass = '', ...props }) => (
+  <div>
+    {label && <label className="block text-xs text-slate-400 mb-1">{label}</label>}
+    <div className="relative">
+      {Icon && <Icon className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${iconClass}`} />}
+      <input {...props} className={`input-dark text-sm py-2 ${Icon ? 'pl-9' : ''} ${inputClass}`} />
+    </div>
+  </div>
+);
+
+const Notice = ({ type = 'success', children, className = '' }) => (
+  <div className={`px-3 py-2 rounded-xl text-sm border ${
+    type === 'error'
+      ? 'bg-red-500/10 text-red-300 border-red-500/20'
+      : 'bg-green-500/10 text-green-300 border-green-500/20'
+  } ${className}`}>
+    {children}
+  </div>
+);
+
+const NotificationOption = ({ checked, onChange, discordChecked, onDiscordChange, color, title, description }) => (
+  <div className="space-y-2">
+    <label className="flex items-start gap-3 cursor-pointer group">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className={`w-4 h-4 rounded border border-white/20 bg-white/5 mt-1 cursor-pointer transition-all duration-200 ${notifyStyles[color]}`}
+      />
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-medium text-white transition-colors ${notifyStyles[color].split(' ').at(-1)}`}>
+          {title}
+        </p>
+        <p className="text-xs text-slate-500">{description}</p>
+      </div>
+    </label>
+    {checked && (
+      <label className="flex items-center gap-2 pl-7 cursor-pointer group">
+        <input
+          type="checkbox"
+          checked={discordChecked}
+          onChange={(e) => onDiscordChange(e.target.checked)}
+          className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 checked:bg-[#5865F2] checked:border-[#5865F2] cursor-pointer transition-all duration-200"
+        />
+        <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Auch per Discord senden</span>
+      </label>
+    )}
+  </div>
+);
 
 export default function SettingsPanel({ session, isLoading, onSettingsChange }) {
   
@@ -59,11 +115,8 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
 
     const loadSettings = async () => {
       try {
-        const userPayload = {
-          userId: session.id || null,
-          email: session.email,
-        };
-        const data = await fetchUserSettings(userPayload);
+        const payload = userPayload(session);
+        const data = await fetchUserSettings(payload);
         setSettings(data);
         setLocalLimit(String(data.dailyLimit || 400));
         setNotifyAtLimit(data.notifyAtLimit !== false);
@@ -75,7 +128,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         setTheme(data.theme || 'system');
         
 
-        const sec = await fetchSecurityStatus(userPayload);
+        const sec = await fetchSecurityStatus(payload);
         setSecurity(sec);
       } catch (err) {
         console.error('Fehler beim Laden der Einstellungen:', err);
@@ -92,9 +145,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
 
     try {
       const dailyLimit = Math.max(0, Math.round(Number(localLimit) || 400));
-      const updatedSettings = await updateUserSettings({
-        userId: session.id || null,
-        email: session.email,
+      const updatedSettings = await updateUserSettings(userPayload(session, {
         dailyLimit,
         notifyAtLimit,
         notifyLate,
@@ -103,8 +154,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         discordNotifyLate,
         discordNotifyRapid,
         theme,
-
-      });
+      }));
 
       setSettings(updatedSettings);
       setMessage('saved');
@@ -128,14 +178,12 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     setProfileSaving(true);
     setProfileMessage('');
     try {
-      await updateUserProfile({
-        userId: session.id || null,
-        email: session.email,
+      await updateUserProfile(userPayload(session, {
         currentPassword,
         newName: profileName,
         newEmail: profileEmail,
         newPassword: newPassword || undefined
-      });
+      }));
       setProfileMessage('success:Profil erfolgreich aktualisiert!');
       setCurrentPassword('');
       setNewPassword('');
@@ -146,22 +194,11 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     }
   };
 
-  const handleStartTotpSetup = async () => {
-    if (!totpPassword.trim()) {
-      setSecurityMessage('Bitte Passwort eingeben.');
-      return;
-    }
+  const runSecurityAction = async (action) => {
     setSecurityLoading(true);
     setSecurityMessage('');
     try {
-      const data = await setupTotp({
-        userId: session.id || null,
-        email: session.email,
-        password: totpPassword,
-      });
-      setTotpSecret(data.secret);
-      setTotpUri(data.otpauthUrl);
-      setSecurityMessage('TOTP vorbereitet. Code aus Authenticator-App eingeben.');
+      await action();
     } catch (err) {
       setSecurityMessage(err.message);
     } finally {
@@ -169,53 +206,37 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     }
   };
 
+  const handleStartTotpSetup = async () => {
+    if (!totpPassword.trim()) return setSecurityMessage('Bitte Passwort eingeben.');
+    runSecurityAction(async () => {
+      const data = await setupTotp(userPayload(session, { password: totpPassword }));
+      setTotpSecret(data.secret);
+      setTotpUri(data.otpauthUrl);
+      setSecurityMessage('TOTP vorbereitet. Code aus Authenticator-App eingeben.');
+    });
+  };
+
   const handleEnableTotp = async () => {
-    if (!totpCode.trim()) {
-      setSecurityMessage('Bitte den 2FA Code eingeben.');
-      return;
-    }
-    setSecurityLoading(true);
-    setSecurityMessage('');
-    try {
-      const data = await enableTotp({
-        userId: session.id || null,
-        email: session.email,
-        code: totpCode,
-      });
+    if (!totpCode.trim()) return setSecurityMessage('Bitte den 2FA Code eingeben.');
+    runSecurityAction(async () => {
+      const data = await enableTotp(userPayload(session, { code: totpCode }));
       setSecurity(data.security);
       setTotpPassword('');
       setTotpSecret('');
       setTotpUri('');
       setTotpCode('');
       setSecurityMessage('2FA erfolgreich aktiviert.');
-    } catch (err) {
-      setSecurityMessage(err.message);
-    } finally {
-      setSecurityLoading(false);
-    }
+    });
   };
 
   const handleDisableTotp = async () => {
-    if (!totpDisablePassword.trim()) {
-      setSecurityMessage('Bitte Passwort eingeben, um 2FA zu deaktivieren.');
-      return;
-    }
-    setSecurityLoading(true);
-    setSecurityMessage('');
-    try {
-      const data = await disableTotp({
-        userId: session.id || null,
-        email: session.email,
-        password: totpDisablePassword,
-      });
+    if (!totpDisablePassword.trim()) return setSecurityMessage('Bitte Passwort eingeben, um 2FA zu deaktivieren.');
+    runSecurityAction(async () => {
+      const data = await disableTotp(userPayload(session, { password: totpDisablePassword }));
       setSecurity(data.security);
       setTotpDisablePassword('');
       setSecurityMessage('2FA deaktiviert.');
-    } catch (err) {
-      setSecurityMessage(err.message);
-    } finally {
-      setSecurityLoading(false);
-    }
+    });
   };
 
   const handleRegisterPasskey = async () => {
@@ -224,49 +245,28 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
       return;
     }
 
-    setSecurityLoading(true);
-    setSecurityMessage('');
-    try {
-      const reg = await fetchPasskeyRegistrationOptions({
-        userId: session.id || null,
-        email: session.email,
-      });
+    runSecurityAction(async () => {
+      const reg = await fetchPasskeyRegistrationOptions(userPayload(session));
 
       const attestation = await startRegistration({ optionsJSON: reg.options });
       const label = `YubiKey ${new Date().toLocaleDateString('de-DE')}`;
-      const verified = await verifyPasskeyRegistration({
-        userId: session.id || null,
-        email: session.email,
+      const verified = await verifyPasskeyRegistration(userPayload(session, {
         challengeToken: reg.challengeToken,
         response: attestation,
         name: label,
-      });
+      }));
 
       setSecurity(verified.security);
       setSecurityMessage('Sicherheitsschlüssel erfolgreich registriert.');
-    } catch (err) {
-      setSecurityMessage(err.message || 'Passkey-Registrierung fehlgeschlagen.');
-    } finally {
-      setSecurityLoading(false);
-    }
+    });
   };
 
   const handleRemovePasskey = async (credentialId) => {
-    setSecurityLoading(true);
-    setSecurityMessage('');
-    try {
-      const data = await removePasskey({
-        userId: session.id || null,
-        email: session.email,
-        credentialId,
-      });
+    runSecurityAction(async () => {
+      const data = await removePasskey(userPayload(session, { credentialId }));
       setSecurity(data.security);
       setSecurityMessage('Sicherheitsschlüssel entfernt.');
-    } catch (err) {
-      setSecurityMessage(err.message);
-    } finally {
-      setSecurityLoading(false);
-    }
+    });
   };
 
   if (!settings) {
@@ -293,33 +293,12 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
             Profil bearbeiten
           </h4>
           <form onSubmit={handleUpdateProfile} className="space-y-3">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">{'Name'}</label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} className="input-dark text-sm py-2 pl-9" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">{'E-Mail'}</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} className="input-dark text-sm py-2 pl-9" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Neues Passwort (optional)</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-dark text-sm py-2 pl-9" placeholder="Leer lassen um es nicht zu ändern" />
-              </div>
-            </div>
+            <TextField label="Name" icon={User} type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+            <TextField label="E-Mail" icon={Mail} type="email" value={profileEmail} onChange={(e) => setProfileEmail(e.target.value)} />
+            <TextField label="Neues Passwort (optional)" icon={Lock} type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Leer lassen um es nicht zu ändern" />
             <div className="pt-2">
               <label className="block text-xs text-amber-400 mb-1">Aktuelles Passwort (erforderlich)</label>
-              <div className="relative">
-                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/70" />
-                <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input-dark text-sm py-2 pl-9 border border-amber-500/30" required />
-              </div>
+              <TextField icon={KeyRound} iconClass="text-amber-400/70" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} inputClass="border border-amber-500/30" required />
             </div>
             
             <button type="submit" disabled={profileSaving} className="w-full px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-medium rounded-xl transition-colors disabled:opacity-50 mt-2">
@@ -327,9 +306,9 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
             </button>
 
             {profileMessage && (
-              <div className={`px-3 py-2 rounded-xl text-sm ${profileMessage.startsWith('error') ? 'bg-red-500/10 text-red-300 border border-red-500/20' : 'bg-green-500/10 text-green-300 border border-green-500/20'}`}>
-                {profileMessage.split(':')[1]}
-              </div>
+              <Notice type={profileMessage.startsWith('error') ? 'error' : 'success'}>
+                {profileMessage.replace(/^(error|success):/, '')}
+              </Notice>
             )}
           </form>
         </div>
@@ -383,107 +362,9 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
           </h4>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={notifyAtLimit}
-                  onChange={(e) => setNotifyAtLimit(e.target.checked)}
-                  className="w-4 h-4 rounded border border-white/20 bg-white/5 
-                    checked:bg-red-500 checked:border-red-400 mt-1 cursor-pointer
-                    transition-all duration-200"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white group-hover:text-red-300 transition-colors">
-                    Limit überschritten
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Warnung wenn Koffein Limit erreicht wird
-                  </p>
-                </div>
-              </label>
-              {notifyAtLimit && (
-                <label className="flex items-center gap-2 pl-7 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={discordNotifyAtLimit}
-                    onChange={(e) => setDiscordNotifyAtLimit(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 
-                      checked:bg-[#5865F2] checked:border-[#5865F2] cursor-pointer
-                      transition-all duration-200"
-                  />
-                  <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Auch per Discord senden</span>
-                </label>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={notifyLate}
-                  onChange={(e) => setNotifyLate(e.target.checked)}
-                  className="w-4 h-4 rounded border border-white/20 bg-white/5 
-                    checked:bg-blue-500 checked:border-blue-400 mt-1 cursor-pointer
-                    transition-all duration-200"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors">
-                    Spätes Koffein
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Warnung nach 18:00 Uhr
-                  </p>
-                </div>
-              </label>
-              {notifyLate && (
-                <label className="flex items-center gap-2 pl-7 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={discordNotifyLate}
-                    onChange={(e) => setDiscordNotifyLate(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 
-                      checked:bg-[#5865F2] checked:border-[#5865F2] cursor-pointer
-                      transition-all duration-200"
-                  />
-                  <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Auch per Discord senden</span>
-                </label>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={notifyRapid}
-                  onChange={(e) => setNotifyRapid(e.target.checked)}
-                  className="w-4 h-4 rounded border border-white/20 bg-white/5 
-                    checked:bg-amber-500 checked:border-amber-400 mt-1 cursor-pointer
-                    transition-all duration-200"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white group-hover:text-amber-300 transition-colors">
-                    Schnelle Folge
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Warnung bei 3+ Getränken in 2h
-                  </p>
-                </div>
-              </label>
-              {notifyRapid && (
-                <label className="flex items-center gap-2 pl-7 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={discordNotifyRapid}
-                    onChange={(e) => setDiscordNotifyRapid(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border border-white/20 bg-white/5 
-                      checked:bg-[#5865F2] checked:border-[#5865F2] cursor-pointer
-                      transition-all duration-200"
-                  />
-                  <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Auch per Discord senden</span>
-                </label>
-              )}
-            </div>
+            <NotificationOption checked={notifyAtLimit} onChange={setNotifyAtLimit} discordChecked={discordNotifyAtLimit} onDiscordChange={setDiscordNotifyAtLimit} color="red" title="Limit überschritten" description="Warnung wenn Koffein Limit erreicht wird" />
+            <NotificationOption checked={notifyLate} onChange={setNotifyLate} discordChecked={discordNotifyLate} onDiscordChange={setDiscordNotifyLate} color="blue" title="Spätes Koffein" description="Warnung nach 18:00 Uhr" />
+            <NotificationOption checked={notifyRapid} onChange={setNotifyRapid} discordChecked={discordNotifyRapid} onDiscordChange={setDiscordNotifyRapid} color="amber" title="Schnelle Folge" description="Warnung bei 3+ Getränken in 2h" />
           </div>
         </div>
 
@@ -511,16 +392,14 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
         </button>
 
         {message === 'saved' && (
-          <div className="px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30
-            text-green-300 text-sm font-medium text-center animate-fade-in">
+          <Notice className="px-4 py-2.5 rounded-2xl font-medium text-center animate-fade-in">
             ✔ Einstellungen gespeichert
-          </div>
+          </Notice>
         )}
         {message === 'error' && (
-          <div className="px-4 py-2.5 rounded-2xl bg-red-500/10 border border-red-500/30
-            text-red-300 text-sm font-medium text-center animate-fade-in">
+          <Notice type="error" className="px-4 py-2.5 rounded-2xl font-medium text-center animate-fade-in">
             × Fehler beim Speichern
-          </div>
+          </Notice>
         )}
 
         <div className="border-t border-white/10 pt-5 space-y-4">
@@ -649,9 +528,5 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     </div>
   );
 }
-
-
-
-
 
 
