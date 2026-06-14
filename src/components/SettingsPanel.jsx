@@ -13,6 +13,7 @@ import {
   removePasskey,
   updateUserProfile,
 } from '../services/api';
+import { saveSession } from '../services/auth';
 
 const userPayload = (session, extra = {}) => ({ userId: session?.id || null, email: session?.email, ...extra });
 const notifyStyles = {
@@ -181,12 +182,13 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     setProfileSaving(true);
     setProfileMessage('');
     try {
-      await updateUserProfile(userPayload(session, {
+      const updatedProfile = await updateUserProfile(userPayload(session, {
         currentPassword,
         newName: profileName,
         newEmail: profileEmail,
         newPassword: newPassword || undefined
       }));
+      saveSession({ ...session, ...updatedProfile });
       setProfileMessage('success:Profil erfolgreich aktualisiert!');
       setCurrentPassword('');
       setNewPassword('');
@@ -550,4 +552,3 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
     </div>
   );
 }
-

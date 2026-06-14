@@ -16,18 +16,90 @@ const postJson = async (path, body, fallback) => {
   return data;
 };
 
-const saveSession = (user) => {
+const getStorageItem = (key) => {
+  try {
+    return localStorage.getItem(key) || sessionStorage.getItem(key);
+  } catch {
+    try {
+      return sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+};
+
+const setStorageItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+    return;
+  } catch {
+  }
+
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+  }
+};
+
+const removeStorageItem = (key) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+  }
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+  }
+};
+
+const decodeSessionFromToken = (token) => {
+  try {
+    const [payload] = String(token || '').split('.');
+    if (!payload) return null;
+    const padded = payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '=');
+    const data = JSON.parse(atob(padded));
+    if (!data?.email || !data?.sub || (data.exp && Date.now() > Number(data.exp))) return null;
+    return {
+      id: String(data.sub),
+      name: data.name || data.email,
+      email: String(data.email).toLowerCase(),
+      role: data.role === 'admin' ? 'admin' : 'user',
+      token,
+      loginAt: Number(data.iat || Date.now()),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const normalizeSession = (session) => {
+  if (!session || typeof session !== 'object') return null;
+  const token = session.token || getStorageItem(TOKEN_KEY);
+  const tokenSession = decodeSessionFromToken(token);
+  if (!session.email || !token) return null;
+  if (!tokenSession) return null;
+  return {
+    ...tokenSession,
+    ...session,
+    email: String(session.email).toLowerCase(),
+    role: session.role === 'admin' ? 'admin' : 'user',
+    token,
+  };
+};
+
+export const saveSession = (user) => {
+  if (!user || typeof user !== 'object') return null;
   const { password, ...safeUser } = user;
-  const session = { ...safeUser, loginAt: Date.now() };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-  if (session.token) localStorage.setItem(TOKEN_KEY, session.token);
-  else localStorage.removeItem(TOKEN_KEY);
+  const session = normalizeSession({ ...safeUser, loginAt: Date.now() });
+  if (!session) return null;
+  setStorageItem(AUTH_KEY, JSON.stringify(session));
+  setStorageItem(TOKEN_KEY, session.token);
   return session;
 };
 
 const readJsonStorage = (key) => {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = getStorageItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -85,13 +157,27 @@ export const completeLoginWithPasskey = async ({ loginToken }) => {
 
 /** Clear the stored session. */
 export const logout = () => {
-  localStorage.removeItem(AUTH_KEY);
-  localStorage.removeItem(TOKEN_KEY);
+  removeStorageItem(AUTH_KEY);
+  removeStorageItem(TOKEN_KEY);
 };
 
 /** Return current session object, or null if not logged in. */
 export const getSession = () => {
-  return readJsonStorage(AUTH_KEY);
+  const session = normalizeSession(readJsonStorage(AUTH_KEY));
+  if (session) {
+    setStorageItem(AUTH_KEY, JSON.stringify(session));
+    setStorageItem(TOKEN_KEY, session.token);
+    return session;
+  }
+
+  const restored = decodeSessionFromToken(getStorageItem(TOKEN_KEY));
+  if (!restored) {
+    logout();
+    return null;
+  }
+
+  setStorageItem(AUTH_KEY, JSON.stringify(restored));
+  return restored;
 };
 
 /** True when the current user has the admin role. */
@@ -103,26 +189,21 @@ const IMPERSONATOR_KEY = 'et-impersonator';
 /** Start impersonating a user. Saves the current admin session and switches to the target. */
 export const startImpersonation = (targetUser) => {
   const adminSession = getSession();
-  localStorage.setItem(IMPERSONATOR_KEY, JSON.stringify(adminSession));
-  const session = { ...targetUser, loginAt: Date.now(), impersonated: true };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
-  if (session.token) localStorage.setItem(TOKEN_KEY, session.token);
+  setStorageItem(IMPERSONATOR_KEY, JSON.stringify(adminSession));
+  const session = saveSession({ ...targetUser, impersonated: true });
   return session;
 };
 
 /** Stop impersonating and restore the original admin session. */
 export const stopImpersonation = () => {
-  const adminSession = localStorage.getItem(IMPERSONATOR_KEY);
-  localStorage.removeItem(IMPERSONATOR_KEY);
+  const adminSession = getStorageItem(IMPERSONATOR_KEY);
+  removeStorageItem(IMPERSONATOR_KEY);
   if (adminSession) {
-    localStorage.setItem(AUTH_KEY, adminSession);
     const parsed = JSON.parse(adminSession);
-    if (parsed?.token) localStorage.setItem(TOKEN_KEY, parsed.token);
-    else localStorage.removeItem(TOKEN_KEY);
-    return parsed;
+    return saveSession(parsed);
   }
-  localStorage.removeItem(AUTH_KEY);
-  localStorage.removeItem(TOKEN_KEY);
+  removeStorageItem(AUTH_KEY);
+  removeStorageItem(TOKEN_KEY);
   return null;
 };
 
