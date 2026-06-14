@@ -78,23 +78,14 @@ test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angem
 
   try {
     const webhookUrl = 'https://discord.com/api/webhooks/123456789/test-token';
-    const saveRes = await fetch(`${BASE_URL}/admin/smtp`, {
+    const saveRes = await fetch(`${BASE_URL}/admin/discord/webhook`, {
       method: 'POST',
       headers: authHeaders(adminToken, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        host: '',
-        port: 587,
-        secure: false,
-        auth: { user: '', pass: '' },
-        fromName: 'Koffein-Tracker',
-        fromEmail: '',
-        baseUrl: '',
-        registrationEnabled: true,
-        demoEnabled: true,
-        discordWebhook: webhookUrl,
-      }),
+      body: JSON.stringify({ webhookUrl }),
     });
     assert.strictEqual(saveRes.status, 200, `Expected 200 OK, got ${saveRes.status}`);
+    const saveBody = await saveRes.json();
+    assert.strictEqual(saveBody.webhookConfigured, true);
 
     const getRes = await fetch(`${BASE_URL}/admin/smtp`, {
       headers: authHeaders(adminToken),

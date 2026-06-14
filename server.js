@@ -2306,6 +2306,33 @@ app.post('/api/admin/discord/test', requireAdmin, async (req, res) => {
   }
 });
 
+app.post('/api/admin/discord/webhook', requireAdmin, async (req, res) => {
+  const { webhookUrl } = req.body || {};
+  const safeWebhook = String(webhookUrl || '').trim();
+
+  if (safeWebhook && !isValidDiscordWebhookUrl(safeWebhook)) {
+    return res.status(400).json({ error: 'Ungültige Discord Webhook URL.' });
+  }
+
+  try {
+    const current = await loadSmtpConfig();
+    await saveSmtpConfig({
+      ...current,
+      discordWebhook: safeWebhook,
+    });
+    res.json({
+      success: true,
+      message: safeWebhook
+        ? 'Discord Bot Webhook gespeichert.'
+        : 'Discord Bot Webhook entfernt.',
+      webhookConfigured: !!safeWebhook,
+    });
+  } catch (err) {
+    console.error('POST /api/admin/discord/webhook error:', err);
+    res.status(500).json({ error: err.message || 'Discord Webhook konnte nicht gespeichert werden.' });
+  }
+});
+
 // ── Redis Health Check ────────────────────────────────────────────────────────
 app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
   try {

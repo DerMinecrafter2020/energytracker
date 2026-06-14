@@ -12,7 +12,7 @@ import { fetchLogs, deleteLog as deleteApiLog, adminUpdateLog } from '../service
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
-  testDiscordWebhook, fetchDiscordAiStatus, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
+  testDiscordWebhook, saveDiscordWebhook, fetchDiscordAiStatus, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
   fetchAdminActivity, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
 } from '../services/adminApi';
 
@@ -200,13 +200,14 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
   // â”€â”€ SMTP state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const defaultSmtp = { host: '', port: 587, secure: false, auth: { user: '', pass: '' },
-    fromName: 'Koffein-Tracker', fromEmail: '', baseUrl: '', registrationEnabled: true, demoEnabled: true };
+    fromName: 'Koffein-Tracker', fromEmail: '', baseUrl: '', registrationEnabled: true, demoEnabled: true, discordWebhook: '' };
   const [smtp, setSmtp]           = useState(defaultSmtp);
   const [smtpLoaded, setSmtpLoaded] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [showSmtpPw, setShowSmtpPw] = useState(false);
   const [smtpSaving, setSmtpSaving] = useState(false);
   const [smtpTesting, setSmtpTesting] = useState(false);
+  const [discordSaving, setDiscordSaving] = useState(false);
   const [discordTesting, setDiscordTesting] = useState(false);
   const [smtpMsg, setSmtpMsg]     = useState(null);
   const [discordAiStatus, setDiscordAiStatus] = useState(null);
@@ -398,6 +399,22 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     }
   };
 
+  const handleDiscordWebhookSave = async () => {
+    const safeWebhook = smtp.discordWebhook?.trim() || '';
+    setDiscordSaving(true);
+    setSmtpMsg(null);
+    try {
+      const res = await saveDiscordWebhook(safeWebhook);
+      setSmtp((prev) => ({ ...prev, discordWebhook: safeWebhook }));
+      await loadDiscordAiStatus();
+      setSmtpMsg({ type: 'success', text: res.message || 'Discord Bot Webhook gespeichert.' });
+    } catch (err) {
+      setSmtpMsg({ type: 'error', text: err.message });
+    } finally {
+      setDiscordSaving(false);
+    }
+  };
+
   const handleDiscordTest = async () => {
     if (!smtp.discordWebhook?.trim()) {
       setSmtpMsg({ type: 'error', text: 'Bitte Discord Webhook URL eingeben.' });
@@ -409,7 +426,8 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     try {
       const safeWebhook = smtp.discordWebhook.trim();
       const res = await testDiscordWebhook(safeWebhook);
-      await saveSmtpConfig({ ...smtp, discordWebhook: safeWebhook });
+      await saveDiscordWebhook(safeWebhook);
+      setSmtp((prev) => ({ ...prev, discordWebhook: safeWebhook }));
       await loadDiscordAiStatus();
       setSmtpMsg({ type: 'success', text: res.message || 'Discord Testnachricht gesendet.' });
     } catch (err) {
@@ -1628,22 +1646,31 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               </div>
             </div>
 
-            {/* Discord test card */}
+            {/* Discord bot webhook card */}
             <div className="glass-card rounded-2xl p-6 space-y-4">
               <h3 className="font-semibold text-white flex items-center gap-2">
                 <MessageCircle className="w-4 h-4 text-indigo-400" />
-                Discord-Webhook testen
+                Discord KI-Bot Webhook
               </h3>
               <p className="text-xs text-slate-500">
-                Sendet eine Testnachricht an deinen Discord Webhook. Die Webhook-URL wird mit den Systemeinstellungen gespeichert.
+                Hinterlege hier den Discord Webhook, über den der KI-Bot geplante Nachrichten sendet.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input type="url" value={smtp.discordWebhook || ''} onChange={(e) => setSmtp({ ...smtp, discordWebhook: e.target.value })}
                   placeholder="https://discord.com/api/webhooks/..." className="input-dark flex-1" />
+                <button onClick={handleDiscordWebhookSave} disabled={discordSaving}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl
+                    bg-green-500/20 border border-green-500/30 text-green-300
+                    hover:bg-green-500/30 transition-all text-sm disabled:opacity-50 shrink-0 justify-center">
+                  {discordSaving
+                    ? <Spinner className="w-4 h-4 border-2 border-green-400/30 border-t-green-400" />
+                    : <CheckCircle className="w-4 h-4" />}
+                  Webhook speichern
+                </button>
                 <button onClick={handleDiscordTest} disabled={discordTesting || !smtp.discordWebhook?.trim()}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl
                     bg-indigo-500/20 border border-indigo-500/30 text-indigo-300
-                    hover:bg-indigo-500/30 transition-all text-sm disabled:opacity-50 shrink-0">
+                    hover:bg-indigo-500/30 transition-all text-sm disabled:opacity-50 shrink-0 justify-center">
                   {discordTesting
                     ? <Spinner className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400" />
                     : <MessageCircle className="w-4 h-4" />}
