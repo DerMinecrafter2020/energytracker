@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
-  Download, Search, ChevronDown, ChevronUp, Coffee,
+  Download, Upload, Search, ChevronDown, ChevronUp, Coffee,
   Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
   CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash, Edit3,
   Activity, FileText, Printer,
@@ -13,7 +13,7 @@ import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
   testDiscordWebhook, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
-  fetchAdminActivity, fetchAdminExportLogs,
+  fetchAdminActivity, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
 } from '../services/adminApi';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -251,6 +251,9 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [redisHealth, setRedisHealth]     = useState(null);
   const [redisChecking, setRedisChecking] = useState(false);
   const [redisError, setRedisError]       = useState(null);
+  const [dbBackupLoading, setDbBackupLoading] = useState(false);
+  const [dbImportLoading, setDbImportLoading] = useState(false);
+  const [dbBackupMsg, setDbBackupMsg] = useState(null);
 
 
   // Load SMTP config when settings tab is opened
@@ -290,6 +293,56 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       setRedisError(err.message);
     } finally {
       setRedisChecking(false);
+    }
+  };
+
+  const handleDatabaseExport = async () => {
+    setDbBackupLoading(true);
+    setDbBackupMsg(null);
+    try {
+      const backup = await fetchDatabaseBackup();
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      downloadFile(
+        JSON.stringify(backup, null, 2),
+        `koffein-db-backup-${stamp}.json`,
+        'application/json;charset=utf-8;'
+      );
+      setDbBackupMsg({ type: 'success', text: 'Datenbank-Backup wurde heruntergeladen.' });
+    } catch (err) {
+      setDbBackupMsg({ type: 'error', text: err.message || 'Backup fehlgeschlagen.' });
+    } finally {
+      setDbBackupLoading(false);
+    }
+  };
+
+  const handleDatabaseImport = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!window.confirm('Datenbank wirklich importieren? Der aktuelle Datenbestand wird ersetzt.')) return;
+
+    setDbImportLoading(true);
+    setDbBackupMsg(null);
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      const result = await importDatabaseBackup(backup);
+      const summary = result.summary || {};
+      setDbBackupMsg({
+        type: 'success',
+        text: `Import abgeschlossen: ${summary.logs || 0} Logs, ${summary.users || 0} Benutzer, ${summary.reminders || 0} Reminder.`,
+      });
+      await Promise.all([
+        loadAllLogs(),
+        activeTab === 'users' ? loadRegUsers() : Promise.resolve(),
+        activeTab === 'chat' ? loadChatStats() : Promise.resolve(),
+        activeTab === 'activity' ? loadAdminActivity() : Promise.resolve(),
+        handleRedisCheck(),
+      ]);
+    } catch (err) {
+      setDbBackupMsg({ type: 'error', text: err.message || 'Import fehlgeschlagen.' });
+    } finally {
+      setDbImportLoading(false);
     }
   };
 
@@ -1667,6 +1720,50 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                 Prüft ob Redis erreichbar ist, wie viele Einträge pro Datenschlüssel gespeichert sind
                 und wann zuletzt ein Snapshot gesichert wurde.
               </p>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-white">Datenbank Backup</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Exportiert oder importiert alle Redis-Daten als JSON. Import ersetzt den aktuellen Datenbestand.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDatabaseExport}
+                      disabled={dbBackupLoading || dbImportLoading}
+                      className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs
+                        bg-green-600/20 border border-green-500/30 text-green-300
+                        hover:bg-green-600/30 transition-all disabled:opacity-50"
+                    >
+                      {dbBackupLoading
+                        ? <Spinner className="w-3 h-3 border-2 border-green-400/30 border-t-green-400" />
+                        : <Download className="w-3.5 h-3.5" />}
+                      Export
+                    </button>
+                    <label className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs
+                      bg-amber-600/20 border border-amber-500/30 text-amber-300
+                      hover:bg-amber-600/30 transition-all cursor-pointer
+                      ${dbBackupLoading || dbImportLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      {dbImportLoading
+                        ? <Spinner className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400" />
+                        : <Upload className="w-3.5 h-3.5" />}
+                      Import
+                      <input
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={handleDatabaseImport}
+                        disabled={dbBackupLoading || dbImportLoading}
+                      />
+                    </label>
+                  </div>
+                </div>
+                <MessageBox message={dbBackupMsg} onClose={() => setDbBackupMsg(null)} className="rounded-xl p-3" />
+              </div>
+
               {redisError && (
                 <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />

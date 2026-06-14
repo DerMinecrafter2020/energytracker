@@ -229,7 +229,7 @@ app.use(helmet({
 }));
 app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(hpp());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -320,7 +320,9 @@ const REDIS_KEYS = {
   discord_schedules: 'koffein:discord_schedules',
 };
 
-let dbState = {
+const DB_EXPORT_VERSION = 1;
+
+const createEmptyDbState = () => ({
   appName: 'Drink-Tracker',
   caffeine_logs: [],
   users: [],
@@ -333,12 +335,68 @@ let dbState = {
   custom_drinks: [], // [{id, ownerKey, name, size, caffeine, icon}]
   ai_chat_messages: [], // [{ownerKey, userId/email, messages, updatedAt}]
   discord_schedules: [], // [{id, time, message, sent, date}]
-};
+});
+
+let dbState = createEmptyDbState();
 
 const safeParse = (s, fallback) => {
   if (!s) return fallback;
   try { return JSON.parse(s); } catch { return fallback; }
 };
+
+const cloneJson = (value) => JSON.parse(JSON.stringify(value));
+const asArray = (value) => Array.isArray(value) ? value : [];
+const asObjectOrNull = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+
+const normalizeDbState = (value = {}) => {
+  const source = value?.database || value?.dbState || value?.data || value;
+  const fallback = createEmptyDbState();
+  const parsedAi = asObjectOrNull(source.ai_config) || {};
+
+  return {
+    appName: typeof source.appName === 'string' && source.appName.trim() ? source.appName.trim() : fallback.appName,
+    caffeine_logs: asArray(source.caffeine_logs),
+    users: asArray(source.users),
+    smtp_settings: asObjectOrNull(source.smtp_settings),
+    auth_config: asObjectOrNull(source.auth_config),
+    reminders: asArray(source.reminders),
+    favorites: asArray(source.favorites),
+    ai_config: {
+      apiKey: String(parsedAi.apiKey || ''),
+      model: String(parsedAi.model || fallback.ai_config.model),
+      braveSearchKey: String(parsedAi.braveSearchKey || ''),
+    },
+    user_settings: asArray(source.user_settings),
+    custom_drinks: asArray(source.custom_drinks),
+    ai_chat_messages: asArray(source.ai_chat_messages),
+    discord_schedules: asArray(source.discord_schedules),
+  };
+};
+
+const hasDatabaseShape = (value = {}) => {
+  const source = value?.database || value?.dbState || value?.data || value;
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return false;
+  return [
+    'caffeine_logs',
+    'users',
+    'smtp_settings',
+    'reminders',
+    'favorites',
+    'ai_config',
+    'user_settings',
+    'custom_drinks',
+    'ai_chat_messages',
+    'discord_schedules',
+  ].some((key) => Object.prototype.hasOwnProperty.call(source, key));
+};
+
+const buildDatabaseExport = () => ({
+  type: 'koffein-tracker-db-export',
+  version: DB_EXPORT_VERSION,
+  exportedAt: new Date().toISOString(),
+  appVersion,
+  database: cloneJson(normalizeDbState(dbState)),
+});
 
 const loadDbState = async () => {
   try {
@@ -364,7 +422,7 @@ const loadDbState = async () => {
       REDIS_KEYS.discord_schedules,
     );
     const parsedAi = safeParse(ai, {});
-    dbState = {
+    dbState = normalizeDbState({
       caffeine_logs: safeParse(logs, []),
       users:         safeParse(users, []),
       smtp_settings: safeParse(smtp, null),
@@ -380,26 +438,29 @@ const loadDbState = async () => {
       custom_drinks: safeParse(drinks, []),
       ai_chat_messages: safeParse(chatMessages, []),
       discord_schedules: safeParse(discordSchedules, []),
-    };
+      appName: appName || 'Drink-Tracker',
+    });
   } catch (err) {
     console.error('[DB] Redis Ladefehler:', err.message);
   }
 };
 
 const persistDbState = () => {
-  redis.mset(
-    REDIS_KEYS.app_name,      dbState.appName || 'Drink-Tracker',
-    REDIS_KEYS.caffeine_logs,  JSON.stringify(dbState.caffeine_logs),
-    REDIS_KEYS.users,          JSON.stringify(dbState.users),
-    REDIS_KEYS.smtp_settings,  JSON.stringify(dbState.smtp_settings),
-    REDIS_KEYS.auth_config,    JSON.stringify(dbState.auth_config),
-    REDIS_KEYS.reminders,      JSON.stringify(dbState.reminders),
-    REDIS_KEYS.favorites,      JSON.stringify(dbState.favorites),
-    REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
-    REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
-    REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
-    REDIS_KEYS.ai_chat_messages, JSON.stringify(dbState.ai_chat_messages),
-    REDIS_KEYS.discord_schedules, JSON.stringify(dbState.discord_schedules),
+  const next = normalizeDbState(dbState);
+  dbState = next;
+  return redis.mset(
+    REDIS_KEYS.app_name,      next.appName || 'Drink-Tracker',
+    REDIS_KEYS.caffeine_logs,  JSON.stringify(next.caffeine_logs),
+    REDIS_KEYS.users,          JSON.stringify(next.users),
+    REDIS_KEYS.smtp_settings,  JSON.stringify(next.smtp_settings),
+    REDIS_KEYS.auth_config,    JSON.stringify(next.auth_config),
+    REDIS_KEYS.reminders,      JSON.stringify(next.reminders),
+    REDIS_KEYS.favorites,      JSON.stringify(next.favorites),
+    REDIS_KEYS.ai_config,      JSON.stringify(next.ai_config),
+    REDIS_KEYS.user_settings,  JSON.stringify(next.user_settings),
+    REDIS_KEYS.custom_drinks,  JSON.stringify(next.custom_drinks),
+    REDIS_KEYS.ai_chat_messages, JSON.stringify(next.ai_chat_messages),
+    REDIS_KEYS.discord_schedules, JSON.stringify(next.discord_schedules),
   ).catch((err) => console.error('[DB] Redis Speicherfehler:', err.message));
 };
 
@@ -1360,6 +1421,12 @@ const logMatchesUser = (log, { userId, email } = {}) => {
   return !!(matchId || matchEmail);
 };
 
+const userHasLogForDate = ({ userId, email, date }) =>
+  dbState.caffeine_logs.some((log) =>
+    String(log.date || '') === String(date || '')
+    && logMatchesUser(log, { userId, email })
+  );
+
 const getLogsForUser = ({ userId, email, start, end }) =>
   dbState.caffeine_logs
     .filter((log) => logMatchesUser(log, { userId, email }))
@@ -1727,7 +1794,7 @@ const sendDiscordReminder = async ({ webhookUrl, email, title, message }) => {
 const processRemindersTick = async () => {
   const now = new Date();
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const today = now.toISOString().slice(0, 10);
+  const today = getTodayKey();
   const cfg = await loadSmtpConfig();
   let stateChanged = false;
 
@@ -1742,6 +1809,16 @@ const processRemindersTick = async () => {
       try {
         const user = dbState.users.find(u => (reminder.userId && String(u.id) === String(reminder.userId)) || (reminder.email && String(u.email).toLowerCase() === String(reminder.email).toLowerCase()));
         const targetEmail = user?.email || reminder.email;
+        const targetUserId = user?.id || reminder.userId || null;
+
+        if (userHasLogForDate({ userId: targetUserId, email: targetEmail, date: today })) {
+          reminder.lastTriggeredDate = today;
+          reminder.updatedAt = new Date().toISOString();
+          reminder.skippedBecauseTrackedDate = today;
+          stateChanged = true;
+          console.log(`[Reminder] Übersprungen für ${targetEmail}: heute bereits Eintrag vorhanden.`);
+          continue;
+        }
 
         if (normalized.mailEnabled) {
           await sendReminderEmail({ to: targetEmail });
@@ -2112,6 +2189,51 @@ app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/database/export', requireAdmin, async (req, res) => {
+  try {
+    const backup = buildDatabaseExport();
+    const stamp = backup.exportedAt.replace(/[:.]/g, '-');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="koffein-db-backup-${stamp}.json"`);
+    res.json(backup);
+  } catch (err) {
+    console.error('GET /api/admin/database/export error:', err);
+    res.status(500).json({ error: 'Datenbank-Export fehlgeschlagen.' });
+  }
+});
+
+app.post('/api/admin/database/import', requireAdmin, async (req, res) => {
+  try {
+    const payload = req.body?.backup || req.body;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return res.status(400).json({ error: 'Ungueltige Backup-Datei.' });
+    }
+    if (!hasDatabaseShape(payload)) {
+      return res.status(400).json({ error: 'Backup enthaelt keine erkennbaren Datenbankfelder.' });
+    }
+
+    const nextState = normalizeDbState(payload);
+    dbState = nextState;
+    await persistDbState();
+
+    res.json({
+      success: true,
+      importedAt: new Date().toISOString(),
+      summary: {
+        logs: nextState.caffeine_logs.length,
+        users: nextState.users.length,
+        reminders: nextState.reminders.length,
+        favorites: nextState.favorites.length,
+        aiChatMessages: nextState.ai_chat_messages.length,
+        customDrinks: nextState.custom_drinks.length,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/admin/database/import error:', err);
+    res.status(500).json({ error: 'Datenbank-Import fehlgeschlagen.' });
   }
 });
 

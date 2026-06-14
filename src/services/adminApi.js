@@ -51,6 +51,8 @@ export const fetchAdminChatStats = () => request('/api/admin/ai/chat-stats');
 export const fetchAdminActivity = () => request('/api/admin/activity');
 export const fetchAdminExportLogs = ({ start, end, email } = {}) =>
   requestQuery('/api/admin/export/logs', { start, end, email });
+export const fetchDatabaseBackup = () => request('/api/admin/database/export');
+export const importDatabaseBackup = (backup) => post('/api/admin/database/import', { backup });
 export const verifyAdminUser = (id) => post(`/api/admin/users/${id}/verify`);
 export const deleteAdminUser = (id) => request(`/api/admin/users/${id}`, { method: 'DELETE' });
 export const setUserRole = (id, role) => post(`/api/admin/users/${id}/role`, { role });

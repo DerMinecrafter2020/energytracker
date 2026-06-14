@@ -43,6 +43,30 @@ test('Admin-API akzeptiert Bearer-Token und weist alte Secret-Header ab', async 
   assert.ok(Array.isArray(users), 'Admin-Benutzerliste muss ein Array sein');
 });
 
+test('Admin kann Datenbank exportieren und dasselbe Backup wieder importieren', async () => {
+  const token = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+  const exportRes = await fetch(`${BASE_URL}/admin/database/export`, {
+    headers: authHeaders(token),
+  });
+
+  assert.strictEqual(exportRes.status, 200, `Expected 200 OK, got ${exportRes.status}`);
+  const backup = await exportRes.json();
+  assert.strictEqual(backup.type, 'koffein-tracker-db-export');
+  assert.ok(backup.database, 'Backup muss database enthalten');
+  assert.ok(Array.isArray(backup.database.caffeine_logs), 'Backup muss caffeine_logs als Array enthalten');
+
+  const importRes = await fetch(`${BASE_URL}/admin/database/import`, {
+    method: 'POST',
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ backup }),
+  });
+
+  assert.strictEqual(importRes.status, 200, `Expected 200 OK, got ${importRes.status}`);
+  const importBody = await importRes.json();
+  assert.strictEqual(importBody.success, true);
+  assert.ok(importBody.summary, 'Import muss eine Zusammenfassung liefern');
+});
+
 test('Log-API ist pro Benutzer geschuetzt und bleibt editierbar', async () => {
   const unauthenticatedCreate = await fetch(`${BASE_URL}/logs`, {
     method: 'POST',
