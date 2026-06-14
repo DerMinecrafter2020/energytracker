@@ -111,6 +111,16 @@ test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angem
     assert.strictEqual(scheduleRes.status, 200, `Expected 200 OK, got ${scheduleRes.status}`);
     const scheduleBody = await scheduleRes.json();
     assert.strictEqual(scheduleBody.success, true);
+    assert.ok(scheduleBody.runAt, 'Geplante Discord-Nachricht muss runAt enthalten');
+
+    const statusRes = await fetch(`${BASE_URL}/admin/discord-ai/status`, {
+      headers: authHeaders(adminToken),
+    });
+    assert.strictEqual(statusRes.status, 200, `Expected 200 OK, got ${statusRes.status}`);
+    const status = await statusRes.json();
+    assert.strictEqual(status.running, true);
+    assert.strictEqual(status.webhookConfigured, true);
+    assert.ok(Number(status.counts?.pending || 0) >= 1, 'Mindestens eine Discord-KI-Nachricht muss offen sein');
   } finally {
     await fetch(`${BASE_URL}/admin/database/import`, {
       method: 'POST',

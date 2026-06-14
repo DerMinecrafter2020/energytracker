@@ -12,7 +12,7 @@ import { fetchLogs, deleteLog as deleteApiLog, adminUpdateLog } from '../service
 import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
-  testDiscordWebhook, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
+  testDiscordWebhook, fetchDiscordAiStatus, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
   fetchAdminActivity, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
 } from '../services/adminApi';
 
@@ -209,6 +209,9 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [smtpTesting, setSmtpTesting] = useState(false);
   const [discordTesting, setDiscordTesting] = useState(false);
   const [smtpMsg, setSmtpMsg]     = useState(null);
+  const [discordAiStatus, setDiscordAiStatus] = useState(null);
+  const [discordAiStatusLoading, setDiscordAiStatusLoading] = useState(false);
+  const [discordAiStatusMsg, setDiscordAiStatusMsg] = useState(null);
 
   // â”€â”€ AI Config state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [aiApiKey, setAiApiKey]   = useState('');
@@ -269,6 +272,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
           setBraveKeyMasked(cfg.braveSearchKeyMasked || ''); 
         })
         .catch(() => {});
+      loadDiscordAiStatus();
 
     }
     if (activeTab === 'users') loadRegUsers();
@@ -406,11 +410,25 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       const safeWebhook = smtp.discordWebhook.trim();
       const res = await testDiscordWebhook(safeWebhook);
       await saveSmtpConfig({ ...smtp, discordWebhook: safeWebhook });
+      await loadDiscordAiStatus();
       setSmtpMsg({ type: 'success', text: res.message || 'Discord Testnachricht gesendet.' });
     } catch (err) {
       setSmtpMsg({ type: 'error', text: err.message });
     } finally {
       setDiscordTesting(false);
+    }
+  };
+
+  const loadDiscordAiStatus = async () => {
+    setDiscordAiStatusLoading(true);
+    setDiscordAiStatusMsg(null);
+    try {
+      const data = await fetchDiscordAiStatus();
+      setDiscordAiStatus(data);
+    } catch (err) {
+      setDiscordAiStatusMsg({ type: 'error', text: err.message || 'Discord-KI-Status konnte nicht geladen werden.' });
+    } finally {
+      setDiscordAiStatusLoading(false);
     }
   };
 
@@ -1632,6 +1650,63 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   Test senden
                 </button>
               </div>
+            </div>
+
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-violet-400" />
+                    Discord KI-Bot Status
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Der Scheduler startet automatisch mit dem Server und sendet fällige KI-Nachrichten über den gespeicherten Webhook.
+                  </p>
+                </div>
+                <button onClick={loadDiscordAiStatus} disabled={discordAiStatusLoading}
+                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs
+                    bg-white/5 border border-white/10 text-slate-300
+                    hover:bg-white/10 transition-all disabled:opacity-50">
+                  {discordAiStatusLoading
+                    ? <Spinner className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400" />
+                    : <RefreshCw className="w-3.5 h-3.5" />}
+                  Aktualisieren
+                </button>
+              </div>
+
+              <MessageBox message={discordAiStatusMsg} onClose={() => setDiscordAiStatusMsg(null)} className="rounded-xl p-3" />
+
+              {discordAiStatus && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div className={`rounded-xl px-3 py-2.5 border ${discordAiStatus.running ? 'bg-green-500/10 border-green-500/30 text-green-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                      <p className="text-slate-500 mb-1">Bot</p>
+                      <p className="font-semibold">{discordAiStatus.running ? 'läuft' : 'gestoppt'}</p>
+                    </div>
+                    <div className={`rounded-xl px-3 py-2.5 border ${discordAiStatus.webhookConfigured ? 'bg-green-500/10 border-green-500/30 text-green-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
+                      <p className="text-slate-500 mb-1">Webhook</p>
+                      <p className="font-semibold">{discordAiStatus.webhookConfigured ? 'konfiguriert' : 'fehlt'}</p>
+                    </div>
+                    <div className="rounded-xl px-3 py-2.5 border border-white/10 bg-white/5">
+                      <p className="text-slate-500 mb-1">Offen</p>
+                      <p className="font-semibold text-white">{discordAiStatus.counts?.pending || 0}</p>
+                    </div>
+                    <div className="rounded-xl px-3 py-2.5 border border-white/10 bg-white/5">
+                      <p className="text-slate-500 mb-1">Gesendet / Fehler</p>
+                      <p className="font-semibold text-white">{discordAiStatus.counts?.sent || 0} / {discordAiStatus.counts?.failed || 0}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2.5 text-xs text-slate-400 space-y-1">
+                    <p>Gestartet: <span className="text-slate-200">{discordAiStatus.startedAt ? formatDate(discordAiStatus.startedAt) : '–'}</span></p>
+                    <p>Letzter Check: <span className="text-slate-200">{discordAiStatus.lastTickAt ? formatDate(discordAiStatus.lastTickAt) : '–'}</span></p>
+                    <p>Nächste Nachricht: <span className="text-slate-200">{discordAiStatus.nextSchedule?.runAt ? formatDate(discordAiStatus.nextSchedule.runAt) : '–'}</span></p>
+                    {discordAiStatus.lastError && (
+                      <p className="text-red-300">Letzter Fehler: {discordAiStatus.lastError}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* AI / OpenRouter settings card */}

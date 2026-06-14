@@ -1809,6 +1809,157 @@ const sendDiscordReminder = async ({ webhookUrl, email, title, message }) => {
   }
 };
 
+const DISCORD_AI_SCHEDULER_INTERVAL_MS = 60 * 1000;
+let discordAiSchedulerInterval = null;
+const discordAiSchedulerState = {
+  running: false,
+  startedAt: null,
+  lastTickAt: null,
+  lastSentAt: null,
+  lastError: null,
+};
+
+const parseDiscordScheduleTime = (time) => {
+  const match = String(time || '').match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (!match) return null;
+  return `${String(match[1]).padStart(2, '0')}:${match[2]}`;
+};
+
+const buildDiscordRunAt = (time, now = new Date()) => {
+  const safeTime = parseDiscordScheduleTime(time);
+  if (!safeTime) return null;
+  const [hour, minute] = safeTime.split(':').map(Number);
+  const runAt = new Date(now);
+  runAt.setHours(hour, minute, 0, 0);
+  if (runAt <= now) runAt.setDate(runAt.getDate() + 1);
+  return runAt.toISOString();
+};
+
+const ensureDiscordScheduleShape = (schedule) => {
+  if (!schedule || typeof schedule !== 'object') return null;
+  const time = parseDiscordScheduleTime(schedule.time);
+  const message = String(schedule.message || '').trim();
+  if (!time || !message) return null;
+
+  if (!schedule.id) schedule.id = crypto.randomUUID();
+  schedule.time = time;
+  schedule.message = message;
+  schedule.status = schedule.status || (schedule.sent ? 'sent' : 'pending');
+  schedule.sent = schedule.status === 'sent';
+  schedule.createdAt = schedule.createdAt || schedule.date || new Date().toISOString();
+  schedule.runAt = schedule.runAt || buildDiscordRunAt(time, new Date(schedule.createdAt));
+  schedule.updatedAt = schedule.updatedAt || schedule.createdAt;
+  return schedule;
+};
+
+const getDiscordAiSchedulerStatus = async () => {
+  const cfg = await loadSmtpConfig().catch(() => null);
+  const schedules = asArray(dbState.discord_schedules)
+    .map(ensureDiscordScheduleShape)
+    .filter(Boolean);
+  const pending = schedules.filter((item) => item.status === 'pending');
+  const sent = schedules.filter((item) => item.status === 'sent');
+  const failed = schedules.filter((item) => item.status === 'failed');
+  const next = [...pending].sort((a, b) => String(a.runAt || '').localeCompare(String(b.runAt || '')))[0] || null;
+
+  return {
+    running: discordAiSchedulerState.running,
+    startedAt: discordAiSchedulerState.startedAt,
+    lastTickAt: discordAiSchedulerState.lastTickAt,
+    lastSentAt: discordAiSchedulerState.lastSentAt,
+    lastError: discordAiSchedulerState.lastError,
+    intervalMs: DISCORD_AI_SCHEDULER_INTERVAL_MS,
+    webhookConfigured: !!cfg?.discordWebhook,
+    counts: {
+      pending: pending.length,
+      sent: sent.length,
+      failed: failed.length,
+      total: schedules.length,
+    },
+    nextSchedule: next ? {
+      id: next.id,
+      time: next.time,
+      runAt: next.runAt,
+      message: next.message,
+      status: next.status,
+    } : null,
+  };
+};
+
+const processDiscordAiSchedulesTick = async () => {
+  discordAiSchedulerState.lastTickAt = new Date().toISOString();
+  const cfg = await loadSmtpConfig();
+  let stateChanged = false;
+
+  if (!Array.isArray(dbState.discord_schedules)) dbState.discord_schedules = [];
+
+  for (const schedule of dbState.discord_schedules) {
+    const before = JSON.stringify(schedule);
+    const normalized = ensureDiscordScheduleShape(schedule);
+    if (!normalized || normalized.status !== 'pending') {
+      if (normalized && JSON.stringify(normalized) !== before) stateChanged = true;
+      continue;
+    }
+    if (!normalized.runAt || new Date(normalized.runAt) > new Date()) {
+      if (JSON.stringify(normalized) !== before) stateChanged = true;
+      continue;
+    }
+
+    try {
+      if (!cfg?.discordWebhook) {
+        normalized.lastError = 'Kein Discord Webhook hinterlegt.';
+        normalized.updatedAt = new Date().toISOString();
+        discordAiSchedulerState.lastError = normalized.lastError;
+        stateChanged = true;
+        continue;
+      }
+
+      await sendDiscordReminder({
+        webhookUrl: cfg.discordWebhook,
+        title: 'KI-Assistent',
+        message: normalized.message,
+      });
+
+      normalized.status = 'sent';
+      normalized.sent = true;
+      normalized.sentAt = new Date().toISOString();
+      normalized.updatedAt = normalized.sentAt;
+      normalized.lastError = null;
+      discordAiSchedulerState.lastSentAt = normalized.sentAt;
+      discordAiSchedulerState.lastError = null;
+      stateChanged = true;
+      console.log(`[Discord AI] Nachricht gesendet (${normalized.time}).`);
+    } catch (err) {
+      normalized.status = 'failed';
+      normalized.sent = false;
+      normalized.lastError = err.message;
+      normalized.updatedAt = new Date().toISOString();
+      discordAiSchedulerState.lastError = err.message;
+      stateChanged = true;
+      console.error('[Discord AI] Fehler:', err.message);
+    }
+  }
+
+  if (stateChanged) await persistDbState();
+};
+
+const startDiscordAiScheduler = () => {
+  if (discordAiSchedulerInterval) return;
+  discordAiSchedulerState.running = true;
+  discordAiSchedulerState.startedAt = new Date().toISOString();
+  discordAiSchedulerInterval = setInterval(() => {
+    processDiscordAiSchedulesTick().catch((err) => {
+      discordAiSchedulerState.lastError = err.message;
+      console.error('[Discord AI] Scheduler-Tick Fehler:', err.message);
+    });
+  }, DISCORD_AI_SCHEDULER_INTERVAL_MS);
+  processDiscordAiSchedulesTick().catch((err) => {
+    discordAiSchedulerState.lastError = err.message;
+    console.error('[Discord AI] Start-Tick Fehler:', err.message);
+  });
+  console.log('[Discord AI] Scheduler gestartet.');
+};
+
 const processRemindersTick = async () => {
   const now = new Date();
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -1851,31 +2002,6 @@ const processRemindersTick = async () => {
         console.log(`[Reminder] Gesendet an ${reminder.email} (${normalized.time})`);
       } catch (err) {
         console.error(`[Reminder] Fehler für ${reminder.email}:`, err.message);
-      }
-    }
-  }
-
-  // 2. Scheduled AI Discord Messages
-  if (Array.isArray(dbState.discord_schedules) && dbState.discord_schedules.length > 0) {
-    for (let i = 0; i < dbState.discord_schedules.length; i++) {
-      const sched = dbState.discord_schedules[i];
-      if (!sched.sent && sched.time === hhmm) {
-        try {
-          if (cfg && cfg.discordWebhook) {
-            await sendDiscordReminder({ 
-              webhookUrl: cfg.discordWebhook, 
-              title: "KI-Assistent", 
-              message: sched.message 
-            });
-            console.log(`[Discord Schedule] Gesendet (${sched.time})`);
-          } else {
-            console.log(`[Discord Schedule] Übersprungen (${sched.time}): Kein Webhook hinterlegt.`);
-          }
-          sched.sent = true;
-          stateChanged = true;
-        } catch(err) {
-          console.error(`[Discord Schedule] Fehler:`, err.message);
-        }
       }
     }
   }
@@ -2224,6 +2350,15 @@ app.get('/api/admin/redis/health', requireAdmin, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/discord-ai/status', requireAdmin, async (req, res) => {
+  try {
+    res.json(await getDiscordAiSchedulerStatus());
+  } catch (err) {
+    console.error('GET /api/admin/discord-ai/status error:', err);
+    res.status(500).json({ error: 'Discord AI Status konnte nicht geladen werden.' });
   }
 });
 
@@ -3670,26 +3805,36 @@ app.post('/api/ai/schedule-discord', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Kein Discord Webhook im Admin-Panel konfiguriert.' });
     }
     
-    let timeMatch = String(time).match(/\d{1,2}:\d{2}/);
-    if (!timeMatch) return res.status(400).json({ error: 'time muss eine Uhrzeit im Format HH:MM enthalten.' });
-    
-    const formattedTime = timeMatch[0].padStart(5, '0');
+    const formattedTime = parseDiscordScheduleTime(time);
+    if (!formattedTime) return res.status(400).json({ error: 'time muss eine Uhrzeit im Format HH:MM enthalten.' });
+    const safeMessage = String(message || '').trim();
+    if (!safeMessage) return res.status(400).json({ error: 'message darf nicht leer sein.' });
+    const runAt = buildDiscordRunAt(formattedTime);
     
     if (!Array.isArray(dbState.discord_schedules)) {
       dbState.discord_schedules = [];
     }
     
-    const id = Date.now();
-    dbState.discord_schedules.push({
+    const id = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const schedule = {
       id,
       time: formattedTime,
-      message,
+      message: safeMessage,
+      runAt,
+      status: 'pending',
       sent: false,
-      date: new Date().toISOString()
-    });
+      createdAt,
+      updatedAt: createdAt,
+      createdBy: {
+        userId: req.auth?.userId || null,
+        email: req.auth?.email || null,
+      },
+    };
+    dbState.discord_schedules.push(schedule);
     
     persistDbState();
-    res.json({ success: true, id, time: formattedTime, message });
+    res.json({ success: true, id, time: formattedTime, runAt, message: safeMessage });
   } catch (err) {
     console.error('[AI Schedule Discord] Fehler:', err.message);
     res.status(500).json({ error: err.message });
@@ -3909,6 +4054,8 @@ process.on('SIGTERM', async () => {
       REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
       REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
       REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
+      REDIS_KEYS.ai_chat_messages, JSON.stringify(dbState.ai_chat_messages),
+      REDIS_KEYS.discord_schedules, JSON.stringify(dbState.discord_schedules),
     );
     console.log('[DB] ✓ Letzter Stand gespeichert.');
   } catch (err) {
@@ -3920,6 +4067,7 @@ process.on('SIGTERM', async () => {
 initDb()
   .then(() => {
 
+    startDiscordAiScheduler();
 
     // Check every minute whether a reminder is due.
     setInterval(() => {
