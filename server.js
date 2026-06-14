@@ -495,6 +495,7 @@ class FileDbAdapter {
         base_url: params[7] || '',
         registration_enabled: params[8] ? 1 : 0,
         demo_enabled: params[9] ? 1 : 0,
+        discord_webhook: params[10] || '',
         updated_at: new Date().toISOString(),
       };
       persistDbState();
@@ -732,6 +733,7 @@ const mapSmtpRowToConfig = (row) => {
     baseUrl: '',
     registrationEnabled: true, // ✓ Default: Registrierung ENABLED
     demoEnabled: true,
+    discordWebhook: '',
   };
   
   if (!row) return defaults;
@@ -761,8 +763,24 @@ const loadSmtpConfig = async () => {
   return mapSmtpRowToConfig(rows[0] || null);
 };
 
+const isMaskedSecret = (value) => /^[•*]{4,}$/.test(String(value || '').trim());
+const isValidDiscordWebhookUrl = (value) =>
+  /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/.+/i.test(String(value || '').trim());
+
 const saveSmtpConfig = async (cfg) => {
   const dbPool = getPool();
+  const current = await loadSmtpConfig().catch(() => null);
+  const incomingPass = String(cfg.auth?.pass || '');
+  const authPass = incomingPass && !isMaskedSecret(incomingPass)
+    ? incomingPass
+    : (current?.auth?.pass || '');
+  const hasDiscordWebhook = Object.prototype.hasOwnProperty.call(cfg, 'discordWebhook');
+  const discordWebhook = hasDiscordWebhook ? String(cfg.discordWebhook || '').trim() : (current?.discordWebhook || '');
+
+  if (discordWebhook && !isValidDiscordWebhookUrl(discordWebhook)) {
+    throw new Error('Ungueltige Discord Webhook URL.');
+  }
+
   await dbPool.execute(
     `INSERT INTO smtp_settings
       (id, host, port, secure, auth_user, auth_pass, from_name, from_email, base_url, registration_enabled, demo_enabled, discord_webhook)
@@ -785,13 +803,13 @@ const saveSmtpConfig = async (cfg) => {
       Number(cfg.port),
       !!cfg.secure,
       cfg.auth?.user || '',
-      cfg.auth?.pass || '',
+      authPass,
       cfg.fromName || 'Koffein-Tracker',
       cfg.fromEmail || cfg.auth?.user || '',
       cfg.baseUrl || '',
       !!cfg.registrationEnabled,
       !!cfg.demoEnabled,
-      cfg.discordWebhook || ''
+      discordWebhook
     ]
   );
 };
@@ -2071,31 +2089,48 @@ app.get('/api/admin/smtp', requireAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/smtp', requireAdmin, async (req, res) => {
-  const { host, port, secure, auth, fromName, fromEmail, baseUrl, registrationEnabled, demoEnabled } = req.body || {};
-  if (!host || !port)
-    return res.status(400).json({ error: 'Host und Port sind erforderlich.' });
+  const {
+    host = '',
+    port = 587,
+    secure,
+    auth = {},
+    fromName,
+    fromEmail,
+    baseUrl,
+    registrationEnabled,
+    demoEnabled,
+    discordWebhook,
+  } = req.body || {};
+  const incomingAuthPass = String(auth?.pass || '').trim();
+  const hasSmtpValues = !!(
+    String(host || '').trim()
+    || String(auth?.user || '').trim()
+    || (incomingAuthPass && !isMaskedSecret(incomingAuthPass))
+  );
+  if (hasSmtpValues && !String(host || '').trim()) {
+    return res.status(400).json({ error: 'SMTP-Host ist erforderlich, wenn E-Mail-Versand konfiguriert wird.' });
+  }
 
   try {
-    const prev = await loadSmtpConfig();
     await saveSmtpConfig({
-      host,
+      host: String(host || '').trim(),
       port: Number(port),
       secure: !!secure,
       auth: {
-        user: auth.user,
-        // Keep existing password when client sends the masked placeholder
-        pass: auth.pass === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' ? (prev?.auth?.pass || '') : auth.pass,
+        user: auth?.user || '',
+        pass: auth?.pass || '',
       },
       fromName: fromName || 'Koffein-Tracker',
       fromEmail: fromEmail || 'admin@fra03.de',
       baseUrl: baseUrl || '',
       registrationEnabled: registrationEnabled !== false,
       demoEnabled: demoEnabled !== false,
+      discordWebhook,
     });
     res.json({ success: true });
   } catch (err) {
     console.error('POST /api/admin/smtp error:', err);
-    res.status(500).json({ error: 'Database error' });
+    res.status(500).json({ error: err.message || 'Database error' });
   }
 });
 
@@ -2130,7 +2165,7 @@ app.post('/api/admin/discord/test', requireAdmin, async (req, res) => {
   if (!safeWebhook) {
     return res.status(400).json({ error: 'Discord Webhook URL fehlt.' });
   }
-  if (!/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/.+/i.test(safeWebhook)) {
+  if (!isValidDiscordWebhookUrl(safeWebhook)) {
     return res.status(400).json({ error: 'Ungültige Discord Webhook URL.' });
   }
 
@@ -3626,10 +3661,14 @@ Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.
 });
 
 // ── AI Schedule Discord ──────────────────────────────────────────────────────
-app.post('/api/ai/schedule-discord', requireAdmin, async (req, res) => {
+app.post('/api/ai/schedule-discord', requireAuth, async (req, res) => {
   try {
     const { time, message } = req.body || {};
     if (!time || !message) return res.status(400).json({ error: 'time und message werden benötigt.' });
+    const cfg = await loadSmtpConfig();
+    if (!cfg?.discordWebhook) {
+      return res.status(400).json({ error: 'Kein Discord Webhook im Admin-Panel konfiguriert.' });
+    }
     
     let timeMatch = String(time).match(/\d{1,2}:\d{2}/);
     if (!timeMatch) return res.status(400).json({ error: 'time muss eine Uhrzeit im Format HH:MM enthalten.' });

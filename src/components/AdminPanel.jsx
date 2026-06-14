@@ -403,7 +403,9 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     setDiscordTesting(true);
     setSmtpMsg(null);
     try {
-      const res = await testDiscordWebhook(smtp.discordWebhook.trim());
+      const safeWebhook = smtp.discordWebhook.trim();
+      const res = await testDiscordWebhook(safeWebhook);
+      await saveSmtpConfig({ ...smtp, discordWebhook: safeWebhook });
       setSmtpMsg({ type: 'success', text: res.message || 'Discord Testnachricht gesendet.' });
     } catch (err) {
       setSmtpMsg({ type: 'error', text: err.message });

@@ -67,6 +67,59 @@ test('Admin kann Datenbank exportieren und dasselbe Backup wieder importieren', 
   assert.ok(importBody.summary, 'Import muss eine Zusammenfassung liefern');
 });
 
+test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angemeldete Benutzer', async () => {
+  const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+  const userToken = await login(USER_EMAIL, USER_PASSWORD);
+  const exportRes = await fetch(`${BASE_URL}/admin/database/export`, {
+    headers: authHeaders(adminToken),
+  });
+  assert.strictEqual(exportRes.status, 200);
+  const backup = await exportRes.json();
+
+  try {
+    const webhookUrl = 'https://discord.com/api/webhooks/123456789/test-token';
+    const saveRes = await fetch(`${BASE_URL}/admin/smtp`, {
+      method: 'POST',
+      headers: authHeaders(adminToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        host: '',
+        port: 587,
+        secure: false,
+        auth: { user: '', pass: '' },
+        fromName: 'Koffein-Tracker',
+        fromEmail: '',
+        baseUrl: '',
+        registrationEnabled: true,
+        demoEnabled: true,
+        discordWebhook: webhookUrl,
+      }),
+    });
+    assert.strictEqual(saveRes.status, 200, `Expected 200 OK, got ${saveRes.status}`);
+
+    const getRes = await fetch(`${BASE_URL}/admin/smtp`, {
+      headers: authHeaders(adminToken),
+    });
+    assert.strictEqual(getRes.status, 200);
+    const cfg = await getRes.json();
+    assert.strictEqual(cfg.discordWebhook, webhookUrl);
+
+    const scheduleRes = await fetch(`${BASE_URL}/ai/schedule-discord`, {
+      method: 'POST',
+      headers: authHeaders(userToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ time: '23:59', message: 'Testnachricht' }),
+    });
+    assert.strictEqual(scheduleRes.status, 200, `Expected 200 OK, got ${scheduleRes.status}`);
+    const scheduleBody = await scheduleRes.json();
+    assert.strictEqual(scheduleBody.success, true);
+  } finally {
+    await fetch(`${BASE_URL}/admin/database/import`, {
+      method: 'POST',
+      headers: authHeaders(adminToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ backup }),
+    });
+  }
+});
+
 test('Log-API ist pro Benutzer geschuetzt und bleibt editierbar', async () => {
   const unauthenticatedCreate = await fetch(`${BASE_URL}/logs`, {
     method: 'POST',
