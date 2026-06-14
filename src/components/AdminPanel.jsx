@@ -309,10 +309,10 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       downloadFile(
         JSON.stringify(backup, null, 2),
-        `koffein-db-backup-${stamp}.json`,
-        'application/json;charset=utf-8;'
+        `koffein-db-backup-${stamp}.db`,
+        'application/vnd.koffein-tracker.database+json;charset=utf-8;'
       );
-      setDbBackupMsg({ type: 'success', text: 'Datenbank-Backup wurde heruntergeladen.' });
+      setDbBackupMsg({ type: 'success', text: 'Datenbank-Backup wurde als .db-Datei heruntergeladen.' });
     } catch (err) {
       setDbBackupMsg({ type: 'error', text: err.message || 'Backup fehlgeschlagen.' });
     } finally {
@@ -345,7 +345,8 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         handleRedisCheck(),
       ]);
     } catch (err) {
-      setDbBackupMsg({ type: 'error', text: err.message || 'Import fehlgeschlagen.' });
+      const isParseError = err instanceof SyntaxError;
+      setDbBackupMsg({ type: 'error', text: isParseError ? 'Die .db-Datei ist kein gültiges Koffein-Tracker-Backup.' : (err.message || 'Import fehlgeschlagen.') });
     } finally {
       setDbImportLoading(false);
     }
@@ -1830,7 +1831,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   <div>
                     <h4 className="text-sm font-semibold text-white">Datenbank Backup</h4>
                     <p className="text-xs text-slate-500 mt-1">
-                      Exportiert oder importiert alle Redis-Daten als JSON. Import ersetzt den aktuellen Datenbestand.
+                      Exportiert oder importiert alle Redis-Daten als .db-Datei. Import ersetzt den aktuellen Datenbestand.
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
@@ -1857,7 +1858,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                       Import
                       <input
                         type="file"
-                        accept="application/json,.json"
+                        accept=".db,application/json,.json"
                         className="hidden"
                         onChange={handleDatabaseImport}
                         disabled={dbBackupLoading || dbImportLoading}

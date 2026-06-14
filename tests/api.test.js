@@ -50,6 +50,7 @@ test('Admin kann Datenbank exportieren und dasselbe Backup wieder importieren', 
   });
 
   assert.strictEqual(exportRes.status, 200, `Expected 200 OK, got ${exportRes.status}`);
+  assert.match(exportRes.headers.get('content-disposition') || '', /\.db"/);
   const backup = await exportRes.json();
   assert.strictEqual(backup.type, 'koffein-tracker-db-export');
   assert.ok(backup.database, 'Backup muss database enthalten');

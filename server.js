@@ -2394,7 +2394,7 @@ app.get('/api/admin/database/export', requireAdmin, async (req, res) => {
     const backup = buildDatabaseExport();
     const stamp = backup.exportedAt.replace(/[:.]/g, '-');
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="koffein-db-backup-${stamp}.json"`);
+    res.setHeader('Content-Disposition', `attachment; filename="koffein-db-backup-${stamp}.db"`);
     res.json(backup);
   } catch (err) {
     console.error('GET /api/admin/database/export error:', err);
