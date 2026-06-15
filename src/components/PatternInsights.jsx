@@ -30,12 +30,12 @@ const PatternInsights = ({ insights }) => {
         <div className="rounded-2xl bg-blue-500/10 border border-blue-500/20 p-3">
           <Clock className="w-4 h-4 text-blue-300 mb-2" />
           <p className="text-xl font-bold text-white">{insights.lateDrinkCount || 0}</p>
-          <p className="text-xs text-slate-500">spaete Eintraege</p>
+          <p className="text-xs text-slate-500">späte Einträge</p>
         </div>
         <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-3">
           <BarChart2 className="w-4 h-4 text-red-300 mb-2" />
           <p className="text-xl font-bold text-white">{insights.overLimitDays || 0}</p>
-          <p className="text-xs text-slate-500">Tage ueber Limit</p>
+          <p className="text-xs text-slate-500">Tage über Limit</p>
         </div>
       </div>
 
@@ -43,7 +43,7 @@ const PatternInsights = ({ insights }) => {
         <div>
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <Coffee className="w-4 h-4 text-amber-300" />
-            Haeufigste Getraenke
+            Häufigste Getränke
           </h3>
           <div className="space-y-2">
             {topDrinks.map((drink) => (

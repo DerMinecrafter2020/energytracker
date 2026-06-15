@@ -101,9 +101,9 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
       setView('reset');
     }
     const v = params.get('verified');
-    if (v === '1') setVerifiedBanner({ type: 'success', text: 'E-Mail erfolgreich besttigt! Du kannst dich jetzt anmelden.' });
-    else if (v === 'expired') setVerifiedBanner({ type: 'warning', text: 'Der Besttigungslink ist abgelaufen. Bitte registriere dich erneut.' });
-    else if (v === 'invalid') setVerifiedBanner({ type: 'error', text: 'Ungltiger Besttigungslink.' });
+    if (v === '1') setVerifiedBanner({ type: 'success', text: 'E-Mail erfolgreich bestätigt! Du kannst dich jetzt anmelden.' });
+    else if (v === 'expired') setVerifiedBanner({ type: 'warning', text: 'Der Bestätigungslink ist abgelaufen. Bitte registriere dich erneut.' });
+    else if (v === 'invalid') setVerifiedBanner({ type: 'error', text: 'Ungültiger Bestätigungslink.' });
     if (v) window.history.replaceState({}, '', window.location.pathname);
   }, []);
 
@@ -122,8 +122,8 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
     if (password.length < 8) return setError('Passwort muss mindestens 8 Zeichen lang sein.');
     setIsLoading(true); setError(''); setMsg(null);
     try {
-      await authRequest('/api/auth/reset-password', { token: resetToken, newPassword: password }, 'Fehler beim Zurcksetzen.');
-      setMsg({ type: 'success', text: 'Dein Passwort wurde erfolgreich gendert. Du kannst dich jetzt anmelden.' });
+      await authRequest('/api/auth/reset-password', { token: resetToken, newPassword: password }, 'Fehler beim Zurücksetzen.');
+      setMsg({ type: 'success', text: 'Dein Passwort wurde erfolgreich geändert. Du kannst dich jetzt anmelden.' });
       setView('login'); setPassword('');
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (err) { setError(err.message); } finally { setIsLoading(false); }
@@ -131,7 +131,7 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password) { setError('Bitte alle Felder ausfllen.'); return; }
+    if (!email.trim() || !password) { setError('Bitte alle Felder ausfüllen.'); return; }
     setError('');
     setIsLoading(true);
     try {
@@ -255,7 +255,7 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
           <div className="space-y-4">
             <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200">
               <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" />Zweiter Faktor erforderlich</p>
-              <p className="text-violet-300/90 mt-1">Fr {pending2FA.user?.email} muss die Anmeldung besttigt werden.</p>
+              <p className="text-violet-300/90 mt-1">Für {pending2FA.user?.email} muss die Anmeldung bestätigt werden.</p>
             </div>
 
             {pending2FA.methods?.totp && (
@@ -271,7 +271,7 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
                     bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500
                     disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Code prfen
+                  Code prüfen
                 </button>
               </div>
             )}
@@ -280,7 +280,7 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
               <>
               {!webauthnSupported && (
                 <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
-                  Passkey-Login wird von diesem Browser nicht untersttzt. Nutze den 2FA-Code.
+                  Passkey-Login wird von diesem Browser nicht unterstützt. Nutze den 2FA-Code.
                 </div>
               )}
               <button
@@ -291,7 +291,7 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
                   bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500
                   disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <KeyRound className="w-4 h-4" /> Mit Sicherheitsschlssel anmelden
+                <KeyRound className="w-4 h-4" /> Mit Sicherheitsschlüssel anmelden
               </button>
               </>
             )}
@@ -305,7 +305,7 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
               }}
               className="w-full py-2 text-sm text-slate-400 hover:text-slate-300 transition-colors"
             >
-              Zurck zur normalen Anmeldung
+              Zurück zur normalen Anmeldung
             </button>
           </div>
           )}
@@ -357,7 +357,6 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
 };
 
 export default LoginPage;
-
 
 
 

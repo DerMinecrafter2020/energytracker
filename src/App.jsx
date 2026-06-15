@@ -343,7 +343,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const dailyLimit = settings?.dailyLimit || todayStats?.dailyLimit || 400;
   const selectedDateLabel = isSelectedDateToday ? 'Heute' : formatDateLabel(selectedDate);
   const remainingCaffeine = Math.max(0, dailyLimit - selectedDateCaffeine);
-  const aiContextSummary = `${selectedDateLabel}: ${selectedDateCaffeine} mg, ${logs.length} Eintraege, Limit ${dailyLimit} mg`;
+  const aiContextSummary = `${selectedDateLabel}: ${selectedDateCaffeine} mg, ${logs.length} Einträge, Limit ${dailyLimit} mg`;
 
   
   
@@ -518,7 +518,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
               <div className="glass-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 min-w-0">
                 <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-2 min-w-0">
                   <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-300 shrink-0" />
-                  Eintraege
+                  Einträge
                 </div>
                 <p className="text-sm sm:text-lg font-bold text-white truncate">{logs.length}</p>
               </div>

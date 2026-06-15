@@ -59,9 +59,9 @@ const renderPrintableHtml = ({ items, summary }) => `
       <h1>Koffein Export</h1>
       <div class="meta">${htmlEscape(summary.start)} bis ${htmlEscape(summary.end)}</div>
       <div class="cards">
-        <div class="card"><div class="value">${summary.logCount}</div><div>Eintraege</div></div>
+        <div class="card"><div class="value">${summary.logCount}</div><div>Einträge</div></div>
         <div class="card"><div class="value">${summary.totalCaffeine} mg</div><div>Koffein</div></div>
-        <div class="card"><div class="value">${summary.totalSize} ml</div><div>Getraenke</div></div>
+        <div class="card"><div class="value">${summary.totalSize} ml</div><div>Getränke</div></div>
       </div>
       <table>
         <thead>
@@ -105,7 +105,7 @@ const ExportPanel = ({ userIdentity }) => {
     try {
       const data = await loadExport();
       downloadFile(buildCsv(data.items), `koffein-export-${filenameRange}.csv`, 'text/csv;charset=utf-8;');
-      setMessage(`${data.summary.logCount} Eintraege exportiert.`);
+      setMessage(`${data.summary.logCount} Einträge exportiert.`);
     } catch (err) {
       setMessage(err.message);
     } finally {
@@ -116,7 +116,7 @@ const ExportPanel = ({ userIdentity }) => {
   const handlePdf = async () => {
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) {
-      setMessage('Popup blockiert. Bitte Popups fuer diese Seite erlauben.');
+      setMessage('Popup blockiert. Bitte Popups für diese Seite erlauben.');
       return;
     }
 
@@ -130,7 +130,7 @@ const ExportPanel = ({ userIdentity }) => {
       printWindow.document.close();
       printWindow.focus();
       setTimeout(() => printWindow.print(), 250);
-      setMessage(`${data.summary.logCount} Eintraege fuer PDF vorbereitet.`);
+      setMessage(`${data.summary.logCount} Einträge für PDF vorbereitet.`);
     } catch (err) {
       printWindow.close();
       setMessage(err.message);

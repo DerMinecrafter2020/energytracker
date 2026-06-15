@@ -97,9 +97,9 @@ const renderAdminPrintableHtml = ({ items, summary }) => `
       <h1>Admin Export</h1>
       <div class="meta">${htmlEscape(summary.start)} bis ${htmlEscape(summary.end)}</div>
       <div class="cards">
-        <div class="card"><div class="value">${summary.logCount}</div><div>Eintraege</div></div>
+        <div class="card"><div class="value">${summary.logCount}</div><div>Einträge</div></div>
         <div class="card"><div class="value">${summary.totalCaffeine} mg</div><div>Koffein</div></div>
-        <div class="card"><div class="value">${summary.totalSize} ml</div><div>Getraenke</div></div>
+        <div class="card"><div class="value">${summary.totalSize} ml</div><div>Getränke</div></div>
       </div>
       <table>
         <thead>
@@ -507,7 +507,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         recentLogs: Array.isArray(data.recentLogs) ? data.recentLogs : [],
       });
     } catch (err) {
-      setAdminActivityMsg({ type: 'error', text: 'Fehler beim Laden der Aktivitaet: ' + err.message });
+      setAdminActivityMsg({ type: 'error', text: 'Fehler beim Laden der Aktivität: ' + err.message });
     } finally {
       setAdminActivityLoading(false);
     }
@@ -527,7 +527,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       const items = Array.isArray(data.items) ? data.items : [];
       const summary = data.summary || { start: exportStart, end: exportEnd, logCount: items.length, totalCaffeine: 0, totalSize: 0 };
       downloadFile(buildAdminCsv(items), `koffein-admin-${summary.start}-${summary.end}.csv`, 'text/csv;charset=utf-8;');
-      setExportMsg({ type: 'success', text: `${summary.logCount} Eintraege exportiert.` });
+      setExportMsg({ type: 'success', text: `${summary.logCount} Einträge exportiert.` });
     } catch (err) {
       setExportMsg({ type: 'error', text: err.message });
     } finally {
@@ -538,7 +538,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const handleAdminPdfExport = async () => {
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) {
-      setExportMsg({ type: 'error', text: 'Popup blockiert. Bitte Popups fuer diese Seite erlauben.' });
+      setExportMsg({ type: 'error', text: 'Popup blockiert. Bitte Popups für diese Seite erlauben.' });
       return;
     }
 
@@ -554,7 +554,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       printWindow.document.close();
       printWindow.focus();
       setTimeout(() => printWindow.print(), 250);
-      setExportMsg({ type: 'success', text: `${summary.logCount} Eintraege fuer PDF vorbereitet.` });
+      setExportMsg({ type: 'success', text: `${summary.logCount} Einträge für PDF vorbereitet.` });
     } catch (err) {
       printWindow.close();
       setExportMsg({ type: 'error', text: err.message });
@@ -1359,7 +1359,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <h2 className="font-semibold text-white flex items-center gap-2">
                 <Activity className="w-5 h-5 text-green-400" />
-                Admin-Aktivitaet
+                Admin-Aktivität
               </h2>
               <button onClick={loadAdminActivity} disabled={adminActivityLoading}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl glass-card
@@ -1410,7 +1410,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
                   <Coffee className="w-5 h-5 text-amber-400" />
-                  Meistgenutzte Getraenke
+                  Meistgenutzte Getränke
                 </h3>
                 {adminActivityLoading ? (
                   <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-10 shimmer rounded-xl" />)}</div>
@@ -1437,12 +1437,12 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-red-400" />
-                  Benutzer ueber Limit
+                  Benutzer über Limit
                 </h3>
                 {adminActivityLoading ? (
                   <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-10 shimmer rounded-xl" />)}</div>
                 ) : adminActivity.usersOverLimit.length === 0 ? (
-                  <p className="text-sm text-slate-500">Heute ist niemand ueber Limit.</p>
+                  <p className="text-sm text-slate-500">Heute ist niemand über Limit.</p>
                 ) : (
                   <div className="space-y-2">
                     {adminActivity.usersOverLimit.map((user) => (
@@ -1480,10 +1480,10 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               <div className="glass-card rounded-2xl p-6">
                 <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
                   <Database className="w-5 h-5 text-blue-400" />
-                  Neueste Eintraege
+                  Neueste Einträge
                 </h3>
                 {adminActivity.recentLogs.length === 0 ? (
-                  <p className="text-sm text-slate-500">Keine aktuellen Eintraege.</p>
+                  <p className="text-sm text-slate-500">Keine aktuellen Einträge.</p>
                 ) : (
                   <div className="space-y-2">
                     {adminActivity.recentLogs.slice(0, 8).map((log) => (

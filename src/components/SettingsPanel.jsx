@@ -375,7 +375,7 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
             />
           </div>
           <p className="text-xs text-slate-500 mt-1.5">
-            Wird fuer Schlaf-Warnungen und die Koffein-Abbaukurve genutzt.
+            Wird für Schlaf-Warnungen und die Koffein-Abbaukurve genutzt.
           </p>
         </div>
 

@@ -47,7 +47,7 @@ const PeriodCard = ({ title, subtitle, period, color }) => {
         </div>
         <div>
           <p className="text-sm font-semibold text-white">{period?.daysOverLimit || 0}</p>
-          <p className="text-[10px] text-slate-500">ueber Limit</p>
+          <p className="text-[10px] text-slate-500">über Limit</p>
         </div>
       </div>
     </div>

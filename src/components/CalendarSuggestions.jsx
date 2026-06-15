@@ -33,11 +33,11 @@ const CalendarSuggestions = ({ selectedDate, logs = [], totalCaffeine = 0, daily
     });
 
     if (total > limit) {
-      items.push(`Dieser Tag liegt ${total - limit} mg ueber deinem Limit. Eine kurze Analyse koennte helfen.`);
+      items.push(`Dieser Tag liegt ${total - limit} mg über deinem Limit. Eine kurze Analyse könnte helfen.`);
     } else if (logs.length > 0) {
       items.push(`Dieser Tag liegt bei ${total} mg von ${limit} mg und bleibt im Rahmen.`);
     } else {
-      items.push('An diesem Tag sind noch keine Eintraege vorhanden.');
+      items.push('An diesem Tag sind noch keine Einträge vorhanden.');
     }
 
     if (lateLogs.length > 0) {

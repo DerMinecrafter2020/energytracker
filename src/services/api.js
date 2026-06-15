@@ -58,7 +58,7 @@ export const createLog = (logData) =>
   post('/api/logs', logData, 'Fehler beim Speichern des Logs');
 
 export const deleteLog = (id) =>
-  del(`/api/logs/${id}`, undefined, 'Fehler beim Loeschen des Logs');
+  del(`/api/logs/${id}`, undefined, 'Fehler beim Löschen des Logs');
 
 export const fetchReminderSettings = (user) =>
   get('/api/reminders/me', identity(user), 'Fehler beim Laden der Erinnerungen');
@@ -85,19 +85,19 @@ export const updateUserProfile = (payload) =>
   post('/api/user/profile', payload, 'Fehler beim Aktualisieren des Profils');
 
 export const fetchCustomDrinks = async (user) =>
-  (await get('/api/custom-drinks/me', identity(user), 'Fehler beim Abrufen der Getraenke')).items || [];
+  (await get('/api/custom-drinks/me', identity(user), 'Fehler beim Abrufen der Getränke')).items || [];
 
 export const addCustomDrink = async (payload) =>
-  (await post('/api/custom-drinks/me', payload, 'Fehler beim Hinzufuegen des Getraenks')).item;
+  (await post('/api/custom-drinks/me', payload, 'Fehler beim Hinzufügen des Getränks')).item;
 
 export const removeCustomDrink = ({ userId, email, drinkId }) =>
-  del('/api/custom-drinks/me', { userId, email, drinkId }, 'Fehler beim Loeschen des Getraenks');
+  del('/api/custom-drinks/me', { userId, email, drinkId }, 'Fehler beim Löschen des Getränks');
 
 export const fetchTodayStats = (user) =>
   get('/api/stats/today', identity(user), 'Fehler beim Abrufen der Statistiken');
 
 export const fetchStatsOverview = (user) =>
-  get('/api/stats/overview', identity(user), 'Fehler beim Abrufen der Zieluebersicht');
+  get('/api/stats/overview', identity(user), 'Fehler beim Abrufen der Zielübersicht');
 
 export const fetchWeeklyStats = async (user) =>
   (await get('/api/stats/weekly', identity(user), 'Fehler beim Abrufen der Wochenstatistiken')).items || [];
@@ -127,10 +127,10 @@ export const verifyPasskeyRegistration = (payload) =>
   post('/api/security/passkeys/register/verify', payload, 'Passkey-Registrierung fehlgeschlagen');
 
 export const removePasskey = ({ userId, email, credentialId }) =>
-  del(`/api/security/passkeys/${encodeURIComponent(credentialId)}`, { userId, email }, 'Sicherheitsschluessel konnte nicht geloescht werden');
+  del(`/api/security/passkeys/${encodeURIComponent(credentialId)}`, { userId, email }, 'Sicherheitsschlüssel konnte nicht gelöscht werden');
 
 export const fetchPublicSettings = () =>
-  get('/api/settings/public', undefined, 'Fehler beim Laden der oeffentlichen Einstellungen');
+  get('/api/settings/public', undefined, 'Fehler beim Laden der öffentlichen Einstellungen');
 
 export const updateAppName = (appName) =>
   post('/api/admin/app-name', { appName }, 'Fehler beim Speichern', true);
@@ -142,7 +142,7 @@ export const adminUpdateLog = (id, data) =>
   put(`/api/admin/logs/${id}`, data, 'Fehler beim Aktualisieren', true);
 
 export const adminDeleteLog = (id) =>
-  del(`/api/admin/logs/${id}`, undefined, 'Fehler beim Loeschen', true);
+  del(`/api/admin/logs/${id}`, undefined, 'Fehler beim Löschen', true);
 
 export const testDiscordWebhook = (webhookUrl) =>
   post('/api/admin/discord/test', { webhookUrl }, 'Fehler beim Discord Test');

@@ -534,8 +534,8 @@ const AIAssistant = ({
   const selectedDateLabel = formatDateLabel(selectedDate) || selectedDate || 'dem gewaehlten Tag';
   const quickPrompts = [
     `Analysiere ${selectedDateLabel} und sag mir, was ich verbessern kann.`,
-    `Zeig mir die IDs der Eintraege fuer ${selectedDateLabel}.`,
-    `Fuege fuer ${selectedDateLabel} einen Kaffee mit 250 ml und 100 mg Koffein hinzu.`,
+    `Zeig mir die IDs der Einträge für ${selectedDateLabel}.`,
+    `Füge für ${selectedDateLabel} einen Kaffee mit 250 ml und 100 mg Koffein hinzu.`,
   ];
 
   const usePrompt = (prompt) => {
@@ -716,7 +716,7 @@ const AIAssistant = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder={primary ? 'Frag die KI oder steuere deine Eintraege...' : 'Kommando oder Frage eingeben...'}
+            placeholder={primary ? 'Frag die KI oder steuere deine Einträge...' : 'Kommando oder Frage eingeben...'}
             className="w-full bg-black/20 border border-white/10 text-white placeholder-slate-500 rounded-2xl pl-4 sm:pl-5 pr-14 py-3.5 sm:py-4 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none custom-scrollbar"
             rows="1"
             style={{ minHeight: '52px', maxHeight: '112px' }}

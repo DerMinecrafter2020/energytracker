@@ -133,7 +133,7 @@ const requireAuth = (req, res, next) => {
       ? { id: payload.sub, name: payload.name, email: payload.email, role: payload.role }
       : null;
     const effectiveUser = user || fallbackUser;
-    if (!effectiveUser) return res.status(401).json({ error: 'Sitzung ist ungueltig.' });
+    if (!effectiveUser) return res.status(401).json({ error: 'Sitzung ist ungültig.' });
 
     req.user = effectiveUser;
     req.auth = {
@@ -143,7 +143,7 @@ const requireAuth = (req, res, next) => {
     };
     next();
   } catch (err) {
-    res.status(401).json({ error: 'Sitzung ist ungueltig.' });
+    res.status(401).json({ error: 'Sitzung ist ungültig.' });
   }
 };
 
@@ -780,7 +780,7 @@ const saveSmtpConfig = async (cfg) => {
   const discordWebhook = hasDiscordWebhook ? String(cfg.discordWebhook || '').trim() : (current?.discordWebhook || '');
 
   if (discordWebhook && !isValidDiscordWebhookUrl(discordWebhook)) {
-    throw new Error('Ungueltige Discord Webhook URL.');
+    throw new Error('Ungültige Discord Webhook URL.');
   }
 
   await dbPool.execute(
@@ -817,7 +817,7 @@ const saveSmtpConfig = async (cfg) => {
 };
 
 const initDb = async () => {
-  console.log('[DB] ðŸ—„ï¸  Starte Redis-Datenbank...');
+  console.log('[DB] Starte Redis-Datenbank...');
   getPool();
   await loadDbState();
   console.log(`[DB] ✓ Redis bereit: ${redisUrl}`);
@@ -1576,7 +1576,7 @@ const buildAchievements = ({ logs, dailyLimit }) => {
     {
       id: 'tracked-7',
       title: '7 Tage getrackt',
-      description: 'Sieben verschiedene Tage mit Eintraegen im letzten Monat.',
+      description: 'Sieben verschiedene Tage mit Einträgen im letzten Monat.',
       progress: Math.min(trackedDays, 7),
       target: 7,
       unlocked: trackedDays >= 7,
@@ -1632,10 +1632,10 @@ const getUserInsights = ({ userId, email }) => {
 
   const messages = [];
   if (topWeekday) messages.push(`Du trinkst an ${topWeekday.label}en besonders viel Koffein (${topWeekday.total} mg in 30 Tagen).`);
-  if (lateDrinks.length > 0) messages.push(`${lateDrinks.length} Eintraege lagen nach 18:00 Uhr. Deine Schlaf-Warnung ist hier besonders sinnvoll.`);
-  if (topDrink) messages.push(`${topDrink.name} ist dein haeufigstes Getraenk (${topDrink.count}x).`);
-  if (overLimitDays.length > 0) messages.push(`${overLimitDays.length} Tage lagen im letzten Monat ueber deinem Limit.`);
-  if (messages.length === 0) messages.push('Noch zu wenig Daten fuer robuste Muster. Tracke ein paar Tage weiter.');
+  if (lateDrinks.length > 0) messages.push(`${lateDrinks.length} Einträge lagen nach 18:00 Uhr. Deine Schlaf-Warnung ist hier besonders sinnvoll.`);
+  if (topDrink) messages.push(`${topDrink.name} ist dein häufigstes Getränk (${topDrink.count}x).`);
+  if (overLimitDays.length > 0) messages.push(`${overLimitDays.length} Tage lagen im letzten Monat über deinem Limit.`);
+  if (messages.length === 0) messages.push('Noch zu wenig Daten für robuste Muster. Tracke ein paar Tage weiter.');
 
   return {
     range: { start, end },
@@ -2340,7 +2340,7 @@ app.post('/api/admin/smtp/test', requireAdmin, async (req, res) => {
       to:      testEmail,
       subject: 'Koffein-Tracker \u2013 SMTP Test \u2713',
       html:    buildModernEmail({
-        icon: 'âœ‰ï¸',
+        icon: '✉️',
         headerText: 'SMTP Test Erfolgreich',
         contentHtml: '<p style="text-align: center; margin: 0;">Der SMTP-Server ist korrekt konfiguriert. Diese E-Mail bestätigt die erfolgreiche Verbindung.</p>',
       }),
@@ -2473,7 +2473,7 @@ app.post('/api/admin/database/import', requireAdmin, async (req, res) => {
   try {
     const payload = req.body?.backup || req.body;
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      return res.status(400).json({ error: 'Ungueltige Backup-Datei.' });
+      return res.status(400).json({ error: 'Ungültige Backup-Datei.' });
     }
     if (!hasDatabaseShape(payload)) {
       return res.status(400).json({ error: 'Backup enthaelt keine erkennbaren Datenbankfelder.' });
