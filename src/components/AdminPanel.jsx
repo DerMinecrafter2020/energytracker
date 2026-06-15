@@ -1654,7 +1654,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                 Discord KI-Bot Webhook
               </h3>
               <p className="text-xs text-slate-500">
-                Hinterlege hier den Discord Webhook, über den der KI-Bot geplante Nachrichten sendet.
+                Hinterlege hier den Discord Webhook, über den der KI-Bot geplante Nachrichten sowie Meldungen zu hinzugefügten oder gelöschten Einträgen sendet.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input type="url" value={smtp.discordWebhook || ''} onChange={(e) => setSmtp({ ...smtp, discordWebhook: e.target.value })}

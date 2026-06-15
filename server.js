@@ -1816,9 +1816,45 @@ const sendDiscordReminder = async ({ webhookUrl, email, title, message }) => {
         footer: { text: 'Koffein-Tracker' }
       }]
     }),
+    signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) {
     throw new Error(`Discord Webhook Fehler (${response.status})`);
+  }
+};
+
+const formatDiscordLogDate = (dateKey) => {
+  if (!isValidDateKey(dateKey)) return String(dateKey || 'unbekannt');
+  return parseDateKey(dateKey).toLocaleDateString('de-DE', { timeZone: APP_TIME_ZONE });
+};
+
+const sendDiscordLogChangeNotification = async ({ action, log, actorEmail }) => {
+  try {
+    const cfg = await loadSmtpConfig();
+    if (!cfg?.discordWebhook || !log) return;
+
+    const isDelete = action === 'deleted';
+    const title = isDelete ? 'Eintrag gelöscht' : 'Eintrag hinzugefügt';
+    const actor = actorEmail || log.email || 'unbekannt';
+    const dateLabel = formatDiscordLogDate(log.date);
+    const icon = log.icon || (isDelete ? '🗑️' : '🥤');
+    const message = [
+      `**Benutzer:** ${actor}`,
+      `**Datum:** ${dateLabel}`,
+      `**Getränk:** ${icon} ${log.name || 'Getränk'}`,
+      `**Menge:** ${Number(log.size) || 0} ml`,
+      `**Koffein:** ${Number(log.caffeine) || 0} mg`,
+      log.id ? `**ID:** ${log.id}` : null,
+    ].filter(Boolean).join('\n');
+
+    await sendDiscordReminder({
+      webhookUrl: cfg.discordWebhook,
+      email: actor,
+      title,
+      message,
+    });
+  } catch (err) {
+    console.error('[Discord Log Notify] Fehler:', err.message);
   }
 };
 
@@ -2087,6 +2123,11 @@ app.post('/api/logs', requireAuth, async (req, res) => {
     );
     
     const newLog = rows[0];
+    sendDiscordLogChangeNotification({
+      action: 'created',
+      log: newLog,
+      actorEmail: email,
+    });
 
     // Notification Logic
     if (email) {
@@ -2180,6 +2221,11 @@ app.delete('/api/logs/:id', requireAuth, async (req, res) => {
     if (!canAccessLog(req, existingLog)) return res.status(403).json({ error: 'Kein Zugriff auf diesen Eintrag.' });
 
     await dbPool.execute('DELETE FROM caffeine_logs WHERE id = ?', [id]);
+    sendDiscordLogChangeNotification({
+      action: 'deleted',
+      log: existingLog,
+      actorEmail: req.auth?.email,
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -2205,8 +2251,16 @@ app.put('/api/admin/logs/:id', requireAdmin, async (req, res) => {
 app.delete('/api/admin/logs/:id', requireAdmin, async (req, res) => {
   try {
     const dbPool = getPool();
+    const [existingRows] = await dbPool.execute('SELECT * FROM caffeine_logs WHERE id = ?', [req.params.id]);
+    const existingLog = existingRows[0];
+    if (!existingLog) return res.status(404).json({ error: 'Log nicht gefunden.' });
     const [result] = await dbPool.execute('DELETE FROM caffeine_logs WHERE id = ?', [req.params.id]);
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Log nicht gefunden.' });
+    sendDiscordLogChangeNotification({
+      action: 'deleted',
+      log: existingLog,
+      actorEmail: req.auth?.email,
+    });
     res.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/admin/logs/:id error:', err);
