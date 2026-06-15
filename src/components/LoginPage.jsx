@@ -70,7 +70,7 @@ const authRequest = async (path, body, fallback) => {
   return data;
 };
 
-const LoginPage = ({ onLogin, onShowRegister }) => {
+const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
@@ -202,6 +202,8 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
             <h2 className="text-2xl font-bold text-white">Willkommen zurück</h2>
             <p className="text-slate-400 text-sm mt-1">Bitte melde dich an, um fortzufahren.</p>
           </div>
+
+        {initialMessage && <AlertBox type="warning">{initialMessage}</AlertBox>}
 
         {verifiedBanner && <AlertBox type={verifiedBanner.type}>{verifiedBanner.text}</AlertBox>}
 
@@ -355,7 +357,6 @@ const LoginPage = ({ onLogin, onShowRegister }) => {
 };
 
 export default LoginPage;
-
 
 
 

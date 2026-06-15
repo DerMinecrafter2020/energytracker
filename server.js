@@ -22,10 +22,12 @@ import {
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
+if (!process.env.TZ) process.env.TZ = 'Europe/Berlin';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DB_TYPE = 'redis';
+const APP_TIME_ZONE = process.env.TZ || 'Europe/Berlin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -845,7 +847,10 @@ const callOpenRouter = async (messages, { model, apiKey, tools } = {}) => {
   if (!key) throw new Error('Kein OpenRouter API-Key konfiguriert. Bitte im Admin-Panel eintragen.');
 
   const payload = { model: mdl, messages };
-  if (tools && tools.length > 0) payload.tools = tools;
+  if (tools && tools.length > 0) {
+    payload.tools = tools;
+    payload.tool_choice = 'auto';
+  }
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -866,7 +871,10 @@ const callOpenRouter = async (messages, { model, apiKey, tools } = {}) => {
 
   const data = await response.json();
   const msg = data.choices?.[0]?.message;
-  return { content: msg?.content || '', tool_calls: msg?.tool_calls || [] };
+  const legacyFunctionCall = msg?.function_call
+    ? [{ type: 'function', function: msg.function_call }]
+    : [];
+  return { content: msg?.content || '', tool_calls: msg?.tool_calls || legacyFunctionCall };
 };
 
 const OFF_SEARCH_URL     = 'https://world.openfoodfacts.org/cgi/search.pl';
@@ -1325,7 +1333,7 @@ const getWeeklyStats = ({ userId, email }) => {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    week.push(d.toISOString().split('T')[0]);
+    week.push(toDateKey(d));
   }
 
   const stats = week.map((dateStr) => {
@@ -1359,7 +1367,7 @@ const getDailyStats = (date) => {
 };
 
 const getTodayStats = ({ userId, email }) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayKey();
   const logsForToday = dbState.caffeine_logs.filter((log) => {
     const matchId = userId && String(log.userId) === String(userId);
     const matchEmail = email && String(log.email).toLowerCase() === String(email).toLowerCase();
@@ -1398,7 +1406,12 @@ const parseDateKey = (value) => {
   return new Date(Date.UTC(year, month - 1, day));
 };
 
-const toDateKey = (date) => date.toISOString().slice(0, 10);
+const toDateKey = (date) => new Intl.DateTimeFormat('sv-SE', {
+  timeZone: APP_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}).format(date);
 
 const addDays = (date, days) => new Date(date.getTime() + days * DAY_MS);
 
@@ -2058,7 +2071,7 @@ app.post('/api/logs', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'name, size, caffeine are required' });
     }
 
-    const safeDate = date || new Date().toISOString().split('T')[0];
+    const safeDate = isValidDateKey(date) ? date : getTodayKey();
 
     const dbPool = getPool();
     const [result] = await dbPool.execute(
@@ -3696,7 +3709,7 @@ app.post('/api/ai/chat', requireAuth, async (req, res) => {
         return res.status(400).json({ error: 'Nachricht zu lang (max. 2000 Zeichen).' });
     }
 
-    const today = /^\d{4}-\d{2}-\d{2}$/.test(String(clientDate || '')) ? clientDate : new Date().toISOString().split('T')[0];
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(String(clientDate || '')) ? clientDate : getTodayKey();
     const selectedLogDate = /^\d{4}-\d{2}-\d{2}$/.test(String(selectedDate || '')) ? selectedDate : today;
     const caffeineInfo = typeof totalCaffeineToday === 'number'
       ? `Koffein am aktuell ausgewählten Tag (${selectedLogDate}): ${totalCaffeineToday}mg von ${dailyLimit || 400}mg Tageslimit.`
@@ -3707,9 +3720,9 @@ app.post('/api/ai/chat', requireAuth, async (req, res) => {
     const systemPrompt = `Du bist ein hilfreicher Assistent für den Drink-Tracker (Version 2.0). Du beantwortest Fragen zu Hydration, Kalorien, Energie und Getränken auf Deutsch. Sei präzise, freundlich und praxisnah. ${timeInfo} ${caffeineInfo}
 ${logsInfo}
 
-Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, nutze die zur Verfügung gestellten Tools (Funktionen), um die Aktion auszuführen.
+Wenn der Nutzer dich bittet, ein Getränk hinzuzufügen, zu ändern oder zu löschen, nutze die zur Verfügung gestellten Tools (Funktionen), um die Aktion auszuführen. Stelle keine Rückfrage, wenn Getränk, Anzahl/Menge oder ein üblicher Koffeinwert plausibel geschätzt werden können.
 Wenn der Nutzer nach IDs, Eintrags-IDs oder einer Liste der Einträge fragt, antworte direkt mit den IDs aus der obigen Liste für ${selectedLogDate}. Behaupte niemals, dass du keine Funktion zum Anzeigen der IDs hast.
-Für Hinzufügen: Nutze add_drink nur für ein einzelnes Getränk. Wenn der Nutzer mehrere Getränke, mehrere Mengen oder Getränke für mehrere Tage nennt, nutze add_drinks und erstelle einen Eintrag pro Getränk. Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks. Nutze ein passendes Emoji. Setze date bei jedem Eintrag immer als ISO-Datum YYYY-MM-DD. Wenn der Nutzer kein Datum nennt, nutze den aktuell ausgewählten Tag ${selectedLogDate}. Wenn der Nutzer relative Tage nennt (z.B. heute, gestern, vorgestern, letzten Montag), berechne das Datum ausgehend vom aktuellen Datum ${today}. Lege keine zukünftigen Log-Einträge an.
+Für Hinzufügen: Nutze add_drink nur für ein einzelnes Getränk. Wenn der Nutzer mehrere Getränke, mehrere Mengen oder Getränke für mehrere Tage nennt, nutze add_drinks und erstelle einen Eintrag pro Getränk. Berechne Koffein basierend auf ml und üblichem Gehalt, z.B. 32mg/100ml bei Energy-Drinks, 80mg pro 250ml Red Bull, 160mg pro 500ml Monster, 100mg pro Kaffee. Nutze ein passendes Emoji. Setze date bei jedem Eintrag immer als ISO-Datum YYYY-MM-DD. Wenn der Nutzer kein Datum nennt, nutze den aktuell ausgewählten Tag ${selectedLogDate}. Wenn der Nutzer relative Tage nennt (z.B. heute, gestern, vorgestern, letzten Montag), berechne das Datum ausgehend vom aktuellen Datum ${today}. Lege keine zukünftigen Log-Einträge an. Bei Formulierungen wie "ich hatte gestern zwei Monster und heute einen Kaffee" sollst du direkt add_drinks ausführen.
 Für Ändern/Löschen (update_drink/delete_drink): Nutze exakt die ID aus der Liste der Getränke für ${selectedLogDate}.
 Für geplante Discord-Nachrichten (schedule_discord_message): Nutze dieses Tool, um eine Nachricht zu einer bestimmten Uhrzeit in Discord (Admin Webhook) posten zu lassen.
 Antworte dem Nutzer natürlich, während du die Aktion über die Tools auslöst.`.trim();
@@ -4013,7 +4026,7 @@ app.post('/api/ai/daily-summary', requireAuth, async (req, res) => {
     if (!Array.isArray(logs))
       return res.status(400).json({ error: 'logs ist erforderlich.' });
 
-    const today = /^\d{4}-\d{2}-\d{2}$/.test(String(clientDate || '')) ? clientDate : new Date().toISOString().split('T')[0];
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(String(clientDate || '')) ? clientDate : getTodayKey();
     const selectedLogDate = /^\d{4}-\d{2}-\d{2}$/.test(String(selectedDate || '')) ? selectedDate : today;
     const limit = Number(dailyLimit) || 400;
     const total = Number(totalCaffeine) || 0;

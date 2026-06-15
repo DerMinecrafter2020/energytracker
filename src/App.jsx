@@ -84,6 +84,7 @@ function App() {
   const [authView, setAuthView]   = useState(initialViewState.authView || 'login'); 
   const [adminView, setAdminView] = useState(initialViewState.adminView === 'user' ? 'user' : 'admin');
   const [adminTab, setAdminTab]   = useState(initialViewState.adminTab || 'overview');
+  const [authNotice, setAuthNotice] = useState('');
 
   const impersonator = getImpersonatorSession();
 
@@ -96,6 +97,18 @@ function App() {
     const current = loadViewState();
     saveViewState({ ...current, authView, adminTab, adminView });
   }, [authView, adminTab, adminView]);
+
+  useEffect(() => {
+    const handleAuthExpired = (event) => {
+      logout();
+      setSession(null);
+      setAuthView('login');
+      setAuthNotice(event.detail?.message || 'Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+    };
+
+    window.addEventListener('auth:expired', handleAuthExpired);
+    return () => window.removeEventListener('auth:expired', handleAuthExpired);
+  }, []);
 
   const handleImpersonate = (userData) => {
     const newSession = startImpersonation(userData);
@@ -117,7 +130,7 @@ function App() {
     return <RegisterPage onBack={() => setAuthView('login')} />;
   }
   if (!session) {
-    return <LoginPage onLogin={(s) => { setSession(s); setAdminView(s?.role === 'admin' ? getSavedAdminView() : 'admin'); }} onShowRegister={() => setAuthView('register')} />;
+    return <LoginPage initialMessage={authNotice} onLogin={(s) => { setAuthNotice(''); setSession(s); setAdminView(s?.role === 'admin' ? getSavedAdminView() : 'admin'); }} onShowRegister={() => setAuthView('register')} />;
   }
 
   if (session.role === 'admin' && adminView === 'admin') {
@@ -175,11 +188,13 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [settings, setSettings] = useState(null);
   const [favorites, setFavorites] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [todayKey, setTodayKey] = useState(getTodayKey);
   const [selectedDate, setSelectedDate] = useState(getTodayKey);
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
   const isFirstCheck = useRef(true);
+  const followTodayRef = useRef(true);
   const currentUser = useMemo(() => userPayload(session), [session?.id, session?.email]);
-  const isSelectedDateToday = selectedDate === getTodayKey();
+  const isSelectedDateToday = selectedDate === todayKey;
 
   const refreshStats = useCallback(async () => {
     if (!session?.email) return;
@@ -255,6 +270,29 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       document.documentElement.className = settings.theme === 'system' ? '' : `theme-${settings.theme}`;
     }
   }, [settings?.theme]);
+
+  useEffect(() => {
+    const refreshLocalDay = () => {
+      const nextToday = getTodayKey();
+      setTodayKey((previousToday) => {
+        if (previousToday !== nextToday && (followTodayRef.current || selectedDate === previousToday)) {
+          followTodayRef.current = true;
+          setSelectedDate(nextToday);
+        }
+        return nextToday;
+      });
+    };
+
+    refreshLocalDay();
+    const interval = window.setInterval(refreshLocalDay, 30000);
+    window.addEventListener('focus', refreshLocalDay);
+    document.addEventListener('visibilitychange', refreshLocalDay);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshLocalDay);
+      document.removeEventListener('visibilitychange', refreshLocalDay);
+    };
+  }, [selectedDate]);
 
   useEffect(() => {
     if (!onPersistScrollY) return undefined;
@@ -381,6 +419,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       const targetDate = isDateKey(drinkData?.date) ? drinkData.date : today;
       const payload = { ...drinkData, date: targetDate, ...currentUser };
       const created = await addLog(payload);
+      followTodayRef.current = targetDate === getTodayKey();
       setSelectedDate(targetDate);
       const targetLogs = await fetchTodayLogs(targetDate, currentUser);
       setLogs(targetLogs);
@@ -394,6 +433,11 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       setIsOperationLoading(false);
     }
   }, [currentUser, refreshStats]);
+
+  const handleSelectDate = useCallback((dateKey) => {
+    followTodayRef.current = dateKey === getTodayKey();
+    setSelectedDate(dateKey);
+  }, []);
 
   if (isAppLoading) {
     return (
@@ -534,7 +578,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
                 selectedDate={selectedDate}
                 logs={logs}
                 userIdentity={currentUser}
-                onSelectDate={setSelectedDate}
+                onSelectDate={handleSelectDate}
                 onUpdateLog={handleUpdateLog}
                 onDeleteLog={handleDeleteLog}
                 refreshKey={calendarRefreshKey}

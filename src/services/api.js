@@ -1,5 +1,14 @@
+import { logout } from './auth';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+const handleAuthExpired = () => {
+  logout();
+  window.dispatchEvent(new CustomEvent('auth:expired', {
+    detail: { message: 'Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.' },
+  }));
+};
 
 const authHeader = () => {
   let token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -28,6 +37,10 @@ const request = async (path, { method = 'GET', query, body, auth = false, fallba
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   const data = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    handleAuthExpired();
+    throw new Error(data.error || 'Sitzung abgelaufen. Bitte neu anmelden.');
+  }
   if (!response.ok) throw new Error(data.error || fallback);
   return data;
 };

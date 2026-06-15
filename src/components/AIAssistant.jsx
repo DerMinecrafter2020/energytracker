@@ -75,6 +75,146 @@ const toDrinkItems = (toolName, args) => {
   return [args];
 };
 
+const DRINK_PATTERNS = [
+  { pattern: /\b(monster|monster energy)\b/i, name: 'Monster Energy', size: 500, caffeine: 160, icon: '⚡' },
+  { pattern: /\b(red\s*bull|redbull)\b/i, name: 'Red Bull', size: 250, caffeine: 80, icon: '🐂' },
+  { pattern: /\b(energy|energydrink|energy-drink)\b/i, name: 'Energy Drink', size: 500, caffeine: 160, icon: '⚡' },
+  { pattern: /\b(espresso)\b/i, name: 'Espresso', size: 40, caffeine: 65, icon: '☕' },
+  { pattern: /\b(kaffee|cafe|coffee)\b/i, name: 'Kaffee', size: 250, caffeine: 100, icon: '☕' },
+  { pattern: /\b(cola|coke|coca cola|coca-cola)\b/i, name: 'Cola', size: 330, caffeine: 32, icon: '🥤' },
+  { pattern: /\b(tee|schwarztee|grüner tee|gruener tee)\b/i, name: 'Tee', size: 250, caffeine: 45, icon: '🍵' },
+];
+
+const NUMBER_WORDS = {
+  ein: 1,
+  eine: 1,
+  einen: 1,
+  einer: 1,
+  eins: 1,
+  zwei: 2,
+  drei: 3,
+  vier: 4,
+  fünf: 5,
+  fuenf: 5,
+  sechs: 6,
+  sieben: 7,
+  acht: 8,
+  neun: 9,
+  zehn: 10,
+};
+
+const addDaysToDateKey = (dateKey, offset) => {
+  const [year, month, day] = String(dateKey || getLocalDateKey()).split('-').map(Number);
+  const date = new Date(year, month - 1, day || 1);
+  date.setDate(date.getDate() + offset);
+  return getLocalDateKeyFromDate(date);
+};
+
+const getLocalDateKeyFromDate = (date) => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
+const hasKnownDrink = (text) => DRINK_PATTERNS.some((drink) => drink.pattern.test(text));
+
+const isAddDrinkIntent = (text) => {
+  const value = String(text || '').toLowerCase();
+  if (value.includes('?') && !/(füge|fuege|hinzu|trag|trage|eintragen|logge|speicher|speichere)/i.test(value)) return false;
+  return /(füge|fuege|hinzu|trag|trage|eintragen|logge|speicher|speichere|hatte|habe|hab|trank|getrunken)/i.test(value)
+    && /(getränk|getraenk|drink|kaffee|cafe|coffee|monster|red\s*bull|redbull|energy|espresso|cola|tee|mg|ml|koffein|das|es)/i.test(value);
+};
+
+const quantityBefore = (segment, index) => {
+  const before = segment.slice(Math.max(0, index - 28), index).toLowerCase();
+  const numeric = before.match(/(\d+)\s*$/);
+  if (numeric) return Math.max(1, Math.min(10, Number(numeric[1]) || 1));
+  const word = before.match(/\b(ein|eine|einen|einer|eins|zwei|drei|vier|fünf|fuenf|sechs|sieben|acht|neun|zehn)\s*$/);
+  return word ? NUMBER_WORDS[word[1]] || 1 : 1;
+};
+
+const dateFromSegment = (segment, selectedDate) => {
+  const value = String(segment || '').toLowerCase();
+  const explicit = value.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (explicit && isDateKey(explicit[1])) return explicit[1];
+  if (/\bvorgestern\b/.test(value)) return addDaysToDateKey(getLocalDateKey(), -2);
+  if (/\bgestern\b/.test(value)) return addDaysToDateKey(getLocalDateKey(), -1);
+  if (/\bheute\b/.test(value)) return getLocalDateKey();
+  if (/\bmorgen\b/.test(value)) return null;
+  return isDateKey(selectedDate) ? selectedDate : getLocalDateKey();
+};
+
+const splitByDateMarkers = (text, selectedDate) => {
+  const source = String(text || '');
+  const marker = /\b(heute|gestern|vorgestern|morgen|\d{4}-\d{2}-\d{2})\b/gi;
+  const matches = [...source.matchAll(marker)];
+  if (matches.length === 0) return [{ text: source, date: isDateKey(selectedDate) ? selectedDate : getLocalDateKey() }];
+
+  return matches.map((match, index) => {
+    const start = match.index || 0;
+    const end = matches[index + 1]?.index ?? source.length;
+    const segment = source.slice(start, end);
+    return { text: segment, date: dateFromSegment(segment, selectedDate) };
+  });
+};
+
+const parseLocalAddDrinks = (text, selectedDate, previousMessages = []) => {
+  if (!isAddDrinkIntent(text)) return [];
+
+  let source = text;
+  if (/\b(das|es)\b/i.test(text) && !hasKnownDrink(text)) {
+    const recentContext = previousMessages
+      .slice(-4)
+      .map((message) => message.content || message.summary || '')
+      .join('\n');
+    source = `${recentContext}\n${text}`;
+  }
+
+  const items = [];
+  for (const segment of splitByDateMarkers(source, selectedDate)) {
+    if (!segment.date) continue;
+    for (const drink of DRINK_PATTERNS) {
+      const match = segment.text.match(drink.pattern);
+      if (!match) continue;
+      const sizeMatch = segment.text.match(/(\d{2,4})\s*ml/i);
+      const caffeineMatch = segment.text.match(/(\d{1,4})\s*mg/i);
+      const quantity = quantityBefore(segment.text, match.index || 0);
+      for (let i = 0; i < quantity; i += 1) {
+        items.push({
+          name: drink.name,
+          size: sizeMatch ? Number(sizeMatch[1]) : drink.size,
+          caffeine: caffeineMatch ? Number(caffeineMatch[1]) : drink.caffeine,
+          icon: drink.icon,
+          date: segment.date,
+        });
+      }
+    }
+  }
+
+  if (items.length === 0 && hasKnownDrink(source)) {
+    const fallbackDate = dateFromSegment(source, selectedDate);
+    if (fallbackDate) {
+      for (const drink of DRINK_PATTERNS) {
+        const match = source.match(drink.pattern);
+        if (!match) continue;
+        const sizeMatch = source.match(/(\d{2,4})\s*ml/i);
+        const caffeineMatch = source.match(/(\d{1,4})\s*mg/i);
+        const quantity = quantityBefore(source, match.index || 0);
+        for (let i = 0; i < quantity; i += 1) {
+          items.push({
+            name: drink.name,
+            size: sizeMatch ? Number(sizeMatch[1]) : drink.size,
+            caffeine: caffeineMatch ? Number(caffeineMatch[1]) : drink.caffeine,
+            icon: drink.icon,
+            date: fallbackDate,
+          });
+        }
+      }
+    }
+  }
+
+  return items.slice(0, 20);
+};
+
 const loadLocalMessages = (storageKey) => {
   try {
     for (const key of [storageKey, legacyStorageKey]) {
@@ -221,6 +361,30 @@ const AIAssistant = ({
     }
   };
 
+  const executeAddDrinkItems = async (drinkItems) => {
+    const actions = [];
+    if (!onAddDrink || !Array.isArray(drinkItems) || drinkItems.length === 0) return actions;
+
+    for (const item of drinkItems) {
+      const targetDate = isDateKey(item.date) ? item.date : (isDateKey(selectedDate) ? selectedDate : getLocalDateKey());
+      const addedDrink = await onAddDrink({
+        name: item.name || 'Getränk',
+        size: Number(item.size) || 0,
+        caffeine: Number(item.caffeine) || 0,
+        icon: item.icon || '🤖',
+        date: targetDate,
+      });
+
+      if (addedDrink) {
+        actions.push({ type: 'drink_added', drink: addedDrink, date: addedDrink.date || targetDate });
+      } else {
+        actions.push({ type: 'text', content: `Getränk für ${formatDateLabel(targetDate) || targetDate} hinzugefügt.` });
+      }
+    }
+
+    return actions;
+  };
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -234,6 +398,25 @@ const AIAssistant = ({
         userMsg,
         { role: 'assistant', type: 'text', content: formatLogIds(logs, selectedDate) },
       ]);
+      return;
+    }
+
+    const localDrinkItems = parseLocalAddDrinks(text, selectedDate, messages);
+    if (localDrinkItems.length > 0) {
+      setMessages((prev) => [...prev, userMsg]);
+      setLoading(true);
+      try {
+        const actionsPerformed = await executeAddDrinkItems(localDrinkItems);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', type: 'text', content: `${actionsPerformed.length} Eintrag${actionsPerformed.length === 1 ? '' : 'e'} hinzugefügt.` },
+          ...actionsPerformed.map((action) => ({ role: 'assistant', ...action })),
+        ]);
+      } catch (err) {
+        setError(err.message || 'Fehler beim Hinzufügen.');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -257,34 +440,21 @@ const AIAssistant = ({
 
       if (tool_calls && tool_calls.length > 0) {
         for (const call of tool_calls) {
-          if (call.function.name === 'add_drink' || call.function.name === 'add_drinks') {
+          const toolName = call.function?.name || call.name;
+          const toolArguments = call.function?.arguments || call.arguments;
+          if (toolName === 'add_drink' || toolName === 'add_drinks') {
             try {
-              const args = parseToolArguments(call.function.arguments);
-              const drinkItems = toDrinkItems(call.function.name, args);
+              const args = parseToolArguments(toolArguments);
+              const drinkItems = toDrinkItems(toolName, args);
               if (onAddDrink && drinkItems.length > 0) {
-                for (const item of drinkItems) {
-                  const targetDate = isDateKey(item.date) ? item.date : (isDateKey(selectedDate) ? selectedDate : getLocalDateKey());
-                  const addedDrink = await onAddDrink({
-                    name: item.name || 'AI Drink',
-                    size: Number(item.size) || 0,
-                    caffeine: Number(item.caffeine) || 0,
-                    icon: item.icon || '🤖',
-                    date: targetDate,
-                  });
-
-                  if (addedDrink) {
-                    actionsPerformed.push({ type: 'drink_added', drink: addedDrink, date: addedDrink.date || targetDate });
-                  } else {
-                    actionsPerformed.push({ type: 'text', content: `Getränk für ${formatDateLabel(targetDate) || targetDate} hinzugefügt.` });
-                  }
-                }
+                actionsPerformed.push(...await executeAddDrinkItems(drinkItems));
               }
             } catch (e) {
               console.error('Fehler beim Ausführen von add_drink/add_drinks', e);
             }
-          } else if (call.function.name === 'delete_drink') {
+          } else if (toolName === 'delete_drink') {
             try {
-              const args = JSON.parse(call.function.arguments);
+              const args = parseToolArguments(toolArguments);
               if (onDeleteDrink) {
                 const match = logs.find(l => String(l.id) === String(args.id));
                 if (match) {
@@ -297,9 +467,9 @@ const AIAssistant = ({
             } catch (e) {
               console.error('Fehler beim Ausführen von delete_drink', e);
             }
-          } else if (call.function.name === 'update_drink') {
+          } else if (toolName === 'update_drink') {
             try {
-              const args = JSON.parse(call.function.arguments);
+              const args = parseToolArguments(toolArguments);
               if (onUpdateDrink) {
                 const match = logs.find(l => String(l.id) === String(args.id));
                 if (match) {
@@ -317,9 +487,9 @@ const AIAssistant = ({
             } catch (e) {
               console.error('Fehler beim Ausführen von update_drink', e);
             }
-          } else if (call.function.name === 'schedule_discord_message') {
+          } else if (toolName === 'schedule_discord_message') {
             try {
-              const args = JSON.parse(call.function.arguments);
+              const args = parseToolArguments(toolArguments);
               const data = await scheduleDiscordMessage(args.time, args.message);
               if (data && data.success) {
                 actionsPerformed.push({ type: 'discord_scheduled', time: args.time, message: args.message });
