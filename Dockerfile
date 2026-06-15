@@ -30,6 +30,7 @@ COPY --from=build /app/dist ./dist
 
 # Kopiere Server
 COPY server.js .
+COPY --from=build /app/tests ./tests
 
 
 # Declare persistent data directory

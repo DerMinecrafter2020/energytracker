@@ -64,6 +64,7 @@ export const saveAiConfig = ({ apiKey, model, braveSearchKey }) =>
 export const fetchAdminUsers = () => request('/api/admin/users');
 export const fetchAdminChatStats = () => request('/api/admin/ai/chat-stats');
 export const fetchAdminActivity = () => request('/api/admin/activity');
+export const fetchAdminApiTests = () => request('/api/admin/tests/api');
 export const fetchAdminExportLogs = ({ start, end, email } = {}) =>
   requestQuery('/api/admin/export/logs', { start, end, email });
 export const fetchDatabaseBackup = () => request('/api/admin/database/export');

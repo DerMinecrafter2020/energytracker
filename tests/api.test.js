@@ -117,6 +117,21 @@ test('Theme-Einstellung wird pro Benutzer gespeichert und validiert', async () =
   }
 });
 
+test('Admin kann API-Testanzeige abrufen', async () => {
+  const token = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+  const res = await fetch(`${BASE_URL}/admin/tests/api`, {
+    headers: authHeaders(token),
+  });
+
+  assert.strictEqual(res.status, 200, `Expected 200 OK, got ${res.status}`);
+  const body = await res.json();
+  assert.strictEqual(body.exists, true);
+  assert.ok(body.file.endsWith('tests/api.test.js'), 'Testanzeige muss api.test.js referenzieren');
+  assert.ok(Array.isArray(body.tests), 'Testanzeige muss Testfälle als Array liefern');
+  assert.ok(body.total >= 1, 'Mindestens ein Testfall muss erkannt werden');
+  assert.ok(body.tests.some((entry) => entry.name.includes('Theme-Einstellung')), 'Theme-Test muss in der Anzeige enthalten sein');
+});
+
 test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angemeldete Benutzer', async () => {
   const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
   const userToken = await login(USER_EMAIL, USER_PASSWORD);

@@ -169,6 +169,68 @@ try {
   console.error('Konnte package.json nicht lesen:', err);
 }
 
+const apiTestFileCandidates = [
+  path.join(__dirname, 'tests', 'api.test.js'),
+  path.join(process.cwd(), 'tests', 'api.test.js'),
+];
+
+const normalizeTestName = (value) => String(value || '')
+  .replace(/\\(['"`])/g, '$1')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const apiTestCategory = (name) => {
+  const lower = String(name || '').toLowerCase();
+  if (lower.includes('admin-api') || lower.includes('secret-header')) return 'Admin-Sicherheit';
+  if (lower.includes('exportieren') || lower.includes('importieren') || lower.includes('backup')) return 'Backup & Import';
+  if (lower.includes('theme')) return 'Benutzer-Einstellungen';
+  if (lower.includes('discord') || lower.includes('ai scheduling')) return 'Discord & KI';
+  if (lower.includes('fremde')) return 'Benutzer-Isolation';
+  if (lower.includes('log-api') || lower.includes('logs')) return 'Logs';
+  return 'API';
+};
+
+const readApiTestOverview = () => {
+  const testFile = apiTestFileCandidates.find((candidate) => fs.existsSync(candidate));
+  if (!testFile) {
+    return {
+      exists: false,
+      file: 'tests/api.test.js',
+      total: 0,
+      tests: [],
+      warning: 'tests/api.test.js wurde im Container nicht gefunden.',
+      command: 'docker compose exec -T app node --test tests/api.test.js',
+    };
+  }
+
+  const source = fs.readFileSync(testFile, 'utf8');
+  const stat = fs.statSync(testFile);
+  const tests = [];
+  const matcher = /\btest\s*\(\s*(['"`])([\s\S]*?)\1\s*,/g;
+  let match;
+
+  while ((match = matcher.exec(source)) !== null) {
+    const name = normalizeTestName(match[2]);
+    if (!name) continue;
+    tests.push({
+      id: tests.length + 1,
+      name,
+      category: apiTestCategory(name),
+    });
+  }
+
+  return {
+    exists: true,
+    file: path.relative(__dirname, testFile) || 'tests/api.test.js',
+    updatedAt: stat.mtime.toISOString(),
+    size: stat.size,
+    hash: crypto.createHash('sha256').update(source).digest('hex').slice(0, 12),
+    total: tests.length,
+    tests,
+    command: 'docker compose exec -T app node --test tests/api.test.js',
+  };
+};
+
 const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const WEBAUTHN_RP_NAME = process.env.WEBAUTHN_RP_NAME || 'Koffein-Tracker';
 
@@ -2869,6 +2931,15 @@ app.get('/api/admin/activity', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('GET /api/admin/activity error:', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/admin/tests/api', requireAdmin, (req, res) => {
+  try {
+    res.json(readApiTestOverview());
+  } catch (err) {
+    console.error('GET /api/admin/tests/api error:', err);
+    res.status(500).json({ error: 'API-Testübersicht konnte nicht geladen werden.' });
   }
 });
 

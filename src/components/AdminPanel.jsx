@@ -13,7 +13,7 @@ import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
   testDiscordWebhook, saveDiscordWebhook, fetchDiscordAiStatus, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
-  fetchAdminActivity, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
+  fetchAdminActivity, fetchAdminApiTests, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
   fetchS3Status, fetchS3Backups, createS3Backup, restoreS3Backup,
 } from '../services/adminApi';
 
@@ -241,6 +241,9 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [adminActivity, setAdminActivity] = useState({ totals: {}, recentLogins: [], topDrinks: [], usersOverLimit: [], recentLogs: [] });
   const [adminActivityLoading, setAdminActivityLoading] = useState(false);
   const [adminActivityMsg, setAdminActivityMsg] = useState(null);
+  const [apiTests, setApiTests] = useState({ exists: false, tests: [], total: 0 });
+  const [apiTestsLoading, setApiTestsLoading] = useState(false);
+  const [apiTestsMsg, setApiTestsMsg] = useState(null);
   const [exportStart, setExportStart] = useState(defaultExportStart);
   const [exportEnd, setExportEnd] = useState(() => dateKey(new Date()));
   const [exportEmail, setExportEmail] = useState('');
@@ -293,6 +296,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     if (activeTab === 'users') loadRegUsers();
     if (activeTab === 'chat') loadChatStats();
     if (activeTab === 'activity') loadAdminActivity();
+    if (activeTab === 'tests') loadApiTests();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -591,6 +595,24 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     }
   };
 
+  const loadApiTests = async () => {
+    setApiTestsLoading(true);
+    setApiTestsMsg(null);
+    try {
+      const data = await fetchAdminApiTests();
+      setApiTests({
+        ...data,
+        tests: Array.isArray(data.tests) ? data.tests : [],
+        total: Number(data.total || 0),
+      });
+      if (data.warning) setApiTestsMsg({ type: 'error', text: data.warning });
+    } catch (err) {
+      setApiTestsMsg({ type: 'error', text: 'Fehler beim Laden der API-Testanzeige: ' + err.message });
+    } finally {
+      setApiTestsLoading(false);
+    }
+  };
+
   const loadAdminExportData = () => fetchAdminExportLogs({
     start: exportStart,
     end: exportEnd,
@@ -759,6 +781,17 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
 
   const chartMax = Math.max(...chartData.map((d) => d.total), 400);
 
+  const apiTestCategories = useMemo(() => {
+    const counts = {};
+    (apiTests.tests || []).forEach((testCase) => {
+      const category = testCase.category || 'API';
+      counts[category] = (counts[category] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [apiTests.tests]);
+
   // â”€â”€ Sorted & filtered logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filteredLogs = useMemo(() => {
     const q = search.toLowerCase();
@@ -891,6 +924,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
             { id: 'users',     label: 'Benutzer',   icon: Users      },
             { id: 'chat',      label: 'KI-Chat',    icon: MessageCircle },
             { id: 'activity',  label: 'Aktivität',  icon: Activity   },
+            { id: 'tests',     label: 'API-Tests',  icon: FileText   },
             { id: 'settings',  label: 'Einstellungen', icon: Settings },
             
           ].map(({ id, label, icon: Icon }) => (
@@ -1574,6 +1608,116 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* API TESTS TAB */}
+        {activeTab === 'tests' && (
+          <div className="animate-fade-in pb-10 space-y-6">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="font-semibold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-400" />
+                API-Testanzeige
+              </h2>
+              <button onClick={loadApiTests} disabled={apiTestsLoading}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl glass-card
+                  text-slate-400 hover:text-white text-sm transition-all disabled:opacity-50">
+                <RefreshCw className={`w-4 h-4 ${apiTestsLoading ? 'animate-spin' : ''}`} />
+                Aktualisieren
+              </button>
+            </div>
+
+            <MessageBox message={apiTestsMsg} onClose={() => setApiTestsMsg(null)} />
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard icon={CheckCircle} label="Testfälle" value={apiTests.total || 0} color="green" />
+              <StatCard icon={FileText} label="Datei" value={apiTests.exists ? 'gefunden' : 'fehlt'} color={apiTests.exists ? 'blue' : 'red'} />
+              <StatCard icon={Hash} label="Hash" value={apiTests.hash || '–'} color="purple" />
+              <StatCard icon={Clock} label="Geändert" value={apiTests.updatedAt ? formatDate(apiTests.updatedAt) : '–'} color="amber" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6">
+              <div className="glass-card rounded-2xl p-6 space-y-4">
+                <div>
+                  <h3 className="font-semibold text-white flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-green-400" />
+                    Kategorien
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Übersicht der Testfälle aus {apiTests.file || 'tests/api.test.js'}.
+                  </p>
+                </div>
+
+                {apiTestsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => <div key={i} className="h-10 shimmer rounded-xl" />)}
+                  </div>
+                ) : apiTestCategories.length === 0 ? (
+                  <p className="text-sm text-slate-500">Keine API-Tests gefunden.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {apiTestCategories.map((category) => {
+                      const pct = apiTests.total > 0 ? (category.count / apiTests.total) * 100 : 0;
+                      return (
+                        <div key={category.name} className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-white truncate">{category.name}</span>
+                            <span className="text-xs text-slate-500 shrink-0">{category.count}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-300" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2.5 text-xs text-slate-400 space-y-1">
+                  <p>Datei: <span className="text-slate-200 font-mono">{apiTests.file || 'tests/api.test.js'}</span></p>
+                  <p>Größe: <span className="text-slate-200">{apiTests.size ? formatBytes(apiTests.size) : '–'}</span></p>
+                  <p className="break-all">Befehl: <span className="text-blue-300 font-mono">{apiTests.command || 'docker compose exec -T app node --test tests/api.test.js'}</span></p>
+                </div>
+              </div>
+
+              <div className="glass-card rounded-2xl overflow-hidden">
+                {apiTestsLoading ? (
+                  <div className="p-6 space-y-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="h-12 shimmer rounded-xl" />
+                    ))}
+                  </div>
+                ) : apiTests.tests.length === 0 ? (
+                  <div className="py-16 text-center text-slate-500">
+                    <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p>Keine Testfälle in api.test.js erkannt.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-[auto_1fr_1fr] gap-3 px-5 py-3
+                      border-b border-white/10 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      <span>#</span>
+                      <span>Testfall</span>
+                      <span>Kategorie</span>
+                    </div>
+                    <div className="divide-y divide-white/5 max-h-[60vh] overflow-y-auto">
+                      {apiTests.tests.map((testCase) => (
+                        <div key={testCase.id}
+                          className="grid grid-cols-[auto_1fr_1fr] gap-3 px-5 py-3.5
+                            hover:bg-white/5 transition-colors items-center text-sm">
+                          <span className="text-slate-600 font-mono">{testCase.id}</span>
+                          <span className="text-white font-medium min-w-0">{testCase.name}</span>
+                          <span className="text-blue-300 text-xs truncate">{testCase.category || 'API'}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-5 py-3 border-t border-white/10 text-xs text-slate-600">
+                      {apiTests.tests.length} Testfälle aus {apiTests.file || 'tests/api.test.js'}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
