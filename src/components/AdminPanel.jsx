@@ -5,7 +5,7 @@ import {
   Download, Upload, Search, ChevronDown, ChevronUp, Coffee,
   Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
   CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash, Edit3,
-  Activity, FileText, Printer,
+  Activity, FileText, Printer, Cloud,
 } from 'lucide-react';
 import { logout } from '../services/auth';
 import { fetchLogs, deleteLog as deleteApiLog, adminUpdateLog } from '../services/api';
@@ -14,6 +14,7 @@ import {
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
   testDiscordWebhook, saveDiscordWebhook, fetchDiscordAiStatus, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
   fetchAdminActivity, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
+  fetchS3Status, fetchS3Backups, createS3Backup, restoreS3Backup,
 } from '../services/adminApi';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -44,6 +45,13 @@ const defaultExportStart = () => {
 };
 
 const csvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+const formatBytes = (value) => {
+  const bytes = Number(value) || 0;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+};
 
 const buildAdminCsv = (items) => {
   const header = ['ID', 'Name', 'Koffein (mg)', 'Groesse (ml)', 'Datum', 'E-Mail', 'Erstellt'];
@@ -258,6 +266,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [dbBackupLoading, setDbBackupLoading] = useState(false);
   const [dbImportLoading, setDbImportLoading] = useState(false);
   const [dbBackupMsg, setDbBackupMsg] = useState(null);
+  const [s3Status, setS3Status] = useState(null);
+  const [s3Backups, setS3Backups] = useState([]);
+  const [s3Loading, setS3Loading] = useState(false);
+  const [s3ActionLoading, setS3ActionLoading] = useState(false);
+  const [s3Msg, setS3Msg] = useState(null);
 
 
   // Load SMTP config when settings tab is opened
@@ -274,6 +287,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         })
         .catch(() => {});
       loadDiscordAiStatus();
+      loadS3Backups();
 
     }
     if (activeTab === 'users') loadRegUsers();
@@ -343,12 +357,76 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         activeTab === 'chat' ? loadChatStats() : Promise.resolve(),
         activeTab === 'activity' ? loadAdminActivity() : Promise.resolve(),
         handleRedisCheck(),
+        loadS3Backups(),
       ]);
     } catch (err) {
       const isParseError = err instanceof SyntaxError;
       setDbBackupMsg({ type: 'error', text: isParseError ? 'Die .db-Datei ist kein gültiges Koffein-Tracker-Backup.' : (err.message || 'Import fehlgeschlagen.') });
     } finally {
       setDbImportLoading(false);
+    }
+  };
+
+  const loadS3Backups = async () => {
+    setS3Loading(true);
+    setS3Msg(null);
+    try {
+      const status = await fetchS3Status();
+      setS3Status(status);
+      if (!status.configured) {
+        setS3Backups([]);
+        return;
+      }
+
+      const data = await fetchS3Backups();
+      setS3Status(data.status || status);
+      setS3Backups(Array.isArray(data.items) ? data.items : []);
+    } catch (err) {
+      setS3Msg({ type: 'error', text: err.message || 'S3-Backups konnten nicht geladen werden.' });
+    } finally {
+      setS3Loading(false);
+    }
+  };
+
+  const handleS3Backup = async () => {
+    setS3ActionLoading(true);
+    setS3Msg(null);
+    try {
+      const result = await createS3Backup();
+      setS3Msg({ type: 'success', text: `S3-Backup gespeichert: ${result.filename || result.key}` });
+      await loadS3Backups();
+    } catch (err) {
+      setS3Msg({ type: 'error', text: err.message || 'S3-Backup fehlgeschlagen.' });
+    } finally {
+      setS3ActionLoading(false);
+    }
+  };
+
+  const handleS3Restore = async (key) => {
+    if (!key) return;
+    if (!window.confirm('S3-Backup wirklich wiederherstellen? Der aktuelle Datenbestand wird ersetzt.')) return;
+
+    setS3ActionLoading(true);
+    setS3Msg(null);
+    try {
+      const result = await restoreS3Backup(key);
+      const summary = result.summary || {};
+      setS3Msg({
+        type: 'success',
+        text: `S3-Restore abgeschlossen: ${summary.logs || 0} Logs, ${summary.users || 0} Benutzer, ${summary.reminders || 0} Reminder.`,
+      });
+      await Promise.all([
+        loadAllLogs(),
+        activeTab === 'users' ? loadRegUsers() : Promise.resolve(),
+        activeTab === 'chat' ? loadChatStats() : Promise.resolve(),
+        activeTab === 'activity' ? loadAdminActivity() : Promise.resolve(),
+        handleRedisCheck(),
+        loadS3Backups(),
+      ]);
+    } catch (err) {
+      setS3Msg({ type: 'error', text: err.message || 'S3-Restore fehlgeschlagen.' });
+    } finally {
+      setS3ActionLoading(false);
     }
   };
 
@@ -1867,6 +1945,91 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   </div>
                 </div>
                 <MessageBox message={dbBackupMsg} onClose={() => setDbBackupMsg(null)} className="rounded-xl p-3" />
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Cloud className="w-4 h-4 text-sky-300" />
+                      S3 Backup und Restore
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Sichert die .db-Datei in einen S3-kompatiblen Bucket und kann sie auf einer neuen Instanz wiederherstellen.
+                    </p>
+                    {s3Status && (
+                      <p className="text-[11px] text-slate-500 mt-2 font-mono break-all">
+                        {s3Status.configured
+                          ? `${s3Status.bucket}/${s3Status.prefix || ''}`
+                          : 'Nicht konfiguriert: S3_BUCKET, S3_ACCESS_KEY_ID und S3_SECRET_ACCESS_KEY setzen.'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={loadS3Backups}
+                      disabled={s3Loading || s3ActionLoading}
+                      className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs
+                        bg-white/5 border border-white/10 text-slate-300
+                        hover:bg-white/10 transition-all disabled:opacity-50"
+                    >
+                      {s3Loading
+                        ? <Spinner className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400" />
+                        : <RefreshCw className="w-3.5 h-3.5" />}
+                      Aktualisieren
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleS3Backup}
+                      disabled={s3ActionLoading || s3Loading || !s3Status?.configured}
+                      className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs
+                        bg-sky-600/20 border border-sky-500/30 text-sky-300
+                        hover:bg-sky-600/30 transition-all disabled:opacity-50"
+                    >
+                      {s3ActionLoading
+                        ? <Spinner className="w-3 h-3 border-2 border-sky-400/30 border-t-sky-400" />
+                        : <Upload className="w-3.5 h-3.5" />}
+                      Nach S3 sichern
+                    </button>
+                  </div>
+                </div>
+
+                <MessageBox message={s3Msg} onClose={() => setS3Msg(null)} className="rounded-xl p-3" />
+
+                {s3Status?.configured && (
+                  <div className="rounded-xl border border-white/8 overflow-hidden text-xs">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] px-3 py-2 bg-white/5 text-slate-500 font-semibold uppercase tracking-wider">
+                      <span>Backup</span>
+                      <span className="text-right">Aktion</span>
+                    </div>
+                    {s3Backups.length === 0 ? (
+                      <div className="px-3 py-3 text-slate-500">Noch keine S3-Backups vorhanden.</div>
+                    ) : (
+                      s3Backups.slice(0, 12).map((backup) => (
+                        <div key={backup.key} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-2.5 border-t border-white/5">
+                          <div className="min-w-0">
+                            <p className="text-slate-200 truncate font-mono">{backup.filename || backup.key}</p>
+                            <p className="text-slate-500 mt-0.5">
+                              {backup.lastModified ? formatDate(backup.lastModified) : 'Datum unbekannt'} · {formatBytes(backup.size)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleS3Restore(backup.key)}
+                            disabled={s3ActionLoading || s3Loading}
+                            className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg
+                              bg-amber-600/20 border border-amber-500/30 text-amber-300
+                              hover:bg-amber-600/30 transition-all disabled:opacity-50"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Restore
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
 
               {redisError && (

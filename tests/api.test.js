@@ -45,6 +45,13 @@ test('Admin-API akzeptiert Bearer-Token und weist alte Secret-Header ab', async 
 
 test('Admin kann Datenbank exportieren und dasselbe Backup wieder importieren', async () => {
   const token = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+  const s3StatusRes = await fetch(`${BASE_URL}/admin/s3/status`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(s3StatusRes.status, 200, `Expected 200 OK, got ${s3StatusRes.status}`);
+  const s3Status = await s3StatusRes.json();
+  assert.strictEqual(typeof s3Status.configured, 'boolean');
+
   const exportRes = await fetch(`${BASE_URL}/admin/database/export`, {
     headers: authHeaders(token),
   });

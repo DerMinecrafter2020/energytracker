@@ -76,3 +76,7 @@ export const createAdminUser = ({ name, email, password, role, verified }) =>
 export const impersonateUser = (id) => post(`/api/admin/users/${id}/impersonate`);
 export const fetchPublicSettings = () => request('/api/settings/public', { admin: false });
 export const fetchRedisHealth = () => request('/api/admin/redis/health');
+export const fetchS3Status = () => request('/api/admin/s3/status');
+export const fetchS3Backups = () => request('/api/admin/s3/backups');
+export const createS3Backup = () => post('/api/admin/s3/backup');
+export const restoreS3Backup = (key) => post('/api/admin/s3/restore', { key });

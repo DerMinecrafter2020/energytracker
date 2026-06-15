@@ -400,6 +400,194 @@ const buildDatabaseExport = () => ({
   database: cloneJson(normalizeDbState(dbState)),
 });
 
+const databaseImportSummary = (nextState) => ({
+  logs: nextState.caffeine_logs.length,
+  users: nextState.users.length,
+  reminders: nextState.reminders.length,
+  favorites: nextState.favorites.length,
+  aiChatMessages: nextState.ai_chat_messages.length,
+  customDrinks: nextState.custom_drinks.length,
+});
+
+const importDatabasePayload = async (payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    const err = new Error('Ungültige Backup-Datei.');
+    err.status = 400;
+    throw err;
+  }
+  if (!hasDatabaseShape(payload)) {
+    const err = new Error('Backup enthält keine erkennbaren Datenbankfelder.');
+    err.status = 400;
+    throw err;
+  }
+
+  const nextState = normalizeDbState(payload);
+  dbState = nextState;
+  await persistDbState();
+  return {
+    importedAt: new Date().toISOString(),
+    summary: databaseImportSummary(nextState),
+  };
+};
+
+const s3Config = () => {
+  const region = cleanEnvValue(process.env.S3_REGION) || 'eu-central-1';
+  const endpoint = cleanEnvValue(process.env.S3_ENDPOINT) || `https://s3.${region}.amazonaws.com`;
+  const prefix = cleanEnvValue(process.env.S3_PREFIX || 'koffein-tracker/backups').replace(/^\/+|\/+$/g, '');
+  const forcePathStyle = cleanEnvValue(process.env.S3_FORCE_PATH_STYLE || (process.env.S3_ENDPOINT ? 'true' : 'false')).toLowerCase() !== 'false';
+
+  return {
+    bucket: cleanEnvValue(process.env.S3_BUCKET),
+    region,
+    endpoint,
+    accessKeyId: cleanEnvValue(process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID),
+    secretAccessKey: cleanEnvValue(process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY),
+    prefix,
+    forcePathStyle,
+  };
+};
+
+const s3Status = () => {
+  const cfg = s3Config();
+  return {
+    configured: !!(cfg.bucket && cfg.accessKeyId && cfg.secretAccessKey),
+    bucket: cfg.bucket || '',
+    region: cfg.region,
+    endpoint: cfg.endpoint,
+    prefix: cfg.prefix,
+    forcePathStyle: cfg.forcePathStyle,
+  };
+};
+
+const ensureS3Configured = () => {
+  const cfg = s3Config();
+  if (!cfg.bucket || !cfg.accessKeyId || !cfg.secretAccessKey) {
+    const err = new Error('S3 ist nicht vollständig konfiguriert. Bitte S3_BUCKET, S3_ACCESS_KEY_ID und S3_SECRET_ACCESS_KEY setzen.');
+    err.status = 400;
+    throw err;
+  }
+  return cfg;
+};
+
+const s3Encode = (value) => encodeURIComponent(String(value)).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+const s3HashHex = (value) => crypto.createHash('sha256').update(value || '').digest('hex');
+const s3Hmac = (key, value, encoding) => crypto.createHmac('sha256', key).update(value).digest(encoding);
+const s3DateParts = (now = new Date()) => {
+  const iso = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  return { amzDate: iso, dateStamp: iso.slice(0, 8) };
+};
+
+const s3ObjectKey = (filename) => [s3Config().prefix, filename].filter(Boolean).join('/');
+const canonicalS3Path = (pathname) => pathname.split('/').map((part) => s3Encode(decodeURIComponent(part))).join('/');
+
+const s3UrlFor = (cfg, key = '', query = {}) => {
+  const endpoint = new URL(cfg.endpoint);
+  const safeKey = String(key || '').split('/').map(s3Encode).join('/');
+  const basePath = endpoint.pathname.replace(/\/+$/g, '');
+
+  if (cfg.forcePathStyle) {
+    endpoint.pathname = [basePath, s3Encode(cfg.bucket), safeKey].filter(Boolean).join('/');
+  } else {
+    endpoint.hostname = `${cfg.bucket}.${endpoint.hostname}`;
+    endpoint.pathname = [basePath, safeKey].filter(Boolean).join('/');
+  }
+
+  Object.entries(query).forEach(([name, value]) => {
+    if (value !== undefined && value !== null && value !== '') endpoint.searchParams.set(name, value);
+  });
+  return endpoint;
+};
+
+const signS3Request = ({ cfg, method, url, body = '', contentType = '' }) => {
+  const { amzDate, dateStamp } = s3DateParts();
+  const payloadHash = s3HashHex(body);
+  const headers = {
+    host: url.host,
+    'x-amz-content-sha256': payloadHash,
+    'x-amz-date': amzDate,
+  };
+  if (contentType) headers['content-type'] = contentType;
+
+  const canonicalHeaders = Object.keys(headers).sort().map((key) => `${key}:${headers[key]}\n`).join('');
+  const signedHeaders = Object.keys(headers).sort().join(';');
+  const canonicalQuery = [...url.searchParams.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${s3Encode(key)}=${s3Encode(value)}`)
+    .join('&');
+  const canonicalRequest = [
+    method,
+    canonicalS3Path(url.pathname || '/'),
+    canonicalQuery,
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join('\n');
+  const credentialScope = `${dateStamp}/${cfg.region}/s3/aws4_request`;
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    s3HashHex(canonicalRequest),
+  ].join('\n');
+
+  const kDate = s3Hmac(`AWS4${cfg.secretAccessKey}`, dateStamp);
+  const kRegion = s3Hmac(kDate, cfg.region);
+  const kService = s3Hmac(kRegion, 's3');
+  const kSigning = s3Hmac(kService, 'aws4_request');
+  const signature = s3Hmac(kSigning, stringToSign, 'hex');
+
+  return {
+    ...headers,
+    Authorization: `AWS4-HMAC-SHA256 Credential=${cfg.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+  };
+};
+
+const s3Request = async ({ method, key = '', query = {}, body = '', contentType = '' }) => {
+  const cfg = ensureS3Configured();
+  const url = s3UrlFor(cfg, key, query);
+  const headers = signS3Request({ cfg, method, url, body, contentType });
+  const response = await fetch(url, {
+    method,
+    headers,
+    ...(method === 'GET' || method === 'HEAD' ? {} : { body }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    const err = new Error(`S3 Fehler (${response.status}): ${text.slice(0, 300) || response.statusText}`);
+    err.status = response.status;
+    throw err;
+  }
+  return { text, headers: response.headers };
+};
+
+const xmlDecode = (value) => String(value || '')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&apos;/g, "'")
+  .replace(/&amp;/g, '&');
+
+const listS3Backups = async () => {
+  const cfg = ensureS3Configured();
+  const prefix = cfg.prefix ? `${cfg.prefix}/` : '';
+  const { text } = await s3Request({
+    method: 'GET',
+    query: { 'list-type': '2', prefix, 'max-keys': '100' },
+  });
+
+  return [...text.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)]
+    .map((match) => {
+      const block = match[1];
+      const key = xmlDecode(block.match(/<Key>([\s\S]*?)<\/Key>/)?.[1] || '');
+      const lastModified = xmlDecode(block.match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1] || '');
+      const size = Number(block.match(/<Size>(\d+)<\/Size>/)?.[1] || 0);
+      return { key, filename: key.split('/').pop(), lastModified, size };
+    })
+    .filter((item) => item.key.endsWith('.db'))
+    .sort((a, b) => String(b.lastModified).localeCompare(String(a.lastModified)));
+};
+
 const loadDbState = async () => {
   try {
     // Avoid command retry noise when Redis is currently unreachable.
@@ -2472,32 +2660,87 @@ app.get('/api/admin/database/export', requireAdmin, async (req, res) => {
 app.post('/api/admin/database/import', requireAdmin, async (req, res) => {
   try {
     const payload = req.body?.backup || req.body;
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      return res.status(400).json({ error: 'Ungültige Backup-Datei.' });
-    }
-    if (!hasDatabaseShape(payload)) {
-      return res.status(400).json({ error: 'Backup enthaelt keine erkennbaren Datenbankfelder.' });
-    }
-
-    const nextState = normalizeDbState(payload);
-    dbState = nextState;
-    await persistDbState();
+    const result = await importDatabasePayload(payload);
 
     res.json({
       success: true,
-      importedAt: new Date().toISOString(),
-      summary: {
-        logs: nextState.caffeine_logs.length,
-        users: nextState.users.length,
-        reminders: nextState.reminders.length,
-        favorites: nextState.favorites.length,
-        aiChatMessages: nextState.ai_chat_messages.length,
-        customDrinks: nextState.custom_drinks.length,
-      },
+      importedAt: result.importedAt,
+      summary: result.summary,
     });
   } catch (err) {
     console.error('POST /api/admin/database/import error:', err);
-    res.status(500).json({ error: 'Datenbank-Import fehlgeschlagen.' });
+    res.status(err.status || 500).json({ error: err.message || 'Datenbank-Import fehlgeschlagen.' });
+  }
+});
+
+app.get('/api/admin/s3/status', requireAdmin, async (req, res) => {
+  res.json(s3Status());
+});
+
+app.get('/api/admin/s3/backups', requireAdmin, async (req, res) => {
+  try {
+    res.json({ items: await listS3Backups(), status: s3Status() });
+  } catch (err) {
+    console.error('GET /api/admin/s3/backups error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'S3 Backups konnten nicht geladen werden.' });
+  }
+});
+
+app.post('/api/admin/s3/backup', requireAdmin, async (req, res) => {
+  try {
+    const backup = buildDatabaseExport();
+    const stamp = backup.exportedAt.replace(/[:.]/g, '-');
+    const filename = `koffein-db-backup-${stamp}.db`;
+    const key = s3ObjectKey(filename);
+    const body = JSON.stringify(backup, null, 2);
+
+    await s3Request({
+      method: 'PUT',
+      key,
+      body,
+      contentType: 'application/vnd.koffein-tracker.database+json; charset=utf-8',
+    });
+
+    res.json({
+      success: true,
+      key,
+      filename,
+      size: Buffer.byteLength(body),
+      exportedAt: backup.exportedAt,
+    });
+  } catch (err) {
+    console.error('POST /api/admin/s3/backup error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'S3 Backup fehlgeschlagen.' });
+  }
+});
+
+app.post('/api/admin/s3/restore', requireAdmin, async (req, res) => {
+  try {
+    const key = String(req.body?.key || '').trim();
+    const cfg = ensureS3Configured();
+    const allowedPrefix = cfg.prefix ? `${cfg.prefix}/` : '';
+    if (!key || !key.endsWith('.db') || (allowedPrefix && !key.startsWith(allowedPrefix))) {
+      return res.status(400).json({ error: 'Ungültiger S3 Backup-Schlüssel.' });
+    }
+
+    const { text } = await s3Request({ method: 'GET', key });
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      return res.status(400).json({ error: 'Die S3 .db-Datei ist kein gültiges Koffein-Tracker-Backup.' });
+    }
+
+    const result = await importDatabasePayload(payload);
+    res.json({
+      success: true,
+      key,
+      importedAt: result.importedAt,
+      summary: result.summary,
+    });
+  } catch (err) {
+    console.error('POST /api/admin/s3/restore error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'S3 Restore fehlgeschlagen.' });
   }
 });
 

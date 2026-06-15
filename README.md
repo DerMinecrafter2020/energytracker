@@ -216,6 +216,12 @@ Fuer produktive Installationen:
 | `PASSWORD_SALT` | Salt fuer Passwort-Hashing |
 | `REDIS_URL` | vollstaendige Redis-URL, z.B. `redis://127.0.0.1:6379` |
 | `REDIS_HOST` / `REDIS_PORT` | Redis-Host und Port, falls keine `REDIS_URL` gesetzt ist |
+| `S3_BUCKET` | optionaler Bucket fuer Cloud-Backups |
+| `S3_REGION` | S3-Region, Standard `eu-central-1` |
+| `S3_ENDPOINT` | optionaler Endpoint fuer S3-kompatible Anbieter |
+| `S3_PREFIX` | Ordner/Praefix fuer Backups, Standard `koffein-tracker/backups` |
+| `S3_FORCE_PATH_STYLE` | `true` fuer viele S3-kompatible Anbieter, `false` fuer AWS Virtual-Host-Style |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Zugangsdaten fuer S3-Backup und Restore |
 | `WEBAUTHN_RP_NAME` | Anzeigename fuer Passkeys/TOTP-Issuer |
 | `WEBAUTHN_ORIGIN` | Origin fuer WebAuthn, z.B. `https://deine-domain.de` |
 | `WEBAUTHN_RP_ID` | Domain fuer WebAuthn, z.B. `deine-domain.de` |
@@ -223,6 +229,16 @@ Fuer produktive Installationen:
 | `VITE_ADMIN_EMAIL` / `VITE_USER_EMAIL` | optionale Demo-E-Mail-Hinweise im Login |
 
 SMTP, Registrierung, Demo-Zugang, Discord-Webhook und KI-Keys werden im Admin-Panel gespeichert.
+
+## S3 Backup und Restore
+
+Wenn die `S3_*` Variablen gesetzt sind, kann ein Admin unter **Einstellungen -> Redis Datenpersistenz -> S3 Backup und Restore**:
+
+- ein vollständiges `.db` Backup in den S3-Bucket hochladen
+- vorhandene S3-Backups anzeigen
+- ein Backup auf einer neuen Instanz wiederherstellen
+
+Für AWS S3 reicht normalerweise `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID` und `S3_SECRET_ACCESS_KEY`. Für MinIO, Hetzner, Wasabi oder andere kompatible Anbieter zusätzlich `S3_ENDPOINT` setzen und meistens `S3_FORCE_PATH_STYLE=true` verwenden.
 
 ## KI-Assistent
 
