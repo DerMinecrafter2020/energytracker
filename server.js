@@ -1331,6 +1331,20 @@ const getSettingsOwnerKey = ({ userId, email }) => {
   throw new Error('userId oder email erforderlich');
 };
 
+const ALLOWED_THEMES = new Set([
+  'system',
+  'light',
+  'oled',
+  'neon',
+  'forest',
+  'ocean',
+  'sunrise',
+  'berry',
+  'cyber',
+  'mint',
+  'contrast',
+]);
+
 const getUserSettings = ({ userId, email }) => {
   const ownerKey = getSettingsOwnerKey({ userId, email });
   const settings = dbState.user_settings.find((s) => s.ownerKey === ownerKey);
@@ -1347,7 +1361,9 @@ const getUserSettings = ({ userId, email }) => {
     theme: 'system',
     createdAt: new Date().toISOString(),
   };
-  return settings ? { ...defaults, ...settings } : defaults;
+  const merged = settings ? { ...defaults, ...settings } : defaults;
+  merged.theme = ALLOWED_THEMES.has(merged.theme) ? merged.theme : defaults.theme;
+  return merged;
 };
 
 const isValidTime = (time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(time || ''));
@@ -1367,7 +1383,7 @@ const updateUserSettings = ({ userId, email, dailyLimit, sleepTime, notifyAtLimi
   if (discordNotifyAtLimit !== undefined) settings.discordNotifyAtLimit = discordNotifyAtLimit;
   if (discordNotifyLate !== undefined) settings.discordNotifyLate = discordNotifyLate;
   if (discordNotifyRapid !== undefined) settings.discordNotifyRapid = discordNotifyRapid;
-  if (theme !== undefined) settings.theme = theme;
+  if (theme !== undefined) settings.theme = ALLOWED_THEMES.has(theme) ? theme : 'system';
   
   settings.updatedAt = new Date().toISOString();
   persistDbState();

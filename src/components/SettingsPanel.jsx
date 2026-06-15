@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Zap, Shield, KeyRound, Trash2, User, Mail, Lock, Moon } from 'lucide-react';
+import { Settings, Zap, Shield, KeyRound, Trash2, User, Mail, Lock, Moon, Palette } from 'lucide-react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import {
   fetchUserSettings,
@@ -21,6 +21,20 @@ const notifyStyles = {
   blue: 'checked:bg-blue-500 checked:border-blue-400 group-hover:text-blue-300',
   amber: 'checked:bg-amber-500 checked:border-amber-400 group-hover:text-amber-300',
 };
+
+const themeOptions = [
+  { id: 'system', name: 'Standard Dark', description: 'Material Dark', swatches: ['#0f1115', '#1a1c22', '#a8c7fa'] },
+  { id: 'light', name: 'Light Mode', description: 'Hell und klar', swatches: ['#f8f9fa', '#ffffff', '#0b57d0'] },
+  { id: 'oled', name: 'True Black', description: 'OLED schwarz', swatches: ['#000000', '#0a0a0a', '#a8c7fa'] },
+  { id: 'neon', name: 'Neon Punk', description: 'Violett und laut', swatches: ['#090014', '#13002b', '#d946ef'] },
+  { id: 'forest', name: 'Forest Green', description: 'Ruhig und grün', swatches: ['#04100b', '#081d14', '#34d399'] },
+  { id: 'ocean', name: 'Ocean Focus', description: 'Blaugrün', swatches: ['#03131f', '#082033', '#22d3ee'] },
+  { id: 'sunrise', name: 'Sunrise', description: 'Warm und hell', swatches: ['#fff7ed', '#ffedd5', '#f97316'] },
+  { id: 'berry', name: 'Berry Night', description: 'Beere und Pink', swatches: ['#150814', '#24101f', '#f472b6'] },
+  { id: 'cyber', name: 'Cyber Lime', description: 'Kontrastreich', swatches: ['#050816', '#111827', '#a3e635'] },
+  { id: 'mint', name: 'Mint Fresh', description: 'Frisch und weich', swatches: ['#f0fdfa', '#ccfbf1', '#0f766e'] },
+  { id: 'contrast', name: 'High Contrast', description: 'Maximal lesbar', swatches: ['#000000', '#111111', '#facc15'] },
+];
 
 const TextField = ({ label, icon: Icon, iconClass = 'text-slate-400', inputClass = '', ...props }) => (
   <div>
@@ -320,19 +334,40 @@ export default function SettingsPanel({ session, isLoading, onSettingsChange }) 
 
         {/* Theme & Language */}
         <div className="border-b border-white/10 pb-5">
-          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Palette className="w-3.5 h-3.5 text-violet-300" />
             Erscheinungsbild
           </h4>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Erscheinungsbild</label>
-              <select value={theme} onChange={(e) => setTheme(e.target.value)} className="input-dark text-sm appearance-none cursor-pointer w-full">
-                <option value="system">Standard Dark</option>
-                <option value="light">Light Mode</option>
-                <option value="oled">True Black (OLED)</option>
-                <option value="neon">Neon Punk</option>
-                <option value="forest">Forest Green</option>
-              </select>
+              <p className="text-xs text-slate-500 mb-3">Theme wird pro Benutzer in der Datenbank gespeichert.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {themeOptions.map((option) => {
+                  const active = theme === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setTheme(option.id)}
+                      className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all
+                        ${active
+                          ? 'border-violet-400/60 bg-violet-500/15 text-white'
+                          : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                    >
+                      <span className="flex shrink-0 overflow-hidden rounded-full border border-white/15">
+                        {option.swatches.map((color) => (
+                          <span key={color} className="h-7 w-5" style={{ backgroundColor: color }} />
+                        ))}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold truncate">{option.name}</span>
+                        <span className="block text-xs text-slate-500 truncate">{option.description}</span>
+                      </span>
+                      {active && <span className="h-2.5 w-2.5 rounded-full bg-violet-300 shadow-glow-purple shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

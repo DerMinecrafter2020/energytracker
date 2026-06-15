@@ -75,6 +75,48 @@ test('Admin kann Datenbank exportieren und dasselbe Backup wieder importieren', 
   assert.ok(importBody.summary, 'Import muss eine Zusammenfassung liefern');
 });
 
+test('Theme-Einstellung wird pro Benutzer gespeichert und validiert', async () => {
+  const token = await login(USER_EMAIL, USER_PASSWORD);
+  const originalRes = await fetch(`${BASE_URL}/settings/me`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(originalRes.status, 200, `Expected 200 OK, got ${originalRes.status}`);
+  const original = await originalRes.json();
+
+  try {
+    const saveRes = await fetch(`${BASE_URL}/settings/me`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ theme: 'cyber' }),
+    });
+    assert.strictEqual(saveRes.status, 200, `Expected 200 OK, got ${saveRes.status}`);
+    const saved = await saveRes.json();
+    assert.strictEqual(saved.theme, 'cyber');
+
+    const reloadRes = await fetch(`${BASE_URL}/settings/me`, {
+      headers: authHeaders(token),
+    });
+    assert.strictEqual(reloadRes.status, 200, `Expected 200 OK, got ${reloadRes.status}`);
+    const reloaded = await reloadRes.json();
+    assert.strictEqual(reloaded.theme, 'cyber');
+
+    const invalidRes = await fetch(`${BASE_URL}/settings/me`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ theme: 'does-not-exist' }),
+    });
+    assert.strictEqual(invalidRes.status, 200, `Expected 200 OK, got ${invalidRes.status}`);
+    const invalid = await invalidRes.json();
+    assert.strictEqual(invalid.theme, 'system');
+  } finally {
+    await fetch(`${BASE_URL}/settings/me`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ theme: original.theme || 'system' }),
+    });
+  }
+});
+
 test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angemeldete Benutzer', async () => {
   const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
   const userToken = await login(USER_EMAIL, USER_PASSWORD);

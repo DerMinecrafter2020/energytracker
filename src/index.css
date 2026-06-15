@@ -127,6 +127,7 @@ body {
   --md-sys-color-surface: #0a0a0a;
   --md-sys-color-surface-variant: #1a1a1a;
   --md-sys-color-primary: #a8c7fa;
+  --md-sys-color-on-primary: #062e6f;
   --md-sys-color-on-surface: #e2e2e5;
   --md-sys-color-on-surface-variant: #c4c6d0;
   --md-sys-color-outline: #8e9099;
@@ -137,6 +138,7 @@ body {
   --md-sys-color-surface: #13002b;
   --md-sys-color-surface-variant: #1e0043;
   --md-sys-color-primary: #d946ef;
+  --md-sys-color-on-primary: #3b0347;
   --md-sys-color-on-surface: #fae8ff;
   --md-sys-color-on-surface-variant: #f0abfc;
   --md-sys-color-outline: #a855f7;
@@ -147,7 +149,74 @@ body {
   --md-sys-color-surface: #081d14;
   --md-sys-color-surface-variant: #0c2b1f;
   --md-sys-color-primary: #34d399;
+  --md-sys-color-on-primary: #042f20;
   --md-sys-color-on-surface: #ecfdf5;
   --md-sys-color-on-surface-variant: #6ee7b7;
   --md-sys-color-outline: #10b981;
+}
+
+.theme-ocean {
+  --md-sys-color-background: #03131f;
+  --md-sys-color-surface: #082033;
+  --md-sys-color-surface-variant: #0e334f;
+  --md-sys-color-primary: #22d3ee;
+  --md-sys-color-on-primary: #042f3d;
+  --md-sys-color-on-surface: #e0f7ff;
+  --md-sys-color-on-surface-variant: #a5e4f3;
+  --md-sys-color-outline: #38bdf8;
+}
+
+.theme-sunrise {
+  --md-sys-color-background: #fff7ed;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-surface-variant: #ffedd5;
+  --md-sys-color-primary: #ea580c;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-on-surface: #1f2937;
+  --md-sys-color-on-surface-variant: #7c2d12;
+  --md-sys-color-outline: #fb923c;
+}
+
+.theme-berry {
+  --md-sys-color-background: #150814;
+  --md-sys-color-surface: #24101f;
+  --md-sys-color-surface-variant: #3b1733;
+  --md-sys-color-primary: #f472b6;
+  --md-sys-color-on-primary: #500724;
+  --md-sys-color-on-surface: #fdf2f8;
+  --md-sys-color-on-surface-variant: #fbcfe8;
+  --md-sys-color-outline: #db2777;
+}
+
+.theme-cyber {
+  --md-sys-color-background: #050816;
+  --md-sys-color-surface: #111827;
+  --md-sys-color-surface-variant: #1f2937;
+  --md-sys-color-primary: #a3e635;
+  --md-sys-color-on-primary: #1a2e05;
+  --md-sys-color-on-surface: #f8fafc;
+  --md-sys-color-on-surface-variant: #d9f99d;
+  --md-sys-color-outline: #22c55e;
+}
+
+.theme-mint {
+  --md-sys-color-background: #f0fdfa;
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-surface-variant: #ccfbf1;
+  --md-sys-color-primary: #0f766e;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-on-surface: #0f172a;
+  --md-sys-color-on-surface-variant: #134e4a;
+  --md-sys-color-outline: #14b8a6;
+}
+
+.theme-contrast {
+  --md-sys-color-background: #000000;
+  --md-sys-color-surface: #111111;
+  --md-sys-color-surface-variant: #242424;
+  --md-sys-color-primary: #facc15;
+  --md-sys-color-on-primary: #000000;
+  --md-sys-color-on-surface: #ffffff;
+  --md-sys-color-on-surface-variant: #f5f5f5;
+  --md-sys-color-outline: #ffffff;
 }
