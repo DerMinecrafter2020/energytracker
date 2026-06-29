@@ -108,6 +108,9 @@ export const fetchInsights = (user) =>
 export const fetchExportLogs = ({ userId, email, start, end }) =>
   get('/api/export/logs', { userId, email, start, end }, 'Fehler beim Exportieren der Logs');
 
+export const sendExportPdfEmail = ({ userId, email, start, end }) =>
+  post('/api/export/logs/email-pdf', { userId, email, start, end }, 'PDF-Export konnte nicht per E-Mail gesendet werden');
+
 export const fetchSecurityStatus = (user) =>
   get('/api/security/me', identity(user), 'Fehler beim Abrufen der Sicherheitseinstellungen');
 

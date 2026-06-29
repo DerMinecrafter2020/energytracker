@@ -231,6 +231,11 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [entryMode, setEntryMode] = useState('ai');
   const [entryModeSaving, setEntryModeSaving] = useState(false);
   const [entryModeMsg, setEntryModeMsg] = useState(null);
+  const [secretEncryptionStatus, setSecretEncryptionStatus] = useState({ keySet: false, adminKeySet: false, source: 'session-secret', minLength: 32 });
+  const [secretEncryptionPassword, setSecretEncryptionPassword] = useState('');
+  const [showSecretEncryptionPw, setShowSecretEncryptionPw] = useState(false);
+  const [secretEncryptionSaving, setSecretEncryptionSaving] = useState(false);
+  const [secretEncryptionMsg, setSecretEncryptionMsg] = useState(null);
 
   // â”€â”€ AI Config state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [aiApiKey, setAiApiKey]   = useState('');
@@ -585,6 +590,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     try {
       const data = await fetchAdminAppSettings();
       setEntryMode(data.entryMode === 'manual' ? 'manual' : 'ai');
+      setSecretEncryptionStatus(data.secretEncryption || { keySet: false, adminKeySet: false, source: 'session-secret', minLength: 32 });
     } catch (err) {
       setEntryModeMsg({ type: 'error', text: err.message || 'App-Einstellungen konnten nicht geladen werden.' });
     }
@@ -603,6 +609,32 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       setEntryModeMsg({ type: 'error', text: err.message || 'Eingabeart konnte nicht gespeichert werden.' });
     } finally {
       setEntryModeSaving(false);
+    }
+  };
+
+  const handleSecretEncryptionSave = async () => {
+    const minLength = secretEncryptionStatus.minLength || 32;
+    const password = secretEncryptionPassword.trim();
+    if (password.length < minLength) {
+      setSecretEncryptionMsg({ type: 'error', text: `Das Verschlüsselungskennwort muss mindestens ${minLength} Zeichen lang sein.` });
+      return;
+    }
+    if (!window.confirm('Dieses Verschlüsselungskennwort wird nach dem Speichern nicht erneut angezeigt. Bitte schreibe es sicher auf, bevor du fortfährst.')) {
+      return;
+    }
+
+    setSecretEncryptionSaving(true);
+    setSecretEncryptionMsg(null);
+    try {
+      const result = await saveAdminAppSettings({ secretEncryptionPassword: password });
+      setSecretEncryptionStatus(result.settings?.secretEncryption || { keySet: true, adminKeySet: true, source: 'admin-panel', minLength });
+      setSecretEncryptionPassword('');
+      setSecretEncryptionMsg({ type: 'success', text: 'Verschlüsselungskennwort gespeichert. Es wird nicht erneut angezeigt.' });
+      await loadS3Backups();
+    } catch (err) {
+      setSecretEncryptionMsg({ type: 'error', text: err.message || 'Verschlüsselungskennwort konnte nicht gespeichert werden.' });
+    } finally {
+      setSecretEncryptionSaving(false);
     }
   };
 
@@ -2070,6 +2102,84 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               </div>
 
               <MessageBox message={entryModeMsg} onClose={() => setEntryModeMsg(null)} className="rounded-xl p-3" />
+            </div>
+
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <div>
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-400" />
+                  Verschlüsselungskennwort
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Schützt gespeicherte Zugangsdaten wie S3 Access Key und Secret Key.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100 flex gap-3">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-300" />
+                <p>
+                  Schreibe dir dieses Kennwort sicher auf. Es wird nach dem Speichern nicht erneut angezeigt und wird benötigt,
+                  um gespeicherte Zugangsdaten zuverlässig weiterzuverwenden.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+                <Field
+                  label={`Kennwort mindestens ${secretEncryptionStatus.minLength || 32} Zeichen`}
+                  icon={KeyRound}
+                  type={showSecretEncryptionPw ? 'text' : 'password'}
+                  value={secretEncryptionPassword}
+                  minLength={secretEncryptionStatus.minLength || 32}
+                  autoComplete="new-password"
+                  placeholder={secretEncryptionStatus.adminKeySet ? 'Neues Kennwort setzen' : 'Verschlüsselungskennwort festlegen'}
+                  onChange={(e) => setSecretEncryptionPassword(e.target.value)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setShowSecretEncryptionPw((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                    title={showSecretEncryptionPw ? 'Kennwort verbergen' : 'Kennwort anzeigen'}
+                  >
+                    {showSecretEncryptionPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </Field>
+                <button
+                  type="button"
+                  onClick={handleSecretEncryptionSave}
+                  disabled={secretEncryptionSaving || secretEncryptionPassword.trim().length < (secretEncryptionStatus.minLength || 32)}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm
+                    bg-amber-600/20 border border-amber-500/30 text-amber-200
+                    hover:bg-amber-600/30 transition-all disabled:opacity-50"
+                >
+                  {secretEncryptionSaving
+                    ? <Spinner className="w-3 h-3 border-2 border-amber-300/30 border-t-amber-300" />
+                    : <CheckCircle className="w-4 h-4" />}
+                  Speichern
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2">
+                  <p className="text-slate-500">Status</p>
+                  <p className={secretEncryptionStatus.keySet ? 'text-green-300 font-semibold' : 'text-amber-300 font-semibold'}>
+                    {secretEncryptionStatus.adminKeySet ? 'Im Admin-Panel gesetzt' : (secretEncryptionStatus.keySet ? 'Fallback aktiv' : 'Nicht gesetzt')}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2">
+                  <p className="text-slate-500">Quelle</p>
+                  <p className="text-slate-200 font-semibold">
+                    {secretEncryptionStatus.source === 'admin-panel' ? 'Admin-Panel' : (secretEncryptionStatus.source === 'env' ? 'Umgebung' : 'Session-Secret')}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2">
+                  <p className="text-slate-500">Zuletzt geändert</p>
+                  <p className="text-slate-200 font-semibold">
+                    {secretEncryptionStatus.updatedAt ? formatDate(secretEncryptionStatus.updatedAt) : 'Noch nie'}
+                  </p>
+                </div>
+              </div>
+
+              <MessageBox message={secretEncryptionMsg} onClose={() => setSecretEncryptionMsg(null)} className="rounded-xl p-3" />
             </div>
 
             {/* AI / OpenRouter settings card */}

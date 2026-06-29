@@ -112,6 +112,34 @@ test('Admin kann Datenbank exportieren und dasselbe Backup wieder importieren', 
   assert.strictEqual(s3Config.settings.configured, true);
   assert.strictEqual(s3Config.settings.bucket, 'test-backup-bucket');
 
+  const shortEncryptionPasswordRes = await fetch(`${BASE_URL}/admin/app-settings`, {
+    method: 'POST',
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ secretEncryptionPassword: 'zu-kurz' }),
+  });
+  assert.strictEqual(shortEncryptionPasswordRes.status, 400);
+
+  const encryptionPassword = '0123456789abcdef0123456789abcdef';
+  const encryptionPasswordRes = await fetch(`${BASE_URL}/admin/app-settings`, {
+    method: 'POST',
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ secretEncryptionPassword: encryptionPassword }),
+  });
+  assert.strictEqual(encryptionPasswordRes.status, 200, `Expected 200 OK, got ${encryptionPasswordRes.status}`);
+  const encryptionSettings = await encryptionPasswordRes.json();
+  assert.strictEqual(encryptionSettings.settings.secretEncryption.adminKeySet, true);
+  assert.strictEqual(JSON.stringify(encryptionSettings).includes(encryptionPassword), false);
+
+  const encryptedKeysExportRes = await fetch(`${BASE_URL}/admin/database/export?scope=api-keys`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(encryptedKeysExportRes.status, 200, `Expected 200 OK, got ${encryptedKeysExportRes.status}`);
+  const encryptedKeysBackup = await encryptedKeysExportRes.json();
+  assert.match(encryptedKeysBackup.database.s3_settings.accessKeyId, /^enc:v1:/);
+  assert.match(encryptedKeysBackup.database.s3_settings.secretAccessKey, /^enc:v1:/);
+  assert.notStrictEqual(encryptedKeysBackup.database.s3_settings.accessKeyId, 'test-access-key');
+  assert.notStrictEqual(encryptedKeysBackup.database.s3_settings.secretAccessKey, 'test-secret-key');
+
   const importRes = await fetch(`${BASE_URL}/admin/database/import`, {
     method: 'POST',
     headers: authHeaders(token, { 'Content-Type': 'application/json' }),
@@ -233,6 +261,60 @@ test('Public Settings liefern Demo-Zugangsdaten fuer Demo-Buttons', async () => 
     assert.strictEqual(body.demoCredentials?.user?.password, USER_PASSWORD);
   } else {
     assert.strictEqual(body.demoCredentials, null);
+  }
+});
+
+test('Startseiten Export mailt PDF und Tagesziel-Spruch ist abrufbar', async () => {
+  const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+  const userToken = await login(USER_EMAIL, USER_PASSWORD);
+  const exportRes = await fetch(`${BASE_URL}/admin/database/export`, {
+    headers: authHeaders(adminToken),
+  });
+  assert.strictEqual(exportRes.status, 200);
+  const backup = await exportRes.json();
+
+  try {
+    const smtpRes = await fetch(`${BASE_URL}/admin/smtp`, {
+      method: 'POST',
+      headers: authHeaders(adminToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        host: 'mailpit',
+        port: 1025,
+        secure: false,
+        auth: { user: '', pass: '' },
+        fromName: 'Koffein-Tracker',
+        fromEmail: 'tracker@example.test',
+        baseUrl: 'http://localhost:3001',
+        registrationEnabled: true,
+        demoEnabled: true,
+      }),
+    });
+    assert.strictEqual(smtpRes.status, 200, `Expected 200 OK, got ${smtpRes.status}`);
+
+    const mailRes = await fetch(`${BASE_URL}/export/logs/email-pdf`, {
+      method: 'POST',
+      headers: authHeaders(userToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ start: '2026-06-01', end: '2026-06-30' }),
+    });
+    assert.strictEqual(mailRes.status, 200, `Expected 200 OK, got ${mailRes.status}`);
+    const mailBody = await mailRes.json();
+    assert.strictEqual(mailBody.success, true);
+    assert.match(mailBody.filename, /\.pdf$/);
+    assert.ok(Number(mailBody.size || 0) > 100, 'PDF-Anhang muss Inhalt haben');
+
+    const quoteRes = await fetch(`${BASE_URL}/ai/daily-hydration?date=2026-06-29`, {
+      headers: authHeaders(userToken),
+    });
+    assert.strictEqual(quoteRes.status, 200, `Expected 200 OK, got ${quoteRes.status}`);
+    const quoteBody = await quoteRes.json();
+    assert.strictEqual(quoteBody.date, '2026-06-29');
+    assert.ok(String(quoteBody.quote || '').length >= 8, 'Tagesziel-Spruch muss Text enthalten');
+  } finally {
+    await fetch(`${BASE_URL}/admin/database/import`, {
+      method: 'POST',
+      headers: authHeaders(adminToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ backup }),
+    });
   }
 });
 

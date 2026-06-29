@@ -14,7 +14,7 @@ import AchievementsPanel from './components/AchievementsPanel';
 import ExportPanel from './components/ExportPanel';
 import CalendarSuggestions from './components/CalendarSuggestions';
 import LoginPage from './components/LoginPage';
-import { Zap, Loader2, Bot, CalendarDays, History, Target } from 'lucide-react';
+import { Zap, Loader2, Bot, CalendarDays, History, Target, Droplets } from 'lucide-react';
 import AdminPanel from './components/AdminPanel';
 import RegisterPage from './components/RegisterPage';
 import SettingsPanel from './components/SettingsPanel';
@@ -31,6 +31,7 @@ import {
   updateLog,
 } from './services/api';
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
+import { fetchDailyHydrationQuote } from './services/aiApi';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
 
 const getTodayKey = () => {
@@ -190,6 +191,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [settings, setSettings] = useState(null);
   const [appSettings, setAppSettings] = useState({ entryMode: 'ai' });
   const [favorites, setFavorites] = useState([]);
+  const [hydrationQuote, setHydrationQuote] = useState({ quote: 'Hydration im Blick behalten', source: 'default' });
   const [showSettings, setShowSettings] = useState(false);
   const [todayKey, setTodayKey] = useState(getTodayKey);
   const [selectedDate, setSelectedDate] = useState(getTodayKey);
@@ -275,6 +277,18 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       document.documentElement.className = settings.theme === 'system' ? '' : `theme-${settings.theme}`;
     }
   }, [settings?.theme]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchDailyHydrationQuote(selectedDate)
+      .then((data) => {
+        if (isMounted && data?.quote) setHydrationQuote(data);
+      })
+      .catch(() => {
+        if (isMounted) setHydrationQuote({ quote: 'Hydration im Blick behalten', source: 'fallback' });
+      });
+    return () => { isMounted = false; };
+  }, [selectedDate]);
 
   useEffect(() => {
     const refreshLocalDay = () => {
@@ -499,6 +513,18 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
         {!showSettings && (
           <div className="space-y-4 sm:space-y-5 animate-fade-in">
+            <div className="glass-card rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-cyan-500/20 bg-cyan-500/5">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center shrink-0">
+                  <Droplets className="w-4 h-4 text-cyan-300" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] sm:text-xs text-cyan-300 font-semibold uppercase tracking-wider">Tagesziel</p>
+                  <p className="text-sm sm:text-base text-white font-semibold leading-snug">{hydrationQuote.quote}</p>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-4 gap-2 sm:gap-3">
               <div className="glass-card rounded-xl sm:rounded-2xl p-2.5 sm:p-4 min-w-0">
                 <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-400 mb-1 sm:mb-2 min-w-0">
@@ -632,7 +658,6 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
       <footer className="text-center py-6 pb-32 text-slate-600 text-sm">
         <p>Drink-Tracker &copy; {new Date().getFullYear()}</p>
-        <p className="text-xs mt-1 mb-2">Tagesziel: Hydration im Blick behalten</p>
         {(currentVersion || latestVersion) && (
           <p className="text-[10px] text-slate-500 opacity-60 font-mono tracking-wider">
             Version {latestVersion || currentVersion}

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Download, FileText, Printer } from 'lucide-react';
-import { fetchExportLogs } from '../services/api';
+import { Download, FileText, Mail } from 'lucide-react';
+import { fetchExportLogs, sendExportPdfEmail } from '../services/api';
 
 const dateKey = (date) => {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -21,12 +21,6 @@ const buildCsv = (items) => {
   return [header.map(csvValue).join(','), ...rows].join('\n');
 };
 
-const htmlEscape = (value) => String(value ?? '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;');
-
 const downloadFile = (content, filename, type) => {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -36,51 +30,6 @@ const downloadFile = (content, filename, type) => {
   a.click();
   URL.revokeObjectURL(url);
 };
-
-const renderPrintableHtml = ({ items, summary }) => `
-  <!doctype html>
-  <html lang="de">
-    <head>
-      <meta charset="utf-8" />
-      <title>Koffein Export</title>
-      <style>
-        body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
-        h1 { margin: 0 0 8px; }
-        .meta { color: #4b5563; margin-bottom: 24px; }
-        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
-        .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
-        .value { font-size: 22px; font-weight: 700; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 8px; }
-        th { background: #f9fafb; }
-      </style>
-    </head>
-    <body>
-      <h1>Koffein Export</h1>
-      <div class="meta">${htmlEscape(summary.start)} bis ${htmlEscape(summary.end)}</div>
-      <div class="cards">
-        <div class="card"><div class="value">${summary.logCount}</div><div>Einträge</div></div>
-        <div class="card"><div class="value">${summary.totalCaffeine} mg</div><div>Koffein</div></div>
-        <div class="card"><div class="value">${summary.totalSize} ml</div><div>Getränke</div></div>
-      </div>
-      <table>
-        <thead>
-          <tr><th>Datum</th><th>Name</th><th>Groesse</th><th>Koffein</th></tr>
-        </thead>
-        <tbody>
-          ${items.map((item) => `
-            <tr>
-              <td>${htmlEscape(item.date)}</td>
-              <td>${htmlEscape(item.name)}</td>
-              <td>${htmlEscape(item.size)} ml</td>
-              <td>${htmlEscape(item.caffeine)} mg</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </body>
-  </html>
-`;
 
 const ExportPanel = ({ userIdentity }) => {
   const [start, setStart] = useState(defaultStart);
@@ -113,26 +62,13 @@ const ExportPanel = ({ userIdentity }) => {
     }
   };
 
-  const handlePdf = async () => {
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      setMessage('Popup blockiert. Bitte Popups für diese Seite erlauben.');
-      return;
-    }
-
+  const handlePdfEmail = async () => {
     setLoading(true);
     setMessage('');
-    printWindow.document.write('<p style="font-family:Arial;padding:24px">Export wird vorbereitet...</p>');
     try {
-      const data = await loadExport();
-      printWindow.document.open();
-      printWindow.document.write(renderPrintableHtml(data));
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => printWindow.print(), 250);
-      setMessage(`${data.summary.logCount} Einträge für PDF vorbereitet.`);
+      const data = await sendExportPdfEmail({ ...userIdentity, start, end });
+      setMessage(`PDF wurde an ${data.to || userIdentity.email} gesendet.`);
     } catch (err) {
-      printWindow.close();
       setMessage(err.message);
     } finally {
       setLoading(false);
@@ -147,7 +83,7 @@ const ExportPanel = ({ userIdentity }) => {
         </div>
         <div>
           <h2 className="text-base font-bold text-white">Export</h2>
-          <p className="text-xs text-slate-500">Zeitraum als CSV oder PDF sichern</p>
+          <p className="text-xs text-slate-500">CSV laden oder PDF per Mail senden</p>
         </div>
       </div>
 
@@ -174,12 +110,12 @@ const ExportPanel = ({ userIdentity }) => {
         </button>
         <button
           type="button"
-          onClick={handlePdf}
+          onClick={handlePdfEmail}
           disabled={disabled}
           className="flex-1 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          <Printer className="w-4 h-4" />
-          PDF
+          <Mail className="w-4 h-4" />
+          PDF mailen
         </button>
       </div>
 

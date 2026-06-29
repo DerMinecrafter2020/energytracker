@@ -2,7 +2,7 @@
 
 Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen Warnungen. Die App bringt Benutzerverwaltung, Admin-Panel, Redis-Persistenz, 2FA, Erinnerungen, Discord-Integration und einen KI-Assistenten mit synchronisiertem Chatverlauf mit.
 
-![Version](https://img.shields.io/badge/version-2.1.8-blue)
+![Version](https://img.shields.io/badge/version-2.2.8-blue)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
@@ -14,6 +14,7 @@ Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen War
 - Tagesuebersicht mit Fortschrittsbalken, Warnungen und Tageslimit
 - Drink-Logs mit Name, Menge, Koffein, Icon, Datum, Bearbeiten und Loeschen
 - KI-Assistent fuer Fragen, Tagesanalyse und Drink-Aktionen
+- Taeglicher Hydration-Spruch oben an der Datumsleiste, per KI erzeugt und pro Tag gespeichert
 - Unbegrenzter KI-Chatverlauf ohne 40-Nachrichten-Limit
 - Synchronisierter KI-Chat zwischen mehreren Geraeten pro Benutzer
 - Benutzerkonten mit Registrierung, E-Mail-Verifikation und Passwort-Reset
@@ -25,6 +26,7 @@ Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen War
 - Erinnerungen per E-Mail und optional Discord
 - Discord-Webhook-Test und geplante KI-Discord-Nachrichten
 - SMTP-Konfiguration im Admin-Panel
+- Export auf der Startseite: CSV-Download und PDF-Versand per E-Mail
 - OpenRouter-KI-Konfiguration und optional Brave Search API
 - Redis-Health-Check im Admin-Panel
 - Themes: Standard Dark, Light, OLED, Neon, Forest
@@ -81,6 +83,7 @@ CORS_ORIGIN=http://localhost:3001
 
 SESSION_SECRET=bitte-aendern-langer-zufaelliger-wert
 PASSWORD_SALT=bitte-aendern
+SECRET_ENCRYPTION_KEY=
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=ein-sicheres-passwort
 USER_EMAIL=user@example.com
@@ -148,6 +151,7 @@ CORS_ORIGIN=http://localhost:5173
 
 SESSION_SECRET=bitte-aendern-langer-zufaelliger-wert
 PASSWORD_SALT=et-caffeine-salt-2024
+SECRET_ENCRYPTION_KEY=
 
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
@@ -214,6 +218,7 @@ Fuer produktive Installationen:
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | serverseitige Demo-Admin-Zugangsdaten |
 | `USER_EMAIL` / `USER_PASSWORD` | serverseitige Demo-Benutzer-Zugangsdaten |
 | `PASSWORD_SALT` | Salt fuer Passwort-Hashing |
+| `SECRET_ENCRYPTION_KEY` | optionaler Server-Fallback fuer verschluesselt gespeicherte Zugangsdaten; bevorzugt im Admin-Panel setzen |
 | `REDIS_URL` | vollstaendige Redis-URL, z.B. `redis://127.0.0.1:6379` |
 | `REDIS_HOST` / `REDIS_PORT` | Redis-Host und Port, falls keine `REDIS_URL` gesetzt ist |
 | `S3_BUCKET` | optionaler Bucket fuer Cloud-Backups, alternativ im Admin-Panel setzbar |
@@ -246,6 +251,8 @@ Unter **S3 Backup und Restore** koennen die `S3_*` Werte direkt im Admin-Panel g
 - ein Backup auf einer neuen Instanz wiederherstellen
 
 Für AWS S3 reicht normalerweise Bucket, Region, Access Key und Secret Key. Für MinIO, Hetzner, Wasabi oder andere kompatible Anbieter zusätzlich den Endpoint setzen und meistens Path-Style aktivieren. Der Endpoint kann als Service-Endpoint (`https://s3.example.com`) oder als Bucket-Endpoint (`https://mein-bucket.s3.example.com`) hinterlegt werden; die App erkennt den Bucket im Host und fuegt ihn nicht doppelt ein.
+
+S3 Access Key und Secret Key werden in Redis und in neuen `.db` Exporten verschluesselt gespeichert. Lege unter **Einstellungen -> Verschlüsselungskennwort** ein Kennwort mit mindestens 32 Zeichen fest. Dieses Kennwort wird nach dem Speichern nicht erneut angezeigt, deshalb sicher notieren. `SECRET_ENCRYPTION_KEY` kann weiterhin als Server-Fallback genutzt werden.
 
 ## KI-Assistent
 

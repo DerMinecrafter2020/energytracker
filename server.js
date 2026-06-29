@@ -386,12 +386,71 @@ const REDIS_KEYS = {
   discord_schedules: 'koffein:discord_schedules',
 };
 
-const DB_EXPORT_VERSION = 1;
+const DB_EXPORT_VERSION = 2;
 const BACKUP_SCOPES = new Set(['full', 'users', 'logs', 'api-keys']);
 
 const sanitizeAppSettings = (settings = {}) => ({
   entryMode: settings.entryMode === 'manual' ? 'manual' : 'ai',
+  secretEncryptionKeyEncrypted: cleanEnvValue(settings.secretEncryptionKeyEncrypted),
+  secretEncryptionKeyUpdatedAt: cleanEnvValue(settings.secretEncryptionKeyUpdatedAt),
+  hydrationQuotes: settings.hydrationQuotes && typeof settings.hydrationQuotes === 'object' && !Array.isArray(settings.hydrationQuotes)
+    ? settings.hydrationQuotes
+    : {},
 });
+
+const ENCRYPTED_SECRET_PREFIX = 'enc:v1:';
+const keyFromSecret = (secret) => crypto.createHash('sha256').update(cleanEnvValue(secret) || 'et-caffeine-salt-2024').digest();
+const secretStorageKey = keyFromSecret(process.env.SECRET_KEY_STORAGE_KEY || process.env.SESSION_SECRET || process.env.PASSWORD_SALT);
+
+if (!process.env.SECRET_ENCRYPTION_KEY && !process.env.DATA_ENCRYPTION_KEY && !process.env.SESSION_SECRET) {
+  console.warn('[Security] SECRET_ENCRYPTION_KEY und SESSION_SECRET fehlen. Nutze PASSWORD_SALT als schwachen Fallback fuer verschluesselte gespeicherte Secrets.');
+}
+
+const isEncryptedSecret = (value) => String(value || '').startsWith(ENCRYPTED_SECRET_PREFIX);
+
+const encryptSecretWithKey = (value, key) => {
+  const plain = cleanEnvValue(value);
+  if (!plain || isEncryptedSecret(plain)) return plain;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${ENCRYPTED_SECRET_PREFIX}${iv.toString('base64url')}:${tag.toString('base64url')}:${encrypted.toString('base64url')}`;
+};
+
+const decryptSecretWithKey = (value, key) => {
+  const safe = cleanEnvValue(value);
+  if (!safe || !isEncryptedSecret(safe)) return safe;
+  try {
+    const [ivRaw, tagRaw, encryptedRaw] = safe.slice(ENCRYPTED_SECRET_PREFIX.length).split(':');
+    if (!ivRaw || !tagRaw || !encryptedRaw) return '';
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivRaw, 'base64url'));
+    decipher.setAuthTag(Buffer.from(tagRaw, 'base64url'));
+    return Buffer.concat([
+      decipher.update(Buffer.from(encryptedRaw, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8');
+  } catch (err) {
+    console.error('[Security] Gespeichertes Secret konnte nicht entschluesselt werden:', err.message);
+    return '';
+  }
+};
+
+const adminSecretEncryptionPassword = () => {
+  const stored = cleanEnvValue(dbState?.app_settings?.secretEncryptionKeyEncrypted);
+  if (!stored) return '';
+  return decryptSecretWithKey(stored, secretStorageKey);
+};
+
+const activeSecretEncryptionPassword = () =>
+  adminSecretEncryptionPassword()
+  || cleanEnvValue(process.env.SECRET_ENCRYPTION_KEY || process.env.DATA_ENCRYPTION_KEY)
+  || cleanEnvValue(process.env.SESSION_SECRET || process.env.PASSWORD_SALT)
+  || 'et-caffeine-salt-2024';
+
+const activeSecretEncryptionKey = () => keyFromSecret(activeSecretEncryptionPassword());
+const encryptSecret = (value) => encryptSecretWithKey(value, activeSecretEncryptionKey());
+const decryptSecret = (value) => decryptSecretWithKey(value, activeSecretEncryptionKey());
 
 const sanitizeS3Settings = (settings = {}) => ({
   bucket: cleanEnvValue(settings.bucket),
@@ -402,6 +461,30 @@ const sanitizeS3Settings = (settings = {}) => ({
   accessKeyId: cleanEnvValue(settings.accessKeyId),
   secretAccessKey: cleanEnvValue(settings.secretAccessKey),
 });
+
+const decryptS3Settings = (settings = {}) => {
+  const safe = sanitizeS3Settings(settings);
+  return {
+    ...safe,
+    accessKeyId: decryptSecret(safe.accessKeyId),
+    secretAccessKey: decryptSecret(safe.secretAccessKey),
+  };
+};
+
+const encryptS3SettingsForStorage = (settings = {}) => {
+  const safe = sanitizeS3Settings(settings);
+  return {
+    ...safe,
+    accessKeyId: encryptSecret(safe.accessKeyId),
+    secretAccessKey: encryptSecret(safe.secretAccessKey),
+  };
+};
+
+const hasPlainS3Secrets = (settings = {}) => {
+  const safe = sanitizeS3Settings(settings);
+  return (!!safe.accessKeyId && !isEncryptedSecret(safe.accessKeyId))
+    || (!!safe.secretAccessKey && !isEncryptedSecret(safe.secretAccessKey));
+};
 
 const createEmptyDbState = () => ({
   appName: 'Drink-Tracker',
@@ -458,6 +541,66 @@ const normalizeDbState = (value = {}) => {
     ai_chat_messages: asArray(source.ai_chat_messages),
     discord_schedules: asArray(source.discord_schedules),
   };
+};
+
+const dbStateForStorage = (state = dbState) => {
+  const next = normalizeDbState(state);
+  return {
+    ...next,
+    s3_settings: encryptS3SettingsForStorage(next.s3_settings),
+  };
+};
+
+const encryptionPasswordStatus = () => {
+  const settings = sanitizeAppSettings(dbState.app_settings || {});
+  const adminKeySet = !!settings.secretEncryptionKeyEncrypted && !!adminSecretEncryptionPassword();
+  const envKeySet = !!cleanEnvValue(process.env.SECRET_ENCRYPTION_KEY || process.env.DATA_ENCRYPTION_KEY);
+  return {
+    minLength: 32,
+    keySet: adminKeySet || envKeySet || !!cleanEnvValue(process.env.SESSION_SECRET),
+    adminKeySet,
+    envKeySet,
+    source: adminKeySet ? 'admin-panel' : (envKeySet ? 'env' : 'session-secret'),
+    updatedAt: settings.secretEncryptionKeyUpdatedAt || '',
+  };
+};
+
+const appSettingsForAdmin = () => ({
+  entryMode: sanitizeAppSettings(dbState.app_settings || {}).entryMode,
+  secretEncryption: encryptionPasswordStatus(),
+});
+
+const saveAppSettings = (settings = {}) => {
+  const current = sanitizeAppSettings(dbState.app_settings || {});
+  const next = { ...current };
+
+  if (Object.prototype.hasOwnProperty.call(settings, 'entryMode')) {
+    next.entryMode = settings.entryMode === 'manual' ? 'manual' : 'ai';
+  }
+
+  if (Object.prototype.hasOwnProperty.call(settings, 'secretEncryptionPassword')) {
+    const password = cleanEnvValue(settings.secretEncryptionPassword);
+    if (!password) {
+      const err = new Error('Verschlüsselungskennwort darf nicht leer sein.');
+      err.status = 400;
+      throw err;
+    }
+    if (password.length < 32) {
+      const err = new Error('Verschlüsselungskennwort muss mindestens 32 Zeichen lang sein.');
+      err.status = 400;
+      throw err;
+    }
+
+    const currentS3Settings = decryptS3Settings(dbState.s3_settings || {});
+    next.secretEncryptionKeyEncrypted = encryptSecretWithKey(password, secretStorageKey);
+    next.secretEncryptionKeyUpdatedAt = new Date().toISOString();
+    dbState.app_settings = next;
+    dbState.s3_settings = currentS3Settings;
+    return next;
+  }
+
+  dbState.app_settings = next;
+  return next;
 };
 
 const hasDatabaseShape = (value = {}) => {
@@ -571,7 +714,7 @@ const importDatabasePayload = async (payload) => {
 };
 
 const s3Config = () => {
-  const stored = sanitizeS3Settings(dbState.s3_settings || {});
+  const stored = decryptS3Settings(dbState.s3_settings || {});
   const envEndpoint = cleanEnvValue(process.env.S3_ENDPOINT);
   const region = stored.region || cleanEnvValue(process.env.S3_REGION) || 'eu-central-1';
   const endpoint = stored.endpoint || envEndpoint || `https://s3.${region}.amazonaws.com`;
@@ -842,7 +985,7 @@ const loadDbState = async () => {
       REDIS_KEYS.discord_schedules,
     );
     const parsedAi = safeParse(ai, {});
-    dbState = normalizeDbState({
+    const loadedState = normalizeDbState({
       caffeine_logs: safeParse(logs, []),
       users:         safeParse(users, []),
       smtp_settings: safeParse(smtp, null),
@@ -862,13 +1005,19 @@ const loadDbState = async () => {
       discord_schedules: safeParse(discordSchedules, []),
       appName: appName || 'Drink-Tracker',
     });
+    const shouldEncryptS3Secrets = hasPlainS3Secrets(loadedState.s3_settings);
+    dbState = loadedState;
+    if (shouldEncryptS3Secrets) {
+      console.log('[Security] Migriere gespeicherte S3-Zugangsdaten in verschluesselte Ablage.');
+      await persistDbState();
+    }
   } catch (err) {
     console.error('[DB] Redis Ladefehler:', err.message);
   }
 };
 
 const persistDbState = () => {
-  const next = normalizeDbState(dbState);
+  const next = dbStateForStorage(dbState);
   dbState = next;
   return redis.mset(
     REDIS_KEYS.app_name,      next.appName || 'Drink-Tracker',
@@ -2110,6 +2259,124 @@ const getExportSummary = (logs, start, end) => ({
   totalSize: logs.reduce((sum, log) => sum + (Number(log.size) || 0), 0),
 });
 
+const pdfSafeText = (value) => String(value ?? '')
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^\x20-\x7E]/g, '?')
+  .replace(/[\\()]/g, (char) => `\\${char}`);
+
+const wrapPdfLine = (value, maxLength = 96) => {
+  const words = String(value ?? '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = '';
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  });
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+};
+
+const buildLogsPdfBuffer = ({ logs, summary }) => {
+  const lines = [
+    'Koffein Export',
+    `${summary.start} bis ${summary.end}`,
+    '',
+    `Eintraege: ${summary.logCount}`,
+    `Koffein gesamt: ${summary.totalCaffeine} mg`,
+    `Getraenke gesamt: ${summary.totalSize} ml`,
+    '',
+    'Datum       Koffein  Groesse  Getraenk',
+    '------------------------------------------------------------',
+  ];
+
+  if (logs.length === 0) {
+    lines.push('Keine Eintraege im gewaehlten Zeitraum.');
+  } else {
+    logs.forEach((log) => {
+      const row = `${String(log.date || '').padEnd(10)} ${String(Number(log.caffeine) || 0).padStart(6)}mg ${String(Number(log.size) || 0).padStart(6)}ml  ${log.name || 'Unbekannt'}`;
+      lines.push(...wrapPdfLine(row));
+    });
+  }
+
+  const pageLines = [];
+  for (let i = 0; i < lines.length; i += 44) pageLines.push(lines.slice(i, i + 44));
+
+  const objects = [];
+  const addObject = (content) => {
+    objects.push(content);
+    return objects.length;
+  };
+  const catalogId = addObject('');
+  const pagesId = addObject('');
+  const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  const pageIds = [];
+
+  pageLines.forEach((page, index) => {
+    const escapedLines = [
+      `(${pdfSafeText(`Koffein-Tracker Export - Seite ${index + 1}/${pageLines.length}`)}) Tj T*`,
+      ...page.map((line) => `(${pdfSafeText(line)}) Tj T*`),
+    ].join('\n');
+    const content = `BT\n/F1 10 Tf\n50 790 Td\n14 TL\n${escapedLines}\nET`;
+    const contentId = addObject(`<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`);
+    const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    pageIds.push(pageId);
+  });
+
+  objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+  objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`;
+
+  const chunks = ['%PDF-1.4\n'];
+  const offsets = [0];
+  objects.forEach((content, index) => {
+    offsets.push(Buffer.byteLength(chunks.join(''), 'utf8'));
+    chunks.push(`${index + 1} 0 obj\n${content}\nendobj\n`);
+  });
+  const xrefOffset = Buffer.byteLength(chunks.join(''), 'utf8');
+  chunks.push(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`);
+  offsets.slice(1).forEach((offset) => chunks.push(`${String(offset).padStart(10, '0')} 00000 n \n`));
+  chunks.push(`trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`);
+  return Buffer.from(chunks.join(''), 'utf8');
+};
+
+const sendExportPdfEmail = async ({ to, logs, summary }) => {
+  const cfg = await loadSmtpConfig();
+  if (!cfg?.host) {
+    const err = new Error('SMTP ist nicht vollständig konfiguriert.');
+    err.status = 400;
+    throw err;
+  }
+
+  const filename = `koffein-export-${summary.start}-bis-${summary.end}.pdf`;
+  const pdf = buildLogsPdfBuffer({ logs, summary });
+  const transporter = createTransporter(cfg);
+  await transporter.sendMail({
+    from: `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
+    to,
+    subject: `Koffein-Tracker Export ${summary.start} bis ${summary.end}`,
+    html: buildModernEmail({
+      icon: '📄',
+      headerText: 'Dein Koffein-Export',
+      contentHtml: `
+        <p style="text-align: center; margin-top: 0;">Dein Export fuer den Zeitraum <strong>${summary.start}</strong> bis <strong>${summary.end}</strong> haengt als PDF an.</p>
+        <p style="text-align: center; margin: 0;">${summary.logCount} Eintraege, ${summary.totalCaffeine} mg Koffein, ${summary.totalSize} ml Getraenke.</p>
+      `,
+      footerText: 'Diese E-Mail wurde ueber die Exportfunktion deiner Startseite verschickt.',
+    }),
+    attachments: [{
+      filename,
+      content: pdf,
+      contentType: 'application/pdf',
+    }],
+  });
+  return { filename, size: pdf.length };
+};
+
 const getOwnerLabelForLog = (log) => {
   const email = String(log.email || '').toLowerCase();
   const user = dbState.users.find((entry) =>
@@ -2205,6 +2472,67 @@ const buildModernEmail = ({ icon, headerText, contentHtml, footerText }) => `
     </p>
   </div>
 `;
+
+const HYDRATION_FALLBACK_QUOTES = [
+  'Ein Glas Wasser macht den Kopf klarer als der naechste Reflex-Kaffee.',
+  'Heute kurz trinken, bevor der Akku auf Reserve laeuft.',
+  'Hydration zuerst, Koffein danach mit besserem Gewissen.',
+  'Kleine Wasserpause, grosser Unterschied fuer den Tag.',
+  'Dein Tagesziel startet mit einem Schluck, nicht mit Perfektion.',
+  'Wasser ist der stille Co-Pilot fuer Fokus und Energie.',
+  'Erst auffuellen, dann beschleunigen.',
+];
+
+const fallbackHydrationQuote = (date) => {
+  const hash = crypto.createHash('sha256').update(String(date || getTodayKey())).digest()[0] || 0;
+  return HYDRATION_FALLBACK_QUOTES[hash % HYDRATION_FALLBACK_QUOTES.length];
+};
+
+const sanitizeHydrationQuote = (value, date) => {
+  const cleaned = String(value || '')
+    .replace(/^["'„“”]+|["'„“”]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return fallbackHydrationQuote(date);
+  return cleaned.length > 130 ? `${cleaned.slice(0, 127).trim()}...` : cleaned;
+};
+
+const getDailyHydrationQuote = async (date = getTodayKey()) => {
+  const safeDate = isValidDateKey(date) ? date : getTodayKey();
+  const settings = sanitizeAppSettings(dbState.app_settings || {});
+  const quotes = settings.hydrationQuotes || {};
+  if (quotes[safeDate]) return { date: safeDate, quote: quotes[safeDate], source: 'cache' };
+
+  let quote = '';
+  let source = 'fallback';
+  try {
+    const result = await callOpenRouter([
+      {
+        role: 'system',
+        content: 'Du schreibst kurze, alltagstaugliche deutsche Motivationssaetze fuer eine Koffein-Tracker-App. Keine Emojis, keine Hashtags, maximal 16 Woerter.',
+      },
+      {
+        role: 'user',
+        content: `Erstelle fuer ${safeDate} einen neuen Tagesziel-Spruch zum Thema Hydration im Blick behalten. Nur den Satz ausgeben.`,
+      },
+    ]);
+    quote = sanitizeHydrationQuote(result.content, safeDate);
+    source = 'ai';
+  } catch (err) {
+    quote = fallbackHydrationQuote(safeDate);
+    source = 'fallback';
+  }
+
+  const nextQuotes = {
+    ...quotes,
+    [safeDate]: quote,
+  };
+  const sortedDates = Object.keys(nextQuotes).sort();
+  while (sortedDates.length > 45) delete nextQuotes[sortedDates.shift()];
+  dbState.app_settings = { ...settings, hydrationQuotes: nextQuotes };
+  await persistDbState();
+  return { date: safeDate, quote, source };
+};
 
 const sendReminderEmail = async ({ to }) => {
   const cfg = await loadSmtpConfig();
@@ -2919,17 +3247,21 @@ app.get('/api/admin/discord-ai/status', requireAdmin, async (req, res) => {
 });
 
 app.get('/api/admin/app-settings', requireAdmin, (req, res) => {
-  res.json(sanitizeAppSettings(dbState.app_settings));
+  res.json(appSettingsForAdmin());
 });
 
 app.post('/api/admin/app-settings', requireAdmin, async (req, res) => {
   try {
-    dbState.app_settings = sanitizeAppSettings(req.body || {});
+    saveAppSettings(req.body || {});
     await persistDbState();
-    res.json({ success: true, settings: dbState.app_settings });
+    res.json({ success: true, settings: appSettingsForAdmin() });
   } catch (err) {
-    console.error('POST /api/admin/app-settings error:', err);
-    res.status(500).json({ error: 'App-Einstellungen konnten nicht gespeichert werden.' });
+    if ((err.status || 500) >= 500) {
+      console.error('POST /api/admin/app-settings error:', err);
+    } else {
+      console.warn('POST /api/admin/app-settings validation:', err.message);
+    }
+    res.status(err.status || 500).json({ error: err.message || 'App-Einstellungen konnten nicht gespeichert werden.' });
   }
 });
 
@@ -2977,7 +3309,15 @@ app.post('/api/admin/s3/config', requireAdmin, async (req, res) => {
   try {
     const settings = saveS3Settings(req.body || {});
     await persistDbState();
-    res.json({ success: true, settings: s3ConfigForAdmin(), raw: { ...settings, secretAccessKey: settings.secretAccessKey ? '••••••••' : '' } });
+    res.json({
+      success: true,
+      settings: s3ConfigForAdmin(),
+      raw: {
+        ...settings,
+        accessKeyId: settings.accessKeyId ? maskBackupSecret(settings.accessKeyId) : '',
+        secretAccessKey: settings.secretAccessKey ? '••••••••' : '',
+      },
+    });
   } catch (err) {
     console.error('POST /api/admin/s3/config error:', err);
     res.status(500).json({ error: err.message || 'S3-Konfiguration konnte nicht gespeichert werden.' });
@@ -4256,6 +4596,36 @@ app.get('/api/export/logs', requireAuth, async (req, res) => {
   }
 });
 
+app.post('/api/export/logs/email-pdf', requireAuth, async (req, res) => {
+  try {
+    const { userId, email } = authIdentity(req);
+    const { start, end } = getRangeFromQuery(req.body || {}, 30);
+    const logs = getLogsForUser({ userId, email, start, end });
+    const summary = getExportSummary(logs, start, end);
+    const result = await sendExportPdfEmail({ to: email, logs, summary });
+    res.json({
+      success: true,
+      to: email,
+      filename: result.filename,
+      size: result.size,
+      summary,
+    });
+  } catch (err) {
+    console.error('POST /api/export/logs/email-pdf error:', err);
+    res.status(err.status || 500).json({ error: err.message || 'PDF-Export konnte nicht per E-Mail gesendet werden.' });
+  }
+});
+
+app.get('/api/ai/daily-hydration', requireAuth, async (req, res) => {
+  try {
+    const date = isValidDateKey(req.query.date) ? String(req.query.date) : getTodayKey();
+    res.json(await getDailyHydrationQuote(date));
+  } catch (err) {
+    console.error('GET /api/ai/daily-hydration error:', err);
+    res.status(500).json({ error: 'Tagesziel-Spruch konnte nicht geladen werden.' });
+  }
+});
+
 app.get('/api/admin/ai', requireAdmin, (req, res) => {
   const cfg = loadAiConfig();
   const maskedKey = cfg.apiKey ? cfg.apiKey.slice(0, 8) + '********' + cfg.apiKey.slice(-4) : '';
@@ -4707,20 +5077,22 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', async () => {
   console.log('[DB] SIGTERM empfangen, schreibe letzten Stand nach Redis...');
   try {
+    const next = dbStateForStorage(dbState);
+    dbState = next;
     await redis.mset(
-      REDIS_KEYS.caffeine_logs,  JSON.stringify(dbState.caffeine_logs),
-      REDIS_KEYS.users,          JSON.stringify(dbState.users),
-      REDIS_KEYS.smtp_settings,  JSON.stringify(dbState.smtp_settings),
-      REDIS_KEYS.auth_config,    JSON.stringify(dbState.auth_config),
-      REDIS_KEYS.reminders,      JSON.stringify(dbState.reminders),
-      REDIS_KEYS.favorites,      JSON.stringify(dbState.favorites),
-      REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
-      REDIS_KEYS.s3_settings,    JSON.stringify(dbState.s3_settings),
-      REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
-      REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
-      REDIS_KEYS.ai_chat_messages, JSON.stringify(dbState.ai_chat_messages),
-      REDIS_KEYS.app_settings,   JSON.stringify(dbState.app_settings),
-      REDIS_KEYS.discord_schedules, JSON.stringify(dbState.discord_schedules),
+      REDIS_KEYS.caffeine_logs,  JSON.stringify(next.caffeine_logs),
+      REDIS_KEYS.users,          JSON.stringify(next.users),
+      REDIS_KEYS.smtp_settings,  JSON.stringify(next.smtp_settings),
+      REDIS_KEYS.auth_config,    JSON.stringify(next.auth_config),
+      REDIS_KEYS.reminders,      JSON.stringify(next.reminders),
+      REDIS_KEYS.favorites,      JSON.stringify(next.favorites),
+      REDIS_KEYS.ai_config,      JSON.stringify(next.ai_config),
+      REDIS_KEYS.s3_settings,    JSON.stringify(next.s3_settings),
+      REDIS_KEYS.user_settings,  JSON.stringify(next.user_settings),
+      REDIS_KEYS.custom_drinks,  JSON.stringify(next.custom_drinks),
+      REDIS_KEYS.ai_chat_messages, JSON.stringify(next.ai_chat_messages),
+      REDIS_KEYS.app_settings,   JSON.stringify(next.app_settings),
+      REDIS_KEYS.discord_schedules, JSON.stringify(next.discord_schedules),
     );
     console.log('[DB] ✓ Letzter Stand gespeichert.');
   } catch (err) {
