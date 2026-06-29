@@ -3,6 +3,7 @@ import Header from './components/Header';
 import ProgressBar from './components/ProgressBar';
 import ReminderSettings from './components/ReminderSettings';
 import AIAssistant from './components/AIAssistant';
+import ManualDrinkEntry from './components/ManualDrinkEntry';
 import CalendarWidget from './components/CalendarWidget';
 import CaffeineDecayChart from './components/CaffeineDecayChart';
 import GoalOverview from './components/GoalOverview';
@@ -23,6 +24,7 @@ import {
   fetchStatsOverview,
   fetchInsights,
   fetchUserSettings,
+  fetchPublicSettings,
   fetchFavorites,
   addFavorite,
   removeFavorite,
@@ -186,6 +188,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [overviewStats, setOverviewStats] = useState(null);
   const [insights, setInsights] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [appSettings, setAppSettings] = useState({ entryMode: 'ai' });
   const [favorites, setFavorites] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [todayKey, setTodayKey] = useState(getTodayKey);
@@ -210,13 +213,14 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
   const fetchAllData = useCallback(async () => {
     try {
-      const [selectedLogs, statsData, overviewData, insightsData, userSettings, favoriteItems] = await Promise.all([
+      const [selectedLogs, statsData, overviewData, insightsData, userSettings, favoriteItems, publicSettings] = await Promise.all([
         fetchTodayLogs(selectedDate, currentUser),
         session?.email ? fetchTodayStats(currentUser) : Promise.resolve(null),
         session?.email ? fetchStatsOverview(currentUser) : Promise.resolve(null),
         session?.email ? fetchInsights(currentUser) : Promise.resolve(null),
         session?.email ? fetchUserSettings(currentUser) : Promise.resolve(null),
         session?.email ? fetchFavorites(currentUser) : Promise.resolve([]),
+        fetchPublicSettings().catch(() => ({ entryMode: 'ai' })),
       ]);
       setLogs(selectedLogs);
       if (statsData) setTodayStats(statsData);
@@ -224,6 +228,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       if (insightsData) setInsights(insightsData);
       if (userSettings) setSettings(userSettings);
       setFavorites(Array.isArray(favoriteItems) ? favoriteItems : []);
+      setAppSettings({ entryMode: publicSettings?.entryMode === 'manual' ? 'manual' : 'ai' });
     } catch (err) {
       console.error('Fehler beim Laden der Daten:', err);
       setError('Fehler beim Laden der Daten.');
@@ -344,6 +349,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const selectedDateLabel = isSelectedDateToday ? 'Heute' : formatDateLabel(selectedDate);
   const remainingCaffeine = Math.max(0, dailyLimit - selectedDateCaffeine);
   const aiContextSummary = `${selectedDateLabel}: ${selectedDateCaffeine} mg, ${logs.length} Einträge, Limit ${dailyLimit} mg`;
+  const entryMode = appSettings.entryMode === 'manual' ? 'manual' : 'ai';
 
   
   
@@ -526,18 +532,26 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
             <section className="grid gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_390px] items-start">
               <div className="min-w-0">
-                <AIAssistant
-                  key={session?.id || session?.email}
-                  session={session}
-                  selectedDate={selectedDate}
-                  totalCaffeineToday={selectedDateCaffeine}
-                  logs={logs}
-                  onAddDrink={handleAddDrink}
-                  onDeleteDrink={handleDeleteLog}
-                  onUpdateDrink={handleUpdateLog}
-                  primary
-                  contextSummary={aiContextSummary}
-                />
+                {entryMode === 'manual' ? (
+                  <ManualDrinkEntry
+                    selectedDate={selectedDate}
+                    onAddDrink={handleAddDrink}
+                    isLoading={isOperationLoading}
+                  />
+                ) : (
+                  <AIAssistant
+                    key={session?.id || session?.email}
+                    session={session}
+                    selectedDate={selectedDate}
+                    totalCaffeineToday={selectedDateCaffeine}
+                    logs={logs}
+                    onAddDrink={handleAddDrink}
+                    onDeleteDrink={handleDeleteLog}
+                    onUpdateDrink={handleUpdateLog}
+                    primary
+                    contextSummary={aiContextSummary}
+                  />
+                )}
               </div>
 
               <aside className="space-y-3 sm:space-y-4 xl:sticky xl:top-24">

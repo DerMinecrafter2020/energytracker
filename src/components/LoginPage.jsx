@@ -172,12 +172,12 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
   };
 
   const fillDemo = (role) => {
-    if (role === 'admin') {
-      setEmail(import.meta.env.VITE_ADMIN_EMAIL || 'admin@energytracker.de');
-    } else {
-      setEmail(import.meta.env.VITE_USER_EMAIL || 'user@energytracker.de');
-    }
-    setPassword('');
+    const credentials = publicSettings.demoCredentials?.[role] || {};
+    const fallback = role === 'admin'
+      ? { email: import.meta.env.VITE_ADMIN_EMAIL || 'admin@energytracker.de', password: 'Admin@2024!' }
+      : { email: import.meta.env.VITE_USER_EMAIL || 'user@energytracker.de', password: 'User@2024!' };
+    setEmail(credentials.email || fallback.email);
+    setPassword(credentials.password || fallback.password);
     setError('');
   };
 
@@ -357,7 +357,6 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
 };
 
 export default LoginPage;
-
 
 
 

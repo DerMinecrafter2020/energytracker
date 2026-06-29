@@ -381,13 +381,19 @@ const REDIS_KEYS = {
   custom_drinks: 'koffein:custom_drinks',
   ai_chat_messages: 'koffein:ai_chat_messages',
   app_name:      'koffein:app_name',
+  app_settings:  'koffein:app_settings',
   discord_schedules: 'koffein:discord_schedules',
 };
 
 const DB_EXPORT_VERSION = 1;
 
+const sanitizeAppSettings = (settings = {}) => ({
+  entryMode: settings.entryMode === 'manual' ? 'manual' : 'ai',
+});
+
 const createEmptyDbState = () => ({
   appName: 'Drink-Tracker',
+  app_settings: sanitizeAppSettings(),
   caffeine_logs: [],
   users: [],
   smtp_settings: null,
@@ -416,9 +422,11 @@ const normalizeDbState = (value = {}) => {
   const source = value?.database || value?.dbState || value?.data || value;
   const fallback = createEmptyDbState();
   const parsedAi = asObjectOrNull(source.ai_config) || {};
+  const parsedAppSettings = asObjectOrNull(source.app_settings) || asObjectOrNull(source.appSettings) || {};
 
   return {
     appName: typeof source.appName === 'string' && source.appName.trim() ? source.appName.trim() : fallback.appName,
+    app_settings: sanitizeAppSettings(parsedAppSettings),
     caffeine_logs: asArray(source.caffeine_logs),
     users: asArray(source.users),
     smtp_settings: asObjectOrNull(source.smtp_settings),
@@ -450,6 +458,7 @@ const hasDatabaseShape = (value = {}) => {
     'user_settings',
     'custom_drinks',
     'ai_chat_messages',
+    'app_settings',
     'discord_schedules',
   ].some((key) => Object.prototype.hasOwnProperty.call(source, key));
 };
@@ -659,7 +668,7 @@ const loadDbState = async () => {
       return;
     }
 
-    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, chatMessages, appName, discordSchedules] = await redis.mget(
+    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, chatMessages, appName, appSettings, discordSchedules] = await redis.mget(
       REDIS_KEYS.caffeine_logs,
       REDIS_KEYS.users,
       REDIS_KEYS.smtp_settings,
@@ -671,6 +680,7 @@ const loadDbState = async () => {
       REDIS_KEYS.custom_drinks,
       REDIS_KEYS.ai_chat_messages,
       REDIS_KEYS.app_name,
+      REDIS_KEYS.app_settings,
       REDIS_KEYS.discord_schedules,
     );
     const parsedAi = safeParse(ai, {});
@@ -689,6 +699,7 @@ const loadDbState = async () => {
       user_settings: safeParse(settings, []),
       custom_drinks: safeParse(drinks, []),
       ai_chat_messages: safeParse(chatMessages, []),
+      app_settings: safeParse(appSettings, {}),
       discord_schedules: safeParse(discordSchedules, []),
       appName: appName || 'Drink-Tracker',
     });
@@ -712,6 +723,7 @@ const persistDbState = () => {
     REDIS_KEYS.user_settings,  JSON.stringify(next.user_settings),
     REDIS_KEYS.custom_drinks,  JSON.stringify(next.custom_drinks),
     REDIS_KEYS.ai_chat_messages, JSON.stringify(next.ai_chat_messages),
+    REDIS_KEYS.app_settings,   JSON.stringify(next.app_settings),
     REDIS_KEYS.discord_schedules, JSON.stringify(next.discord_schedules),
   ).catch((err) => console.error('[DB] Redis Speicherfehler:', err.message));
 };
@@ -2275,54 +2287,78 @@ const startDiscordAiScheduler = () => {
   console.log('[Discord AI] Scheduler gestartet.');
 };
 
+let reminderTickInProgress = false;
+
 const processRemindersTick = async () => {
+  if (reminderTickInProgress) return;
+  reminderTickInProgress = true;
   const now = new Date();
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const today = getTodayKey();
-  const cfg = await loadSmtpConfig();
   let stateChanged = false;
 
-  // 1. Regular Reminders
-  if (Array.isArray(dbState.reminders) && dbState.reminders.length > 0) {
-    for (const reminder of dbState.reminders) {
-      const normalized = sanitizeReminder(reminder);
-      if (!normalized.enabled) continue;
-      if (normalized.time !== hhmm) continue;
-      if (normalized.lastTriggeredDate === today) continue;
+  try {
+    const cfg = await loadSmtpConfig();
 
-      try {
+    // 1. Regular Reminders
+    if (Array.isArray(dbState.reminders) && dbState.reminders.length > 0) {
+      for (const reminder of dbState.reminders) {
+        const normalized = sanitizeReminder(reminder);
+        if (!normalized.enabled) continue;
+        if (normalized.time !== hhmm) continue;
+        if (normalized.lastTriggeredDate === today) continue;
+
         const user = dbState.users.find(u => (reminder.userId && String(u.id) === String(reminder.userId)) || (reminder.email && String(u.email).toLowerCase() === String(reminder.email).toLowerCase()));
         const targetEmail = user?.email || reminder.email;
         const targetUserId = user?.id || reminder.userId || null;
-
-        if (userHasLogForDate({ userId: targetUserId, email: targetEmail, date: today })) {
-          reminder.lastTriggeredDate = today;
-          reminder.updatedAt = new Date().toISOString();
-          reminder.skippedBecauseTrackedDate = today;
-          stateChanged = true;
-          console.log(`[Reminder] Übersprungen für ${targetEmail}: heute bereits Eintrag vorhanden.`);
-          continue;
-        }
-
-        if (normalized.mailEnabled) {
-          await sendReminderEmail({ to: targetEmail });
-        }
-        if (normalized.discordEnabled && cfg.discordWebhook) {
-          await sendDiscordReminder({ webhookUrl: cfg.discordWebhook, email: targetEmail });
-        }
+        const triggeredAt = new Date().toISOString();
 
         reminder.lastTriggeredDate = today;
-        reminder.updatedAt = new Date().toISOString();
+        reminder.lastTriggeredAt = triggeredAt;
+        reminder.updatedAt = triggeredAt;
+        reminder.deliveryStatus = 'sending';
+        delete reminder.lastError;
+        delete reminder.skippedBecauseTrackedDate;
         stateChanged = true;
-        console.log(`[Reminder] Gesendet an ${reminder.email} (${normalized.time})`);
-      } catch (err) {
-        console.error(`[Reminder] Fehler für ${reminder.email}:`, err.message);
+        await persistDbState();
+
+        try {
+          if (userHasLogForDate({ userId: targetUserId, email: targetEmail, date: today })) {
+            reminder.deliveryStatus = 'skipped_tracked';
+            reminder.skippedBecauseTrackedDate = today;
+            reminder.updatedAt = new Date().toISOString();
+            stateChanged = true;
+            console.log(`[Reminder] Übersprungen für ${targetEmail}: heute bereits Eintrag vorhanden.`);
+            continue;
+          }
+
+          if (normalized.mailEnabled) {
+            await sendReminderEmail({ to: targetEmail });
+          }
+          if (normalized.discordEnabled && cfg.discordWebhook) {
+            await sendDiscordReminder({ webhookUrl: cfg.discordWebhook, email: targetEmail });
+          }
+
+          reminder.deliveryStatus = 'sent';
+          reminder.updatedAt = new Date().toISOString();
+          stateChanged = true;
+          console.log(`[Reminder] Gesendet an ${reminder.email} (${normalized.time})`);
+        } catch (err) {
+          reminder.deliveryStatus = 'failed';
+          reminder.lastError = err.message;
+          reminder.lastTriggeredDate = today;
+          reminder.updatedAt = new Date().toISOString();
+          stateChanged = true;
+          console.error(`[Reminder] Fehler für ${reminder.email}:`, err.message);
+        }
       }
     }
-  }
 
-  if (stateChanged) {
-    persistDbState();
+    if (stateChanged) {
+      await persistDbState();
+    }
+  } finally {
+    reminderTickInProgress = false;
   }
 };
 
@@ -2722,6 +2758,21 @@ app.get('/api/admin/discord-ai/status', requireAdmin, async (req, res) => {
   }
 });
 
+app.get('/api/admin/app-settings', requireAdmin, (req, res) => {
+  res.json(sanitizeAppSettings(dbState.app_settings));
+});
+
+app.post('/api/admin/app-settings', requireAdmin, async (req, res) => {
+  try {
+    dbState.app_settings = sanitizeAppSettings(req.body || {});
+    await persistDbState();
+    res.json({ success: true, settings: dbState.app_settings });
+  } catch (err) {
+    console.error('POST /api/admin/app-settings error:', err);
+    res.status(500).json({ error: 'App-Einstellungen konnten nicht gespeichert werden.' });
+  }
+});
+
 app.get('/api/admin/database/export', requireAdmin, async (req, res) => {
   try {
     const backup = buildDatabaseExport();
@@ -3075,9 +3126,15 @@ app.post('/api/admin/users/:id/impersonate', requireAdmin, (req, res) => {
 app.get('/api/settings/public', async (req, res) => {
   try {
     const cfg = await loadSmtpConfig();
+    const demoEnabled = cfg?.demoEnabled !== false;
     res.json({
-      demoEnabled: cfg?.demoEnabled !== false,
+      demoEnabled,
       registrationEnabled: cfg?.registrationEnabled !== false,
+      entryMode: sanitizeAppSettings(dbState.app_settings).entryMode,
+      demoCredentials: demoEnabled ? {
+        admin: { email: DEMO_ADMIN_EMAIL, password: DEMO_ADMIN_PASSWORD },
+        user: { email: DEMO_USER_EMAIL, password: DEMO_USER_PASSWORD },
+      } : null,
       authMode: 'local',
       authentikEnabled: false,
       setupRequired: false,
@@ -4479,6 +4536,7 @@ process.on('SIGTERM', async () => {
       REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
       REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
       REDIS_KEYS.ai_chat_messages, JSON.stringify(dbState.ai_chat_messages),
+      REDIS_KEYS.app_settings,   JSON.stringify(dbState.app_settings),
       REDIS_KEYS.discord_schedules, JSON.stringify(dbState.discord_schedules),
     );
     console.log('[DB] ✓ Letzter Stand gespeichert.');

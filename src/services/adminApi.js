@@ -58,6 +58,8 @@ export const testSmtpConfig = (testEmail) => post('/api/admin/smtp/test', { test
 export const testDiscordWebhook = (webhookUrl) => post('/api/admin/discord/test', { webhookUrl });
 export const saveDiscordWebhook = (webhookUrl) => post('/api/admin/discord/webhook', { webhookUrl });
 export const fetchDiscordAiStatus = () => request('/api/admin/discord-ai/status');
+export const fetchAdminAppSettings = () => request('/api/admin/app-settings');
+export const saveAdminAppSettings = (settings) => post('/api/admin/app-settings', settings);
 export const fetchAiConfig = () => request('/api/admin/ai');
 export const saveAiConfig = ({ apiKey, model, braveSearchKey }) =>
   post('/api/admin/ai', { apiKey, model, braveSearchKey });

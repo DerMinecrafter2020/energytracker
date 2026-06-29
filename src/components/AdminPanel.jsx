@@ -13,7 +13,7 @@ import {
   fetchSmtpConfig, saveSmtpConfig, testSmtpConfig,
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
   testDiscordWebhook, saveDiscordWebhook, fetchDiscordAiStatus, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
-  fetchAdminActivity, fetchAdminApiTests, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
+  fetchAdminActivity, fetchAdminApiTests, fetchAdminAppSettings, saveAdminAppSettings, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
   fetchS3Status, fetchS3Backups, createS3Backup, restoreS3Backup,
 } from '../services/adminApi';
 
@@ -221,6 +221,9 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [discordAiStatus, setDiscordAiStatus] = useState(null);
   const [discordAiStatusLoading, setDiscordAiStatusLoading] = useState(false);
   const [discordAiStatusMsg, setDiscordAiStatusMsg] = useState(null);
+  const [entryMode, setEntryMode] = useState('ai');
+  const [entryModeSaving, setEntryModeSaving] = useState(false);
+  const [entryModeMsg, setEntryModeMsg] = useState(null);
 
   // â”€â”€ AI Config state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [aiApiKey, setAiApiKey]   = useState('');
@@ -290,6 +293,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
         })
         .catch(() => {});
       loadDiscordAiStatus();
+      loadAppSettings();
       loadS3Backups();
 
     }
@@ -530,6 +534,31 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       setDiscordAiStatusMsg({ type: 'error', text: err.message || 'Discord-KI-Status konnte nicht geladen werden.' });
     } finally {
       setDiscordAiStatusLoading(false);
+    }
+  };
+
+  const loadAppSettings = async () => {
+    try {
+      const data = await fetchAdminAppSettings();
+      setEntryMode(data.entryMode === 'manual' ? 'manual' : 'ai');
+    } catch (err) {
+      setEntryModeMsg({ type: 'error', text: err.message || 'App-Einstellungen konnten nicht geladen werden.' });
+    }
+  };
+
+  const handleEntryModeSave = async (nextMode) => {
+    const safeMode = nextMode === 'manual' ? 'manual' : 'ai';
+    setEntryMode(safeMode);
+    setEntryModeSaving(true);
+    setEntryModeMsg(null);
+    try {
+      const result = await saveAdminAppSettings({ entryMode: safeMode });
+      setEntryMode(result.settings?.entryMode === 'manual' ? 'manual' : 'ai');
+      setEntryModeMsg({ type: 'success', text: 'Eingabeart gespeichert.' });
+    } catch (err) {
+      setEntryModeMsg({ type: 'error', text: err.message || 'Eingabeart konnte nicht gespeichert werden.' });
+    } finally {
+      setEntryModeSaving(false);
     }
   };
 
@@ -1957,6 +1986,46 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="glass-card rounded-2xl p-6 space-y-4">
+              <div>
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-emerald-400" />
+                  Eingabeart der App
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Legt fest, welches Fenster Benutzer zum Hinzufügen von Getränken zuerst sehen.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { id: 'ai', label: 'AI Chatfenster', icon: Bot, color: 'violet' },
+                  { id: 'manual', label: 'Manuell hinzufügen', icon: Coffee, color: 'emerald' },
+                ].map(({ id, label, icon: Icon, color }) => {
+                  const active = entryMode === id;
+                  const activeClass = color === 'emerald'
+                    ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100'
+                    : 'border-violet-400/50 bg-violet-500/15 text-violet-100';
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => handleEntryModeSave(id)}
+                      disabled={entryModeSaving}
+                      className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all disabled:opacity-60
+                        ${active ? activeClass : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                    >
+                      <Icon className="w-5 h-5 shrink-0" />
+                      <span className="font-semibold text-sm">{label}</span>
+                      {active && <CheckCircle className="w-4 h-4 ml-auto shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <MessageBox message={entryModeMsg} onClose={() => setEntryModeMsg(null)} className="rounded-xl p-3" />
             </div>
 
             {/* AI / OpenRouter settings card */}

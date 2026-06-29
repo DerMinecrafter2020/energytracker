@@ -132,6 +132,61 @@ test('Admin kann API-Testanzeige abrufen', async () => {
   assert.ok(body.tests.some((entry) => entry.name.includes('Theme-Einstellung')), 'Theme-Test muss in der Anzeige enthalten sein');
 });
 
+test('Admin kann globale Eingabeart zwischen KI und manuell umschalten', async () => {
+  const token = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
+  const originalRes = await fetch(`${BASE_URL}/admin/app-settings`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(originalRes.status, 200, `Expected 200 OK, got ${originalRes.status}`);
+  const original = await originalRes.json();
+
+  try {
+    const saveRes = await fetch(`${BASE_URL}/admin/app-settings`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ entryMode: 'manual' }),
+    });
+    assert.strictEqual(saveRes.status, 200, `Expected 200 OK, got ${saveRes.status}`);
+    const saved = await saveRes.json();
+    assert.strictEqual(saved.settings.entryMode, 'manual');
+
+    const publicRes = await fetch(`${BASE_URL}/settings/public`);
+    assert.strictEqual(publicRes.status, 200, `Expected 200 OK, got ${publicRes.status}`);
+    const publicSettings = await publicRes.json();
+    assert.strictEqual(publicSettings.entryMode, 'manual');
+
+    const invalidRes = await fetch(`${BASE_URL}/admin/app-settings`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ entryMode: 'unknown' }),
+    });
+    assert.strictEqual(invalidRes.status, 200, `Expected 200 OK, got ${invalidRes.status}`);
+    const invalid = await invalidRes.json();
+    assert.strictEqual(invalid.settings.entryMode, 'ai');
+  } finally {
+    await fetch(`${BASE_URL}/admin/app-settings`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ entryMode: original.entryMode || 'ai' }),
+    });
+  }
+});
+
+test('Public Settings liefern Demo-Zugangsdaten fuer Demo-Buttons', async () => {
+  const res = await fetch(`${BASE_URL}/settings/public`);
+  assert.strictEqual(res.status, 200, `Expected 200 OK, got ${res.status}`);
+  const body = await res.json();
+
+  if (body.demoEnabled) {
+    assert.strictEqual(body.demoCredentials?.admin?.email, ADMIN_EMAIL);
+    assert.strictEqual(body.demoCredentials?.admin?.password, ADMIN_PASSWORD);
+    assert.strictEqual(body.demoCredentials?.user?.email, USER_EMAIL);
+    assert.strictEqual(body.demoCredentials?.user?.password, USER_PASSWORD);
+  } else {
+    assert.strictEqual(body.demoCredentials, null);
+  }
+});
+
 test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angemeldete Benutzer', async () => {
   const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
   const userToken = await login(USER_EMAIL, USER_PASSWORD);
