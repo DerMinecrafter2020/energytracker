@@ -3,7 +3,7 @@ import {
   ShieldCheck, LogOut, Trash2, RefreshCw, Database,
   TrendingUp, Users, Zap, Calendar, BarChart2, AlertTriangle,
   Download, Upload, Search, ChevronDown, ChevronUp, Coffee,
-  Settings, Mail, Server, Lock, Eye, EyeOff, Send, MessageCircle,
+  Settings, Mail, Server, Lock, KeyRound, Eye, EyeOff, Send, MessageCircle,
   CheckCircle, UserCheck, UserX, Clock, Shield, Bot, User, Link, Hash, Edit3,
   Activity, FileText, Printer, Cloud,
 } from 'lucide-react';
@@ -14,7 +14,7 @@ import {
   fetchAdminUsers, verifyAdminUser, deleteAdminUser, setUserRole, createAdminUser, impersonateUser,
   testDiscordWebhook, saveDiscordWebhook, fetchDiscordAiStatus, fetchAiConfig, saveAiConfig, fetchRedisHealth, fetchAdminChatStats,
   fetchAdminActivity, fetchAdminApiTests, fetchAdminAppSettings, saveAdminAppSettings, fetchAdminExportLogs, fetchDatabaseBackup, importDatabaseBackup,
-  fetchS3Status, fetchS3Backups, createS3Backup, restoreS3Backup,
+  fetchS3Status, fetchS3Config, saveS3Config, fetchS3Backups, createS3Backup, restoreS3Backup,
 } from '../services/adminApi';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -52,6 +52,13 @@ const formatBytes = (value) => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 };
+
+const backupScopes = [
+  { id: 'full', label: 'Datenbank .db', description: 'Alles inklusive Benutzer, Logs und Keys' },
+  { id: 'users', label: 'Benutzer', description: 'Nur Benutzerkonten' },
+  { id: 'logs', label: 'Logs', description: 'Nur Koffein-Einträge' },
+  { id: 'api-keys', label: 'API Keys', description: 'KI-, Brave-, S3- und Discord-Keys' },
+];
 
 const buildAdminCsv = (items) => {
   const header = ['ID', 'Name', 'Koffein (mg)', 'Groesse (ml)', 'Datum', 'E-Mail', 'Erstellt'];
@@ -272,9 +279,20 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
   const [dbBackupLoading, setDbBackupLoading] = useState(false);
   const [dbImportLoading, setDbImportLoading] = useState(false);
   const [dbBackupMsg, setDbBackupMsg] = useState(null);
+  const [backupScope, setBackupScope] = useState('full');
   const [s3Status, setS3Status] = useState(null);
+  const [s3Config, setS3Config] = useState({
+    bucket: '',
+    region: 'eu-central-1',
+    endpoint: '',
+    prefix: 'koffein-tracker/backups',
+    forcePathStyle: false,
+    accessKeyId: '',
+    secretAccessKey: '',
+  });
   const [s3Backups, setS3Backups] = useState([]);
   const [s3Loading, setS3Loading] = useState(false);
+  const [s3Saving, setS3Saving] = useState(false);
   const [s3ActionLoading, setS3ActionLoading] = useState(false);
   const [s3Msg, setS3Msg] = useState(null);
 
@@ -323,18 +341,19 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     }
   };
 
-  const handleDatabaseExport = async () => {
+  const handleDatabaseExport = async (scope = backupScope) => {
     setDbBackupLoading(true);
     setDbBackupMsg(null);
     try {
-      const backup = await fetchDatabaseBackup();
+      const backup = await fetchDatabaseBackup(scope);
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const option = backupScopes.find((item) => item.id === scope) || backupScopes[0];
       downloadFile(
         JSON.stringify(backup, null, 2),
-        `koffein-db-backup-${stamp}.db`,
+        `koffein-${scope}-backup-${stamp}.db`,
         'application/vnd.koffein-tracker.database+json;charset=utf-8;'
       );
-      setDbBackupMsg({ type: 'success', text: 'Datenbank-Backup wurde als .db-Datei heruntergeladen.' });
+      setDbBackupMsg({ type: 'success', text: `${option.label} wurde als .db-Datei heruntergeladen.` });
     } catch (err) {
       setDbBackupMsg({ type: 'error', text: err.message || 'Backup fehlgeschlagen.' });
     } finally {
@@ -346,7 +365,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    if (!window.confirm('Datenbank wirklich importieren? Der aktuelle Datenbestand wird ersetzt.')) return;
+    if (!window.confirm('Backup wirklich importieren? Vollbackups ersetzen die Datenbank, Teilbackups ersetzen nur ihren Bereich.')) return;
 
     setDbImportLoading(true);
     setDbBackupMsg(null);
@@ -355,9 +374,10 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
       const backup = JSON.parse(text);
       const result = await importDatabaseBackup(backup);
       const summary = result.summary || {};
+      const scope = result.scope || backup.scope || 'full';
       setDbBackupMsg({
         type: 'success',
-        text: `Import abgeschlossen: ${summary.logs || 0} Logs, ${summary.users || 0} Benutzer, ${summary.reminders || 0} Reminder.`,
+        text: `Import (${scope}) abgeschlossen: ${summary.logs || 0} Logs, ${summary.users || 0} Benutzer, ${summary.reminders || 0} Reminder.`,
       });
       await Promise.all([
         loadAllLogs(),
@@ -379,8 +399,12 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     setS3Loading(true);
     setS3Msg(null);
     try {
-      const status = await fetchS3Status();
+      const [status, config] = await Promise.all([
+        fetchS3Status(),
+        fetchS3Config(),
+      ]);
       setS3Status(status);
+      setS3Config((prev) => ({ ...prev, ...config }));
       if (!status.configured) {
         setS3Backups([]);
         return;
@@ -396,11 +420,31 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
     }
   };
 
+  const handleS3ConfigChange = (field, value) => {
+    setS3Config((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleS3ConfigSave = async () => {
+    setS3Saving(true);
+    setS3Msg(null);
+    try {
+      const result = await saveS3Config(s3Config);
+      setS3Config((prev) => ({ ...prev, ...(result.settings || {}) }));
+      setS3Status(result.settings || null);
+      setS3Msg({ type: 'success', text: 'S3-Konfiguration gespeichert.' });
+      await loadS3Backups();
+    } catch (err) {
+      setS3Msg({ type: 'error', text: err.message || 'S3-Konfiguration konnte nicht gespeichert werden.' });
+    } finally {
+      setS3Saving(false);
+    }
+  };
+
   const handleS3Backup = async () => {
     setS3ActionLoading(true);
     setS3Msg(null);
     try {
-      const result = await createS3Backup();
+      const result = await createS3Backup(backupScope);
       setS3Msg({ type: 'success', text: `S3-Backup gespeichert: ${result.filename || result.key}` });
       await loadS3Backups();
     } catch (err) {
@@ -2122,13 +2166,13 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                   <div>
                     <h4 className="text-sm font-semibold text-white">Datenbank Backup</h4>
                     <p className="text-xs text-slate-500 mt-1">
-                      Exportiert oder importiert alle Redis-Daten als .db-Datei. Import ersetzt den aktuellen Datenbestand.
+                      Exportiert oder importiert Vollbackups sowie einzelne Bereiche als .db-Datei.
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <button
                       type="button"
-                      onClick={handleDatabaseExport}
+                      onClick={() => handleDatabaseExport(backupScope)}
                       disabled={dbBackupLoading || dbImportLoading}
                       className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs
                         bg-green-600/20 border border-green-500/30 text-green-300
@@ -2156,6 +2200,25 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                       />
                     </label>
                   </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  {backupScopes.map((scope) => {
+                    const active = backupScope === scope.id;
+                    return (
+                      <button
+                        key={scope.id}
+                        type="button"
+                        onClick={() => setBackupScope(scope.id)}
+                        className={`rounded-lg border px-3 py-2 text-left transition-all
+                          ${active
+                            ? 'border-green-400/50 bg-green-500/15 text-green-100'
+                            : 'border-white/10 bg-black/10 text-slate-300 hover:bg-white/10'}`}
+                      >
+                        <span className="block text-xs font-semibold">{scope.label}</span>
+                        <span className="block text-[11px] text-slate-500 mt-0.5">{scope.description}</span>
+                      </button>
+                    );
+                  })}
                 </div>
                 <MessageBox message={dbBackupMsg} onClose={() => setDbBackupMsg(null)} className="rounded-xl p-3" />
               </div>
@@ -2206,6 +2269,58 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
                       Nach S3 sichern
                     </button>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Field label="Bucket" icon={Cloud} type="text" value={s3Config.bucket || ''}
+                    onChange={(e) => handleS3ConfigChange('bucket', e.target.value)} placeholder="mein-backup-bucket" />
+                  <Field label="Region" icon={Hash} type="text" value={s3Config.region || ''}
+                    onChange={(e) => handleS3ConfigChange('region', e.target.value)} placeholder="eu-central-1" />
+                  <Field label="Endpoint optional" icon={Server} type="url" value={s3Config.endpoint || ''}
+                    onChange={(e) => handleS3ConfigChange('endpoint', e.target.value)} placeholder="https://s3.eu-central-1.amazonaws.com" />
+                  <Field label="Prefix / Ordner" icon={Database} type="text" value={s3Config.prefix || ''}
+                    onChange={(e) => handleS3ConfigChange('prefix', e.target.value)} placeholder="koffein-tracker/backups" />
+                  <Field label="Access Key ID" icon={KeyRound} type="text" value={s3Config.accessKeyId || ''}
+                    onChange={(e) => handleS3ConfigChange('accessKeyId', e.target.value)} placeholder="AKIA..." />
+                  <Field label="Secret Access Key" icon={Lock} type="password" value={s3Config.secretAccessKey || ''}
+                    onChange={(e) => handleS3ConfigChange('secretAccessKey', e.target.value)} placeholder={s3Status?.secretAccessKeySet ? 'Gespeichert' : 'Secret'} />
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-white/10 bg-black/10 px-3 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Path-Style erzwingen</p>
+                    <p className="text-xs text-slate-500">Für MinIO, Hetzner, Wasabi oder viele S3-kompatible Anbieter aktivieren.</p>
+                  </div>
+                  <ToggleSwitch checked={!!s3Config.forcePathStyle} onClick={() => handleS3ConfigChange('forcePathStyle', !s3Config.forcePathStyle)} onColor="bg-sky-500" />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={handleS3ConfigSave}
+                    disabled={s3Saving || s3Loading || s3ActionLoading}
+                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs
+                      bg-green-600/20 border border-green-500/30 text-green-300
+                      hover:bg-green-600/30 transition-all disabled:opacity-50"
+                  >
+                    {s3Saving
+                      ? <Spinner className="w-3 h-3 border-2 border-green-400/30 border-t-green-400" />
+                      : <CheckCircle className="w-3.5 h-3.5" />}
+                    S3 speichern
+                  </button>
+                  <button
+                    type="button"
+                    onClick={loadS3Backups}
+                    disabled={s3Loading || s3ActionLoading || s3Saving}
+                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs
+                      bg-white/5 border border-white/10 text-slate-300
+                      hover:bg-white/10 transition-all disabled:opacity-50"
+                  >
+                    {s3Loading
+                      ? <Spinner className="w-3 h-3 border-2 border-slate-400/30 border-t-slate-400" />
+                      : <RefreshCw className="w-3.5 h-3.5" />}
+                    Verbindung prüfen
+                  </button>
                 </div>
 
                 <MessageBox message={s3Msg} onClose={() => setS3Msg(null)} className="rounded-xl p-3" />

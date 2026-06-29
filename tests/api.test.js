@@ -60,8 +60,57 @@ test('Admin kann Datenbank exportieren und dasselbe Backup wieder importieren', 
   assert.match(exportRes.headers.get('content-disposition') || '', /\.db"/);
   const backup = await exportRes.json();
   assert.strictEqual(backup.type, 'koffein-tracker-db-export');
+  assert.strictEqual(backup.scope, 'full');
   assert.ok(backup.database, 'Backup muss database enthalten');
   assert.ok(Array.isArray(backup.database.caffeine_logs), 'Backup muss caffeine_logs als Array enthalten');
+  assert.ok(Array.isArray(backup.database.users), 'Backup muss users als Array enthalten');
+  assert.ok(backup.database.ai_config, 'Backup muss AI/API-Key-Konfiguration enthalten');
+  assert.ok(backup.database.s3_settings, 'Backup muss S3-Konfiguration enthalten');
+
+  const usersExportRes = await fetch(`${BASE_URL}/admin/database/export?scope=users`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(usersExportRes.status, 200, `Expected 200 OK, got ${usersExportRes.status}`);
+  const usersBackup = await usersExportRes.json();
+  assert.strictEqual(usersBackup.scope, 'users');
+  assert.ok(Array.isArray(usersBackup.database.users), 'Benutzer-Backup muss users enthalten');
+  assert.strictEqual(usersBackup.database.caffeine_logs, undefined);
+
+  const logsExportRes = await fetch(`${BASE_URL}/admin/database/export?scope=logs`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(logsExportRes.status, 200, `Expected 200 OK, got ${logsExportRes.status}`);
+  const logsBackup = await logsExportRes.json();
+  assert.strictEqual(logsBackup.scope, 'logs');
+  assert.ok(Array.isArray(logsBackup.database.caffeine_logs), 'Log-Backup muss caffeine_logs enthalten');
+  assert.strictEqual(logsBackup.database.users, undefined);
+
+  const keysExportRes = await fetch(`${BASE_URL}/admin/database/export?scope=api-keys`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(keysExportRes.status, 200, `Expected 200 OK, got ${keysExportRes.status}`);
+  const keysBackup = await keysExportRes.json();
+  assert.strictEqual(keysBackup.scope, 'api-keys');
+  assert.ok(keysBackup.database.ai_config, 'API-Key-Backup muss ai_config enthalten');
+  assert.ok(keysBackup.database.s3_settings, 'API-Key-Backup muss s3_settings enthalten');
+
+  const s3ConfigRes = await fetch(`${BASE_URL}/admin/s3/config`, {
+    method: 'POST',
+    headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      bucket: 'test-backup-bucket',
+      region: 'eu-central-1',
+      endpoint: 'https://s3.example.invalid',
+      prefix: 'tests/backups',
+      forcePathStyle: true,
+      accessKeyId: 'test-access-key',
+      secretAccessKey: 'test-secret-key',
+    }),
+  });
+  assert.strictEqual(s3ConfigRes.status, 200, `Expected 200 OK, got ${s3ConfigRes.status}`);
+  const s3Config = await s3ConfigRes.json();
+  assert.strictEqual(s3Config.settings.configured, true);
+  assert.strictEqual(s3Config.settings.bucket, 'test-backup-bucket');
 
   const importRes = await fetch(`${BASE_URL}/admin/database/import`, {
     method: 'POST',

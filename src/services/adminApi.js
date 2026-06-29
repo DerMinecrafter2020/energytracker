@@ -69,7 +69,8 @@ export const fetchAdminActivity = () => request('/api/admin/activity');
 export const fetchAdminApiTests = () => request('/api/admin/tests/api');
 export const fetchAdminExportLogs = ({ start, end, email } = {}) =>
   requestQuery('/api/admin/export/logs', { start, end, email });
-export const fetchDatabaseBackup = () => request('/api/admin/database/export');
+export const fetchDatabaseBackup = (scope = 'full') =>
+  requestQuery('/api/admin/database/export', { scope });
 export const importDatabaseBackup = (backup) => post('/api/admin/database/import', { backup });
 export const verifyAdminUser = (id) => post(`/api/admin/users/${id}/verify`);
 export const deleteAdminUser = (id) => request(`/api/admin/users/${id}`, { method: 'DELETE' });
@@ -80,6 +81,8 @@ export const impersonateUser = (id) => post(`/api/admin/users/${id}/impersonate`
 export const fetchPublicSettings = () => request('/api/settings/public', { admin: false });
 export const fetchRedisHealth = () => request('/api/admin/redis/health');
 export const fetchS3Status = () => request('/api/admin/s3/status');
+export const fetchS3Config = () => request('/api/admin/s3/config');
+export const saveS3Config = (config) => post('/api/admin/s3/config', config);
 export const fetchS3Backups = () => request('/api/admin/s3/backups');
-export const createS3Backup = () => post('/api/admin/s3/backup');
+export const createS3Backup = (scope = 'full') => post('/api/admin/s3/backup', { scope });
 export const restoreS3Backup = (key) => post('/api/admin/s3/restore', { key });

@@ -377,6 +377,7 @@ const REDIS_KEYS = {
   reminders:     'koffein:reminders',
   favorites:     'koffein:favorites',
   ai_config:     'koffein:ai_config',
+  s3_settings:   'koffein:s3_settings',
   user_settings: 'koffein:user_settings',
   custom_drinks: 'koffein:custom_drinks',
   ai_chat_messages: 'koffein:ai_chat_messages',
@@ -386,9 +387,20 @@ const REDIS_KEYS = {
 };
 
 const DB_EXPORT_VERSION = 1;
+const BACKUP_SCOPES = new Set(['full', 'users', 'logs', 'api-keys']);
 
 const sanitizeAppSettings = (settings = {}) => ({
   entryMode: settings.entryMode === 'manual' ? 'manual' : 'ai',
+});
+
+const sanitizeS3Settings = (settings = {}) => ({
+  bucket: cleanEnvValue(settings.bucket),
+  region: cleanEnvValue(settings.region) || 'eu-central-1',
+  endpoint: cleanEnvValue(settings.endpoint),
+  prefix: cleanEnvValue(settings.prefix || 'koffein-tracker/backups').replace(/^\/+|\/+$/g, ''),
+  forcePathStyle: settings.forcePathStyle === true || settings.forcePathStyle === 'true',
+  accessKeyId: cleanEnvValue(settings.accessKeyId),
+  secretAccessKey: cleanEnvValue(settings.secretAccessKey),
 });
 
 const createEmptyDbState = () => ({
@@ -401,6 +413,7 @@ const createEmptyDbState = () => ({
   reminders: [],
   favorites: [],
   ai_config: { apiKey: '', model: 'deepseek/deepseek-v3', braveSearchKey: '' },
+  s3_settings: sanitizeS3Settings(),
   user_settings: [], // [{userId/email, dailyLimit, notifyAtLimit, notifyLate, notifyRapid}]
   custom_drinks: [], // [{id, ownerKey, name, size, caffeine, icon}]
   ai_chat_messages: [], // [{ownerKey, userId/email, messages, updatedAt}]
@@ -423,6 +436,7 @@ const normalizeDbState = (value = {}) => {
   const fallback = createEmptyDbState();
   const parsedAi = asObjectOrNull(source.ai_config) || {};
   const parsedAppSettings = asObjectOrNull(source.app_settings) || asObjectOrNull(source.appSettings) || {};
+  const parsedS3 = asObjectOrNull(source.s3_settings) || asObjectOrNull(source.s3Settings) || {};
 
   return {
     appName: typeof source.appName === 'string' && source.appName.trim() ? source.appName.trim() : fallback.appName,
@@ -438,6 +452,7 @@ const normalizeDbState = (value = {}) => {
       model: String(parsedAi.model || fallback.ai_config.model),
       braveSearchKey: String(parsedAi.braveSearchKey || ''),
     },
+    s3_settings: sanitizeS3Settings(parsedS3),
     user_settings: asArray(source.user_settings),
     custom_drinks: asArray(source.custom_drinks),
     ai_chat_messages: asArray(source.ai_chat_messages),
@@ -455,6 +470,7 @@ const hasDatabaseShape = (value = {}) => {
     'reminders',
     'favorites',
     'ai_config',
+    's3_settings',
     'user_settings',
     'custom_drinks',
     'ai_chat_messages',
@@ -463,12 +479,29 @@ const hasDatabaseShape = (value = {}) => {
   ].some((key) => Object.prototype.hasOwnProperty.call(source, key));
 };
 
-const buildDatabaseExport = () => ({
+const databaseForScope = (scope = 'full') => {
+  const normalized = normalizeDbState(dbState);
+  if (scope === 'users') return { users: cloneJson(normalized.users) };
+  if (scope === 'logs') return { caffeine_logs: cloneJson(normalized.caffeine_logs) };
+  if (scope === 'api-keys') {
+    return {
+      ai_config: cloneJson(normalized.ai_config),
+      s3_settings: cloneJson(normalized.s3_settings),
+      smtp_settings: normalized.smtp_settings ? {
+        discord_webhook: normalized.smtp_settings.discord_webhook || '',
+      } : null,
+    };
+  }
+  return cloneJson(normalized);
+};
+
+const buildDatabaseExport = ({ scope = 'full' } = {}) => ({
   type: 'koffein-tracker-db-export',
   version: DB_EXPORT_VERSION,
+  scope,
   exportedAt: new Date().toISOString(),
   appVersion,
-  database: cloneJson(normalizeDbState(dbState)),
+  database: databaseForScope(scope),
 });
 
 const databaseImportSummary = (nextState) => ({
@@ -478,7 +511,42 @@ const databaseImportSummary = (nextState) => ({
   favorites: nextState.favorites.length,
   aiChatMessages: nextState.ai_chat_messages.length,
   customDrinks: nextState.custom_drinks.length,
+  apiKeys: {
+    aiApiKey: !!nextState.ai_config?.apiKey,
+    braveSearchKey: !!nextState.ai_config?.braveSearchKey,
+    s3AccessKey: !!nextState.s3_settings?.accessKeyId,
+  },
 });
+
+const mergeImportedState = (payload) => {
+  const scope = BACKUP_SCOPES.has(payload?.scope) ? payload.scope : 'full';
+  if (scope === 'full') return normalizeDbState(payload);
+
+  const source = payload?.database || payload?.dbState || payload?.data || payload;
+  const current = normalizeDbState(dbState);
+
+  if (scope === 'users') return normalizeDbState({ ...current, users: asArray(source.users) });
+  if (scope === 'logs') return normalizeDbState({ ...current, caffeine_logs: asArray(source.caffeine_logs) });
+  if (scope === 'api-keys') {
+    const nextAi = asObjectOrNull(source.ai_config) || current.ai_config;
+    const nextS3 = asObjectOrNull(source.s3_settings) || current.s3_settings;
+    const nextSmtp = asObjectOrNull(source.smtp_settings) || null;
+    return normalizeDbState({
+      ...current,
+      ai_config: {
+        apiKey: String(nextAi.apiKey || ''),
+        model: String(nextAi.model || current.ai_config.model || 'deepseek/deepseek-v3'),
+        braveSearchKey: String(nextAi.braveSearchKey || ''),
+      },
+      s3_settings: nextS3,
+      smtp_settings: nextSmtp?.discord_webhook
+        ? { ...(current.smtp_settings || {}), discord_webhook: nextSmtp.discord_webhook }
+        : current.smtp_settings,
+    });
+  }
+
+  return current;
+};
 
 const importDatabasePayload = async (payload) => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -492,30 +560,43 @@ const importDatabasePayload = async (payload) => {
     throw err;
   }
 
-  const nextState = normalizeDbState(payload);
+  const nextState = mergeImportedState(payload);
   dbState = nextState;
   await persistDbState();
   return {
     importedAt: new Date().toISOString(),
+    scope: BACKUP_SCOPES.has(payload?.scope) ? payload.scope : 'full',
     summary: databaseImportSummary(nextState),
   };
 };
 
 const s3Config = () => {
-  const region = cleanEnvValue(process.env.S3_REGION) || 'eu-central-1';
-  const endpoint = cleanEnvValue(process.env.S3_ENDPOINT) || `https://s3.${region}.amazonaws.com`;
-  const prefix = cleanEnvValue(process.env.S3_PREFIX || 'koffein-tracker/backups').replace(/^\/+|\/+$/g, '');
-  const forcePathStyle = cleanEnvValue(process.env.S3_FORCE_PATH_STYLE || (process.env.S3_ENDPOINT ? 'true' : 'false')).toLowerCase() !== 'false';
+  const stored = sanitizeS3Settings(dbState.s3_settings || {});
+  const envEndpoint = cleanEnvValue(process.env.S3_ENDPOINT);
+  const region = stored.region || cleanEnvValue(process.env.S3_REGION) || 'eu-central-1';
+  const endpoint = stored.endpoint || envEndpoint || `https://s3.${region}.amazonaws.com`;
+  const prefix = cleanEnvValue(stored.prefix || process.env.S3_PREFIX || 'koffein-tracker/backups').replace(/^\/+|\/+$/g, '');
+  const hasStoredForcePathStyle = dbState.s3_settings?.forcePathStyle !== undefined;
+  const forcePathStyle = hasStoredForcePathStyle
+    ? stored.forcePathStyle
+    : cleanEnvValue(process.env.S3_FORCE_PATH_STYLE || (envEndpoint ? 'true' : 'false')).toLowerCase() !== 'false';
 
   return {
-    bucket: cleanEnvValue(process.env.S3_BUCKET),
+    bucket: stored.bucket || cleanEnvValue(process.env.S3_BUCKET),
     region,
     endpoint,
-    accessKeyId: cleanEnvValue(process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID),
-    secretAccessKey: cleanEnvValue(process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY),
+    accessKeyId: stored.accessKeyId || cleanEnvValue(process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID),
+    secretAccessKey: stored.secretAccessKey || cleanEnvValue(process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY),
     prefix,
     forcePathStyle,
   };
+};
+
+const maskBackupSecret = (value, visible = 4) => {
+  const safe = cleanEnvValue(value);
+  if (!safe) return '';
+  if (safe.length <= visible * 2) return '••••••••';
+  return `${safe.slice(0, visible)}••••••••${safe.slice(-visible)}`;
 };
 
 const s3Status = () => {
@@ -527,7 +608,41 @@ const s3Status = () => {
     endpoint: cfg.endpoint,
     prefix: cfg.prefix,
     forcePathStyle: cfg.forcePathStyle,
+    accessKeyIdMasked: maskBackupSecret(cfg.accessKeyId),
+    secretAccessKeySet: !!cfg.secretAccessKey,
   };
+};
+
+const s3ConfigForAdmin = () => {
+  const cfg = s3Config();
+  return {
+    ...s3Status(),
+    accessKeyId: cfg.accessKeyId,
+    secretAccessKey: cfg.secretAccessKey ? '••••••••' : '',
+  };
+};
+
+const saveS3Settings = (settings = {}) => {
+  const current = s3Config();
+  const incomingSecret = cleanEnvValue(settings.secretAccessKey);
+  const secretAccessKey = incomingSecret && !/^[•*]{4,}$/.test(incomingSecret)
+    ? incomingSecret
+    : (settings.clearSecretAccessKey ? '' : current.secretAccessKey);
+  const incomingAccessKey = cleanEnvValue(settings.accessKeyId);
+  const accessKeyId = incomingAccessKey && !/^[•*]{4,}$/.test(incomingAccessKey)
+    ? incomingAccessKey
+    : current.accessKeyId;
+
+  dbState.s3_settings = sanitizeS3Settings({
+    bucket: settings.bucket,
+    region: settings.region,
+    endpoint: settings.endpoint,
+    prefix: settings.prefix,
+    forcePathStyle: settings.forcePathStyle,
+    accessKeyId,
+    secretAccessKey,
+  });
+  return dbState.s3_settings;
 };
 
 const ensureS3Configured = () => {
@@ -551,15 +666,36 @@ const s3DateParts = (now = new Date()) => {
 const s3ObjectKey = (filename) => [s3Config().prefix, filename].filter(Boolean).join('/');
 const canonicalS3Path = (pathname) => pathname.split('/').map((part) => s3Encode(decodeURIComponent(part))).join('/');
 
+const s3EndpointHostHasBucket = (hostname, bucket) => {
+  const safeHost = String(hostname || '').trim().toLowerCase();
+  const safeBucket = String(bucket || '').trim().toLowerCase();
+  return !!safeHost && !!safeBucket && (safeHost === safeBucket || safeHost.startsWith(`${safeBucket}.`));
+};
+
+const s3EndpointHostWithoutBucket = (hostname, bucket) => {
+  const safeHost = String(hostname || '').trim();
+  const safeBucket = String(bucket || '').trim();
+  if (!safeHost || !safeBucket || safeHost.toLowerCase() === safeBucket.toLowerCase()) return safeHost;
+  return safeHost.toLowerCase().startsWith(`${safeBucket.toLowerCase()}.`)
+    ? safeHost.slice(safeBucket.length + 1)
+    : safeHost;
+};
+
 const s3UrlFor = (cfg, key = '', query = {}) => {
   const endpoint = new URL(cfg.endpoint);
   const safeKey = String(key || '').split('/').map(s3Encode).join('/');
   const basePath = endpoint.pathname.replace(/\/+$/g, '');
+  const endpointAlreadyIncludesBucket = s3EndpointHostHasBucket(endpoint.hostname, cfg.bucket);
 
   if (cfg.forcePathStyle) {
+    if (endpointAlreadyIncludesBucket) {
+      endpoint.hostname = s3EndpointHostWithoutBucket(endpoint.hostname, cfg.bucket);
+    }
     endpoint.pathname = [basePath, s3Encode(cfg.bucket), safeKey].filter(Boolean).join('/');
   } else {
-    endpoint.hostname = `${cfg.bucket}.${endpoint.hostname}`;
+    if (!endpointAlreadyIncludesBucket) {
+      endpoint.hostname = `${cfg.bucket}.${endpoint.hostname}`;
+    }
     endpoint.pathname = [basePath, safeKey].filter(Boolean).join('/');
   }
 
@@ -613,16 +749,37 @@ const signS3Request = ({ cfg, method, url, body = '', contentType = '' }) => {
   };
 };
 
+const s3FetchErrorMessage = (err, url) => {
+  const cause = err?.cause || err;
+  const code = cause?.code || err?.code;
+  const host = cause?.hostname || cause?.host || url.hostname;
+  if (code === 'ERR_TLS_CERT_ALTNAME_INVALID') {
+    return `S3 TLS-Zertifikat passt nicht zum Host ${host}. Prüfe den Endpoint und ob Path-Style fuer deinen Anbieter korrekt gesetzt ist.`;
+  }
+  if (['EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT'].includes(code)) {
+    return `S3 Verbindung fehlgeschlagen (${code}) fuer ${host}. Bitte Endpoint, DNS und Netzwerkverbindung pruefen.`;
+  }
+  return `S3 Verbindung fehlgeschlagen: ${err?.message || 'Unbekannter Fehler'}`;
+};
+
 const s3Request = async ({ method, key = '', query = {}, body = '', contentType = '' }) => {
   const cfg = ensureS3Configured();
   const url = s3UrlFor(cfg, key, query);
   const headers = signS3Request({ cfg, method, url, body, contentType });
-  const response = await fetch(url, {
-    method,
-    headers,
-    ...(method === 'GET' || method === 'HEAD' ? {} : { body }),
-    signal: AbortSignal.timeout(30000),
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method,
+      headers,
+      ...(method === 'GET' || method === 'HEAD' ? {} : { body }),
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (err) {
+    const wrapped = new Error(s3FetchErrorMessage(err, url));
+    wrapped.status = 502;
+    wrapped.cause = err;
+    throw wrapped;
+  }
   const text = await response.text();
   if (!response.ok) {
     const err = new Error(`S3 Fehler (${response.status}): ${text.slice(0, 300) || response.statusText}`);
@@ -668,7 +825,7 @@ const loadDbState = async () => {
       return;
     }
 
-    const [logs, users, smtp, authCfg, reminders, favorites, ai, settings, drinks, chatMessages, appName, appSettings, discordSchedules] = await redis.mget(
+    const [logs, users, smtp, authCfg, reminders, favorites, ai, s3Settings, settings, drinks, chatMessages, appName, appSettings, discordSchedules] = await redis.mget(
       REDIS_KEYS.caffeine_logs,
       REDIS_KEYS.users,
       REDIS_KEYS.smtp_settings,
@@ -676,6 +833,7 @@ const loadDbState = async () => {
       REDIS_KEYS.reminders,
       REDIS_KEYS.favorites,
       REDIS_KEYS.ai_config,
+      REDIS_KEYS.s3_settings,
       REDIS_KEYS.user_settings,
       REDIS_KEYS.custom_drinks,
       REDIS_KEYS.ai_chat_messages,
@@ -696,6 +854,7 @@ const loadDbState = async () => {
         model:          parsedAi.model          || 'deepseek/deepseek-v3',
         braveSearchKey: parsedAi.braveSearchKey || '',
       },
+      s3_settings: safeParse(s3Settings, {}),
       user_settings: safeParse(settings, []),
       custom_drinks: safeParse(drinks, []),
       ai_chat_messages: safeParse(chatMessages, []),
@@ -720,6 +879,7 @@ const persistDbState = () => {
     REDIS_KEYS.reminders,      JSON.stringify(next.reminders),
     REDIS_KEYS.favorites,      JSON.stringify(next.favorites),
     REDIS_KEYS.ai_config,      JSON.stringify(next.ai_config),
+    REDIS_KEYS.s3_settings,    JSON.stringify(next.s3_settings),
     REDIS_KEYS.user_settings,  JSON.stringify(next.user_settings),
     REDIS_KEYS.custom_drinks,  JSON.stringify(next.custom_drinks),
     REDIS_KEYS.ai_chat_messages, JSON.stringify(next.ai_chat_messages),
@@ -2775,10 +2935,13 @@ app.post('/api/admin/app-settings', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/database/export', requireAdmin, async (req, res) => {
   try {
-    const backup = buildDatabaseExport();
+    const requestedScope = String(req.query.scope || 'full').trim();
+    const scope = BACKUP_SCOPES.has(requestedScope) ? requestedScope : 'full';
+    const backup = buildDatabaseExport({ scope });
     const stamp = backup.exportedAt.replace(/[:.]/g, '-');
+    const suffix = scope === 'full' ? 'full' : scope;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="koffein-db-backup-${stamp}.db"`);
+    res.setHeader('Content-Disposition', `attachment; filename="koffein-${suffix}-backup-${stamp}.db"`);
     res.json(backup);
   } catch (err) {
     console.error('GET /api/admin/database/export error:', err);
@@ -2806,6 +2969,21 @@ app.get('/api/admin/s3/status', requireAdmin, async (req, res) => {
   res.json(s3Status());
 });
 
+app.get('/api/admin/s3/config', requireAdmin, async (req, res) => {
+  res.json(s3ConfigForAdmin());
+});
+
+app.post('/api/admin/s3/config', requireAdmin, async (req, res) => {
+  try {
+    const settings = saveS3Settings(req.body || {});
+    await persistDbState();
+    res.json({ success: true, settings: s3ConfigForAdmin(), raw: { ...settings, secretAccessKey: settings.secretAccessKey ? '••••••••' : '' } });
+  } catch (err) {
+    console.error('POST /api/admin/s3/config error:', err);
+    res.status(500).json({ error: err.message || 'S3-Konfiguration konnte nicht gespeichert werden.' });
+  }
+});
+
 app.get('/api/admin/s3/backups', requireAdmin, async (req, res) => {
   try {
     res.json({ items: await listS3Backups(), status: s3Status() });
@@ -2817,9 +2995,12 @@ app.get('/api/admin/s3/backups', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/s3/backup', requireAdmin, async (req, res) => {
   try {
-    const backup = buildDatabaseExport();
+    const requestedScope = String(req.body?.scope || 'full').trim();
+    const scope = BACKUP_SCOPES.has(requestedScope) ? requestedScope : 'full';
+    const backup = buildDatabaseExport({ scope });
     const stamp = backup.exportedAt.replace(/[:.]/g, '-');
-    const filename = `koffein-db-backup-${stamp}.db`;
+    const suffix = scope === 'full' ? 'full' : scope;
+    const filename = `koffein-${suffix}-backup-${stamp}.db`;
     const key = s3ObjectKey(filename);
     const body = JSON.stringify(backup, null, 2);
 
@@ -2834,6 +3015,7 @@ app.post('/api/admin/s3/backup', requireAdmin, async (req, res) => {
       success: true,
       key,
       filename,
+      scope,
       size: Buffer.byteLength(body),
       exportedAt: backup.exportedAt,
     });
@@ -4533,6 +4715,7 @@ process.on('SIGTERM', async () => {
       REDIS_KEYS.reminders,      JSON.stringify(dbState.reminders),
       REDIS_KEYS.favorites,      JSON.stringify(dbState.favorites),
       REDIS_KEYS.ai_config,      JSON.stringify(dbState.ai_config),
+      REDIS_KEYS.s3_settings,    JSON.stringify(dbState.s3_settings),
       REDIS_KEYS.user_settings,  JSON.stringify(dbState.user_settings),
       REDIS_KEYS.custom_drinks,  JSON.stringify(dbState.custom_drinks),
       REDIS_KEYS.ai_chat_messages, JSON.stringify(dbState.ai_chat_messages),
