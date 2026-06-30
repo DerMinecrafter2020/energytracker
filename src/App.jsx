@@ -13,6 +13,8 @@ import PatternInsights from './components/PatternInsights';
 import AchievementsPanel from './components/AchievementsPanel';
 import ExportPanel from './components/ExportPanel';
 import CalendarSuggestions from './components/CalendarSuggestions';
+import DailyCoachCard from './components/DailyCoachCard';
+import PersonalRecords from './components/PersonalRecords';
 import LoginPage from './components/LoginPage';
 import { Zap, Loader2, Bot, CalendarDays, History, Target, Droplets } from 'lucide-react';
 import AdminPanel from './components/AdminPanel';
@@ -22,6 +24,7 @@ import WarningAlert from './components/WarningAlert';
 import {
   fetchTodayStats,
   fetchStatsOverview,
+  fetchPersonalRecords,
   fetchInsights,
   fetchUserSettings,
   fetchPublicSettings,
@@ -31,7 +34,7 @@ import {
   updateLog,
 } from './services/api';
 import { fetchTodayLogs, addLog, removeLog } from './services/storage';
-import { fetchDailyHydrationQuote } from './services/aiApi';
+import { fetchDailyCoach, fetchDailyHydrationQuote } from './services/aiApi';
 import { getSession, logout, startImpersonation, stopImpersonation, getImpersonatorSession } from './services/auth';
 
 const getTodayKey = () => {
@@ -187,11 +190,13 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
   const [latestVersion, setLatestVersion]   = useState(null);
   const [todayStats, setTodayStats] = useState(null);
   const [overviewStats, setOverviewStats] = useState(null);
+  const [personalRecords, setPersonalRecords] = useState(null);
   const [insights, setInsights] = useState(null);
   const [settings, setSettings] = useState(null);
   const [appSettings, setAppSettings] = useState({ entryMode: 'ai' });
   const [favorites, setFavorites] = useState([]);
   const [hydrationQuote, setHydrationQuote] = useState({ quote: 'Hydration im Blick behalten', source: 'default' });
+  const [dailyCoach, setDailyCoach] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [todayKey, setTodayKey] = useState(getTodayKey);
   const [selectedDate, setSelectedDate] = useState(getTodayKey);
@@ -203,22 +208,25 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
   const refreshStats = useCallback(async () => {
     if (!session?.email) return;
-    const [statsData, overviewData, insightsData] = await Promise.all([
+    const [statsData, overviewData, recordsData, insightsData] = await Promise.all([
       fetchTodayStats(currentUser),
       fetchStatsOverview(currentUser),
+      fetchPersonalRecords(currentUser),
       fetchInsights(currentUser),
     ]);
     setTodayStats(statsData);
     setOverviewStats(overviewData);
+    setPersonalRecords(recordsData);
     setInsights(insightsData);
   }, [session?.email, currentUser]);
 
   const fetchAllData = useCallback(async () => {
     try {
-      const [selectedLogs, statsData, overviewData, insightsData, userSettings, favoriteItems, publicSettings] = await Promise.all([
+      const [selectedLogs, statsData, overviewData, recordsData, insightsData, userSettings, favoriteItems, publicSettings] = await Promise.all([
         fetchTodayLogs(selectedDate, currentUser),
         session?.email ? fetchTodayStats(currentUser) : Promise.resolve(null),
         session?.email ? fetchStatsOverview(currentUser) : Promise.resolve(null),
+        session?.email ? fetchPersonalRecords(currentUser) : Promise.resolve(null),
         session?.email ? fetchInsights(currentUser) : Promise.resolve(null),
         session?.email ? fetchUserSettings(currentUser) : Promise.resolve(null),
         session?.email ? fetchFavorites(currentUser) : Promise.resolve([]),
@@ -227,6 +235,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
       setLogs(selectedLogs);
       if (statsData) setTodayStats(statsData);
       if (overviewData) setOverviewStats(overviewData);
+      if (recordsData) setPersonalRecords(recordsData);
       if (insightsData) setInsights(insightsData);
       if (userSettings) setSettings(userSettings);
       setFavorites(Array.isArray(favoriteItems) ? favoriteItems : []);
@@ -280,15 +289,21 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
 
   useEffect(() => {
     let isMounted = true;
-    fetchDailyHydrationQuote(selectedDate)
-      .then((data) => {
-        if (isMounted && data?.quote) setHydrationQuote(data);
+    setDailyCoach(null);
+    Promise.all([
+      fetchDailyHydrationQuote(selectedDate).catch(() => null),
+      fetchDailyCoach(selectedDate).catch(() => null),
+    ])
+      .then(([quoteData, coachData]) => {
+        if (!isMounted) return;
+        if (quoteData?.quote) setHydrationQuote(quoteData);
+        if (coachData?.headline) setDailyCoach(coachData);
       })
       .catch(() => {
         if (isMounted) setHydrationQuote({ quote: 'Hydration im Blick behalten', source: 'fallback' });
       });
     return () => { isMounted = false; };
-  }, [selectedDate]);
+  }, [selectedDate, calendarRefreshKey]);
 
   useEffect(() => {
     const refreshLocalDay = () => {
@@ -459,6 +474,45 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
     setSelectedDate(dateKey);
   }, []);
 
+  const isManualMode = entryMode === 'manual';
+  const aiContextWidgets = (
+    <>
+      {isSelectedDateToday && todayStats && settings && (
+        <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
+      )}
+
+      <ProgressBar currentCaffeine={selectedDateCaffeine} title={progressTitle} isToday={isSelectedDateToday} />
+      <DailyCoachCard coach={dailyCoach} />
+      {overviewStats && <GoalOverview overview={overviewStats} />}
+      {isSelectedDateToday && (
+        <CaffeineDecayChart logs={logs} sleepTime={settings?.sleepTime || '23:00'} />
+      )}
+
+      <FavoriteQuickActions
+        favorites={favorites}
+        onAddFavorite={handleAddFavoriteDrink}
+        onRemoveFavorite={handleRemoveFavorite}
+        isLoading={isOperationLoading}
+      />
+
+      <CalendarSuggestions
+        selectedDate={selectedDate}
+        logs={logs}
+        totalCaffeine={selectedDateCaffeine}
+        dailyLimit={dailyLimit}
+        insights={insights}
+      />
+    </>
+  );
+  const analysisWidgets = (
+    <>
+      {insights && <PatternInsights insights={insights} />}
+      {personalRecords && <PersonalRecords records={personalRecords} />}
+      {insights?.achievements && <AchievementsPanel achievements={insights.achievements} />}
+      <ExportPanel userIdentity={currentUser} />
+    </>
+  );
+
   if (isAppLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#02040A] text-white">
@@ -556,9 +610,13 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
               </div>
             </div>
 
-            <section className="grid gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_390px] items-start">
+            <section className={`grid gap-4 sm:gap-5 items-start ${
+              isManualMode
+                ? 'xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]'
+                : 'xl:grid-cols-[minmax(0,1fr)_390px]'
+            }`}>
               <div className="min-w-0">
-                {entryMode === 'manual' ? (
+                {isManualMode ? (
                   <ManualDrinkEntry
                     selectedDate={selectedDate}
                     onAddDrink={handleAddDrink}
@@ -580,36 +638,17 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
                 )}
               </div>
 
-              <aside className="space-y-3 sm:space-y-4 xl:sticky xl:top-24">
+              <aside className={isManualMode ? 'space-y-3 sm:space-y-4' : 'space-y-3 sm:space-y-4 xl:sticky xl:top-24'}>
                 <div className="flex items-center gap-2 px-1 text-sm font-semibold text-slate-300">
                   <Bot className="w-4 h-4 text-violet-300" />
-                  KI-Kontext und Hilfsfunktionen
+                  {isManualMode ? 'KI-Widgets und Automatik-Hilfen' : 'KI-Kontext zum Chat'}
                 </div>
 
-                {isSelectedDateToday && todayStats && settings && (
-                  <WarningAlert todayStats={todayStats} settings={settings} onClose={() => {}} />
-                )}
-
-                <ProgressBar currentCaffeine={selectedDateCaffeine} title={progressTitle} isToday={isSelectedDateToday} />
-                {overviewStats && <GoalOverview overview={overviewStats} />}
-                {isSelectedDateToday && (
-                  <CaffeineDecayChart logs={logs} sleepTime={settings?.sleepTime || '23:00'} />
-                )}
-
-                <FavoriteQuickActions
-                  favorites={favorites}
-                  onAddFavorite={handleAddFavoriteDrink}
-                  onRemoveFavorite={handleRemoveFavorite}
-                  isLoading={isOperationLoading}
-                />
-
-                <CalendarSuggestions
-                  selectedDate={selectedDate}
-                  logs={logs}
-                  totalCaffeine={selectedDateCaffeine}
-                  dailyLimit={dailyLimit}
-                  insights={insights}
-                />
+                {isManualMode ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-3 sm:gap-4">
+                    {aiContextWidgets}
+                  </div>
+                ) : aiContextWidgets}
               </aside>
             </section>
 
@@ -625,7 +664,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
                 isLoading={isOperationLoading}
               />
 
-              <div className="space-y-4 sm:space-y-5">
+              <div className={isManualMode ? 'grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5' : 'space-y-4 sm:space-y-5'}>
                 <DrinkHistory
                   selectedDate={selectedDate}
                   logs={logs}
@@ -633,9 +672,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
                   onToggleFavorite={handleToggleFavorite}
                   isFavoriteLog={(log) => favorites.some((favorite) => drinkKey(favorite) === drinkKey(log))}
                 />
-                {insights && <PatternInsights insights={insights} />}
-                {insights?.achievements && <AchievementsPanel achievements={insights.achievements} />}
-                <ExportPanel userIdentity={currentUser} />
+                {analysisWidgets}
               </div>
             </section>
           </div>

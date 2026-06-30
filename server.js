@@ -2122,6 +2122,60 @@ const getStatsOverview = ({ userId, email }) => {
   };
 };
 
+const getPersonalRecords = ({ userId, email }) => {
+  const settings = getUserSettings({ userId, email });
+  const dailyLimit = Number(settings.dailyLimit) || 400;
+  const today = parseDateKey(getTodayKey());
+  const start = toDateKey(addDays(today, -89));
+  const end = getTodayKey();
+  const logs = getLogsForUser({ userId, email, start, end });
+  const daily = summarizePeriod({ logs, start, end, dailyLimit }).daily;
+
+  const activeDays = daily.filter((day) => day.count > 0);
+  const bestLowDay = [...activeDays]
+    .filter((day) => day.totalCaffeine <= dailyLimit)
+    .sort((a, b) => a.totalCaffeine - b.totalCaffeine || b.count - a.count)[0] || null;
+  const maxCaffeineDay = [...activeDays].sort((a, b) => b.totalCaffeine - a.totalCaffeine)[0] || null;
+  const maxLoggedDay = [...activeDays].sort((a, b) => b.count - a.count || b.totalCaffeine - a.totalCaffeine)[0] || null;
+
+  let currentUnderLimitStreak = 0;
+  let longestUnderLimitStreak = 0;
+  let runningStreak = 0;
+  [...daily].reverse().forEach((day, index) => {
+    const qualifies = day.count > 0 && day.totalCaffeine <= dailyLimit;
+    if (qualifies) {
+      runningStreak += 1;
+      if (index === currentUnderLimitStreak) currentUnderLimitStreak += 1;
+      longestUnderLimitStreak = Math.max(longestUnderLimitStreak, runningStreak);
+    } else {
+      runningStreak = 0;
+    }
+  });
+
+  const drinkStats = new Map();
+  logs.forEach((log) => {
+    const key = String(log.name || 'Unbekannt').toLowerCase().trim();
+    const entry = drinkStats.get(key) || { name: log.name || 'Unbekannt', count: 0, totalCaffeine: 0, totalSize: 0 };
+    entry.count += 1;
+    entry.totalCaffeine += Number(log.caffeine) || 0;
+    entry.totalSize += Number(log.size) || 0;
+    drinkStats.set(key, entry);
+  });
+  const favoriteDrink = [...drinkStats.values()].sort((a, b) => b.count - a.count || b.totalCaffeine - a.totalCaffeine)[0] || null;
+
+  return {
+    range: { start, end },
+    dailyLimit,
+    trackedDays: activeDays.length,
+    currentUnderLimitStreak,
+    longestUnderLimitStreak,
+    maxCaffeineDay,
+    maxLoggedDay,
+    bestLowDay,
+    favoriteDrink,
+  };
+};
+
 const buildAchievements = ({ logs, dailyLimit }) => {
   const today = parseDateKey(getTodayKey());
   const last30Start = toDateKey(addDays(today, -29));
@@ -2216,6 +2270,8 @@ const getUserInsights = ({ userId, email }) => {
   });
   const topDrink = [...drinkStats.values()].sort((a, b) => b.count - a.count || b.totalCaffeine - a.totalCaffeine)[0] || null;
   const overLimitDays = days.filter((day) => day.isOverLimit);
+  const riskScore = Math.min(100, Math.round((overLimitDays.length * 14) + (lateDrinks.length * 4) + ((topDrink?.count || 0) > 8 ? 10 : 0)));
+  const riskLevel = riskScore >= 60 ? 'high' : (riskScore >= 30 ? 'medium' : 'low');
 
   const messages = [];
   if (topWeekday) messages.push(`Du trinkst an ${topWeekday.label}en besonders viel Koffein (${topWeekday.total} mg in 30 Tagen).`);
@@ -2227,6 +2283,11 @@ const getUserInsights = ({ userId, email }) => {
   return {
     range: { start, end },
     messages,
+    riskScore,
+    riskLevel,
+    focus: riskLevel === 'high'
+      ? 'Diese Woche besonders auf späte Drinks und Limit-Tage achten.'
+      : (riskLevel === 'medium' ? 'Ein fester Koffein-Stopp am Nachmittag würde deine Kurve stabilisieren.' : 'Deine Muster wirken ruhig. Bleib bei kleinen, bewussten Einträgen.'),
     topWeekday,
     lateDrinkCount: lateDrinks.length,
     overLimitDays: overLimitDays.length,
@@ -2489,6 +2550,15 @@ const HYDRATION_FALLBACK_QUOTES = [
   'Erst auffuellen, dann beschleunigen.',
 ];
 
+const parseJsonObject = (value) => {
+  try {
+    const cleaned = String(value || '').replace(/^```(?:json)?|```$/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+};
+
 const fallbackHydrationQuote = (date) => {
   const hash = crypto.createHash('sha256').update(String(date || getTodayKey())).digest()[0] || 0;
   return HYDRATION_FALLBACK_QUOTES[hash % HYDRATION_FALLBACK_QUOTES.length];
@@ -2538,6 +2608,74 @@ const getDailyHydrationQuote = async (date = getTodayKey()) => {
   dbState.app_settings = { ...settings, hydrationQuotes: nextQuotes };
   await persistDbState();
   return { date: safeDate, quote, source };
+};
+
+const fallbackDailyCoach = ({ date, logs, totalCaffeine, dailyLimit, remaining, settings }) => {
+  const percent = dailyLimit > 0 ? Math.round((totalCaffeine / dailyLimit) * 100) : 0;
+  const lateLogs = logs.filter((log) => {
+    const time = getLogDateTime(log);
+    return time && time.getHours() >= 18;
+  });
+  const risk = percent >= 100 || lateLogs.length > 0 ? 'high' : (percent >= 70 ? 'medium' : 'low');
+  const headline = risk === 'high'
+    ? 'Heute vorsichtig bleiben'
+    : (risk === 'medium' ? 'Guter Moment zum Bremsen' : 'Du hast noch Spielraum');
+  const advice = risk === 'high'
+    ? `Du liegst bei ${totalCaffeine} mg. Plane den Rest des Tages lieber koffeinfrei.`
+    : (risk === 'medium'
+      ? `Du hast noch etwa ${remaining} mg bis zum Limit. Ein Wasser-Stopp hilft, bevor du nachlegst.`
+      : `Bisher sind es ${totalCaffeine} mg. Halte den Rhythmus ruhig und trinke zwischendurch Wasser.`);
+  const actions = [
+    remaining > 0 ? `${remaining} mg Reserve bewusst einteilen` : 'Keine weiteren Koffein-Drinks einplanen',
+    `Schlafenszeit ${settings.sleepTime || '23:00'} im Blick behalten`,
+    logs.length === 0 ? 'Ersten Drink eintragen, falls schon etwas dabei war' : 'Einträge kurz auf Vollständigkeit prüfen',
+  ];
+  return { date, risk, headline, advice, actions, source: 'fallback' };
+};
+
+const getDailyCoach = async ({ userId, email, date = getTodayKey() }) => {
+  const safeDate = isValidDateKey(date) ? date : getTodayKey();
+  const settings = getUserSettings({ userId, email });
+  const dailyLimit = Number(settings.dailyLimit) || 400;
+  const logs = getLogsForUser({ userId, email, start: safeDate, end: safeDate });
+  const totalCaffeine = logs.reduce((sum, log) => sum + (Number(log.caffeine) || 0), 0);
+  const remaining = Math.max(0, dailyLimit - totalCaffeine);
+
+  const fallback = fallbackDailyCoach({ date: safeDate, logs, totalCaffeine, dailyLimit, remaining, settings });
+  try {
+    if (!loadAiConfig().apiKey) return fallback;
+    const result = await callOpenRouter([
+      {
+        role: 'system',
+        content: 'Du bist der kurze Tagescoach einer Koffein-Tracker-App. Antworte ausschliesslich als JSON mit risk low|medium|high, headline, advice und actions Array mit 3 kurzen deutschen Strings. Keine Markdown-Erklaerung.',
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({
+          date: safeDate,
+          totalCaffeine,
+          dailyLimit,
+          remaining,
+          sleepTime: settings.sleepTime || '23:00',
+          logs: logs.map((log) => ({ name: log.name, caffeine: log.caffeine, size: log.size, createdAt: log.createdAt })),
+        }),
+      },
+    ], { model: loadAiConfig().model });
+    const parsed = parseJsonObject(result.content);
+    if (!parsed || typeof parsed !== 'object') return fallback;
+    return {
+      date: safeDate,
+      risk: ['low', 'medium', 'high'].includes(parsed.risk) ? parsed.risk : fallback.risk,
+      headline: String(parsed.headline || fallback.headline).slice(0, 90),
+      advice: String(parsed.advice || fallback.advice).slice(0, 220),
+      actions: Array.isArray(parsed.actions) && parsed.actions.length
+        ? parsed.actions.slice(0, 3).map((item) => String(item).slice(0, 90))
+        : fallback.actions,
+      source: 'ai',
+    };
+  } catch {
+    return fallback;
+  }
 };
 
 const sendReminderEmail = async ({ to }) => {
@@ -4570,6 +4708,17 @@ app.get('/api/stats/overview', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/stats/records', requireAuth, async (req, res) => {
+  try {
+    const { userId, email } = authIdentity(req);
+
+    res.json(getPersonalRecords({ userId, email }));
+  } catch (err) {
+    console.error('GET /api/stats/records error:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 app.get('/api/insights/me', requireAuth, async (req, res) => {
   try {
     const { userId, email } = authIdentity(req);
@@ -4631,6 +4780,17 @@ app.get('/api/ai/daily-hydration', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('GET /api/ai/daily-hydration error:', err);
     res.status(500).json({ error: 'Tagesziel-Spruch konnte nicht geladen werden.' });
+  }
+});
+
+app.get('/api/ai/daily-coach', requireAuth, async (req, res) => {
+  try {
+    const { userId, email } = authIdentity(req);
+    const date = isValidDateKey(req.query.date) ? String(req.query.date) : getTodayKey();
+    res.json(await getDailyCoach({ userId, email, date }));
+  } catch (err) {
+    console.error('GET /api/ai/daily-coach error:', err);
+    res.status(500).json({ error: 'Tagescoach konnte nicht geladen werden.' });
   }
 });
 

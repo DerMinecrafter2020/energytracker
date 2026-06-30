@@ -99,6 +99,9 @@ export const fetchTodayStats = (user) =>
 export const fetchStatsOverview = (user) =>
   get('/api/stats/overview', identity(user), 'Fehler beim Abrufen der Zielübersicht');
 
+export const fetchPersonalRecords = (user) =>
+  get('/api/stats/records', identity(user), 'Fehler beim Abrufen der Rekorde');
+
 export const fetchWeeklyStats = async (user) =>
   (await get('/api/stats/weekly', identity(user), 'Fehler beim Abrufen der Wochenstatistiken')).items || [];
 

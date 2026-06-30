@@ -1,10 +1,15 @@
 import React from 'react';
-import { BarChart2, Brain, Clock, Coffee } from 'lucide-react';
+import { BarChart2, Brain, Clock, Coffee, Gauge } from 'lucide-react';
 
 const PatternInsights = ({ insights }) => {
   if (!insights) return null;
   const topDrinks = Array.isArray(insights.topDrinks) ? insights.topDrinks : [];
   const maxDrinkCount = Math.max(1, ...topDrinks.map((drink) => Number(drink.count) || 0));
+  const riskColor = insights.riskLevel === 'high'
+    ? 'bg-red-500/10 border-red-500/30 text-red-300'
+    : (insights.riskLevel === 'medium'
+      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300');
 
   return (
     <div className="glass-card rounded-[2rem] p-5 sm:p-6 animate-fade-in">
@@ -19,6 +24,16 @@ const PatternInsights = ({ insights }) => {
       </div>
 
       <div className="space-y-2.5 mb-5">
+        <div className={`rounded-2xl border px-4 py-3 text-sm ${riskColor}`}>
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <span className="flex items-center gap-2 font-semibold">
+              <Gauge className="w-4 h-4" />
+              Muster-Risiko
+            </span>
+            <span>{Math.round(Number(insights.riskScore) || 0)}%</span>
+          </div>
+          <p className="text-slate-200">{insights.focus}</p>
+        </div>
         {(insights.messages || []).map((message) => (
           <div key={message} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-slate-300">
             {message}

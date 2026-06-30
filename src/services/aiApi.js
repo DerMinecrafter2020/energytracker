@@ -79,5 +79,8 @@ export const fetchDailySummary = ({ logs, totalCaffeine, dailyLimit, selectedDat
 export const fetchDailyHydrationQuote = (date) =>
   get('/api/ai/daily-hydration', { date: date || clientDate() });
 
+export const fetchDailyCoach = (date) =>
+  get('/api/ai/daily-coach', { date: date || clientDate() });
+
 export const scheduleDiscordMessage = (time, message) =>
   post('/api/ai/schedule-discord', { time, message });

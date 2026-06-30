@@ -334,6 +334,38 @@ test('Startseiten Export mailt PDF und Tagesziel-Spruch ist abrufbar', async () 
   }
 });
 
+test('Version 3 liefert Tagescoach, Rekorde und erweiterte Muster', async () => {
+  const token = await login(USER_EMAIL, USER_PASSWORD);
+
+  const coachRes = await fetch(`${BASE_URL}/ai/daily-coach?date=2026-06-29`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(coachRes.status, 200, `Expected 200 OK, got ${coachRes.status}`);
+  const coach = await coachRes.json();
+  assert.strictEqual(coach.date, '2026-06-29');
+  assert.ok(['low', 'medium', 'high'].includes(coach.risk));
+  assert.ok(String(coach.headline || '').length > 0);
+  assert.ok(Array.isArray(coach.actions));
+
+  const recordsRes = await fetch(`${BASE_URL}/stats/records`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(recordsRes.status, 200, `Expected 200 OK, got ${recordsRes.status}`);
+  const records = await recordsRes.json();
+  assert.ok(records.range?.start);
+  assert.strictEqual(typeof records.currentUnderLimitStreak, 'number');
+  assert.strictEqual(typeof records.longestUnderLimitStreak, 'number');
+
+  const insightsRes = await fetch(`${BASE_URL}/insights/me`, {
+    headers: authHeaders(token),
+  });
+  assert.strictEqual(insightsRes.status, 200, `Expected 200 OK, got ${insightsRes.status}`);
+  const insights = await insightsRes.json();
+  assert.ok(['low', 'medium', 'high'].includes(insights.riskLevel));
+  assert.strictEqual(typeof insights.riskScore, 'number');
+  assert.ok(String(insights.focus || '').length > 0);
+});
+
 test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angemeldete Benutzer', async () => {
   const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
   const userToken = await login(USER_EMAIL, USER_PASSWORD);

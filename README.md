@@ -2,7 +2,7 @@
 
 Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen Warnungen. Die App bringt Benutzerverwaltung, Admin-Panel, Redis-Persistenz, 2FA, Erinnerungen, Discord-Integration und einen KI-Assistenten mit synchronisiertem Chatverlauf mit.
 
-![Version](https://img.shields.io/badge/version-2.2.9-blue)
+![Version](https://img.shields.io/badge/version-3.0.1-blue)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
@@ -14,7 +14,11 @@ Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen War
 - Tagesuebersicht mit Fortschrittsbalken, Warnungen und Tageslimit
 - Drink-Logs mit Name, Menge, Koffein, Icon, Datum, Bearbeiten und Loeschen
 - KI-Assistent fuer Fragen, Tagesanalyse und Drink-Aktionen
+- Modusabhaengige Startseite: KI-Chat mit Kontextspalte oder manuelle Eingabe mit KI-Widgets
 - Taeglicher Hydration-Spruch oben an der Datumsleiste, per KI erzeugt und pro Tag gespeichert
+- KI-Tagescoach mit Risikolevel und naechsten sinnvollen Aktionen
+- Persoenliche Rekorde fuer Streaks, Top-Getraenke und staerkste Tage
+- Erweiterte Musteranalyse mit Risiko-Fokus
 - Unbegrenzter KI-Chatverlauf ohne 40-Nachrichten-Limit
 - Synchronisierter KI-Chat zwischen mehreren Geraeten pro Benutzer
 - Benutzerkonten mit Registrierung, E-Mail-Verifikation und Passwort-Reset
