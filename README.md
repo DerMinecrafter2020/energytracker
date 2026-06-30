@@ -2,7 +2,7 @@
 
 Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persönlichen Warnungen. Die App bringt Benutzerverwaltung, Admin-Panel, Redis-Persistenz, 2FA, Erinnerungen, Discord-Integration und einen KI-Assistenten mit synchronisiertem Chatverlauf mit.
 
-![Version](https://img.shields.io/badge/version-3.0.6-blue)
+![Version](https://img.shields.io/badge/version-3.0.7-blue)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
@@ -69,7 +69,7 @@ chmod +x tracker.sh
 ./tracker.sh
 ```
 
-Das Script prüft Docker und Docker Compose, erstellt bei Bedarf `.env.local` aus der lokalen `.env.example`, lädt alternativ die aktuelle Vorlage von `https://raw.githubusercontent.com/DerMinecrafter2020/energytracker/refs/heads/main/.env.example` oder nutzt als letzte Rettung eingebaute Standardwerte. Danach fragt es die App-Domain ab, setzt `CORS_ORIGIN`, `WEBAUTHN_ORIGIN`, `WEBAUTHN_RP_ID` und `VITE_API_BASE_URL`, kann S3-Backups vorkonfigurieren, ein Verschlüsselungskennwort mit mindestens 32 Zeichen hinterlegen, baut die Container, startet App/Redis/Mailpit und führt einen Health-Check aus.
+Das Script kann auch allein in einem leeren Ordner gestartet werden. Falls `docker-compose.yml`, `package.json` und `server.js` fehlen, lädt es zuerst das Repository von `https://github.com/DerMinecrafter2020/energytracker.git` in diesen Ordner und startet danach den Installer aus dem Projekt neu. Anschließend erstellt es bei Bedarf `.env.local` aus der lokalen `.env.example`, lädt alternativ die aktuelle Vorlage von `https://raw.githubusercontent.com/DerMinecrafter2020/energytracker/refs/heads/main/.env.example` oder nutzt als letzte Rettung eingebaute Standardwerte. Danach fragt es die App-Domain ab, setzt `CORS_ORIGIN`, `WEBAUTHN_ORIGIN`, `WEBAUTHN_RP_ID` und `VITE_API_BASE_URL`, kann S3-Backups vorkonfigurieren, ein Verschlüsselungskennwort mit mindestens 32 Zeichen hinterlegen, baut die Container, startet App/Redis/Mailpit und führt einen Health-Check aus.
 
 Update einer bestehenden Installation:
 

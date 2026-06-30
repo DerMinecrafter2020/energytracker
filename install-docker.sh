@@ -5,6 +5,8 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
 ENV_FILE="${ENV_FILE:-.env.local}"
+REPO_URL="${REPO_URL:-https://github.com/DerMinecrafter2020/energytracker.git}"
+REPO_ARCHIVE_URL="${REPO_ARCHIVE_URL:-https://github.com/DerMinecrafter2020/energytracker/archive/refs/heads/main.tar.gz}"
 ENV_EXAMPLE_URL="${ENV_EXAMPLE_URL:-https://raw.githubusercontent.com/DerMinecrafter2020/energytracker/refs/heads/main/.env.example}"
 APP_URL="${APP_URL:-}"
 MODE="${1:-}"
@@ -37,6 +39,7 @@ Aufruf:
 
 Optionale Umgebungsvariablen:
   ENV_FILE=.env.local
+  REPO_URL=https://github.com/DerMinecrafter2020/energytracker.git
   ENV_EXAMPLE_URL=https://raw.githubusercontent.com/DerMinecrafter2020/energytracker/refs/heads/main/.env.example
   APP_URL=https://deine-domain.de
 EOF
@@ -51,6 +54,63 @@ if [[ "$MODE" != "" && "$MODE" != "--update" && "$MODE" != "-u" ]]; then
   usage
   fail "Unbekannter Parameter: $MODE"
 fi
+
+project_files_present() {
+  [ -f docker-compose.yml ] && [ -f package.json ] && [ -f server.js ]
+}
+
+bootstrap_repository() {
+  if project_files_present; then
+    return
+  fi
+
+  info "Projektdateien wurden nicht gefunden. Lade Repository nach $PROJECT_DIR ..."
+
+  if ! command -v tar >/dev/null 2>&1; then
+    fail "tar fehlt. Bitte tar installieren oder das Repository manuell klonen."
+  fi
+
+  local tmp_dir repo_dir archive_file
+  tmp_dir="$(mktemp -d)"
+  repo_dir="$tmp_dir/repo"
+  archive_file="$tmp_dir/repo.tar.gz"
+  trap 'rm -rf "$tmp_dir"' RETURN
+
+  if command -v git >/dev/null 2>&1; then
+    git clone --depth 1 "$REPO_URL" "$repo_dir"
+  elif command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 3 --connect-timeout 15 "$REPO_ARCHIVE_URL" -o "$archive_file"
+    mkdir -p "$repo_dir"
+    tar -xzf "$archive_file" -C "$tmp_dir"
+    repo_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d -name 'energytracker-*' | head -n 1)"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -O "$archive_file" "$REPO_ARCHIVE_URL"
+    mkdir -p "$repo_dir"
+    tar -xzf "$archive_file" -C "$tmp_dir"
+    repo_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d -name 'energytracker-*' | head -n 1)"
+  else
+    fail "Weder git noch curl/wget gefunden. Bitte eines davon installieren oder das Repository manuell klonen."
+  fi
+
+  if [ -z "${repo_dir:-}" ] || [ ! -d "$repo_dir" ]; then
+    fail "Repository konnte nicht vorbereitet werden."
+  fi
+
+  info "Kopiere Repository-Dateien in $PROJECT_DIR"
+  (cd "$repo_dir" && tar cf - .) | (cd "$PROJECT_DIR" && tar xpf -)
+  chmod +x "$PROJECT_DIR/install-docker.sh" 2>/dev/null || true
+
+  if ! project_files_present; then
+    fail "Repository wurde geladen, aber docker-compose.yml/package.json/server.js fehlen weiterhin."
+  fi
+
+  success "Repository wurde geladen"
+  if [ -x "$PROJECT_DIR/install-docker.sh" ]; then
+    exec "$PROJECT_DIR/install-docker.sh" "$@"
+  fi
+}
+
+bootstrap_repository "$@"
 
 if ! command -v docker >/dev/null 2>&1; then
   fail "Docker ist nicht installiert. Installiere Docker zuerst: https://docs.docker.com/engine/install/"
