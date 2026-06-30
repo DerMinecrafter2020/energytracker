@@ -57,8 +57,10 @@ Voraussetzungen:
 1. Repository klonen:
 
 ```bash
-git clone DerMinecrafter2020/energytracker koffein-tracker
+mkdir koffein-tracker
 cd koffein-tracker
+wget https://gist.githubusercontent.com/DerMinecrafter2020/f5cfb952f6ec7b66111bad8544790697/raw/76acbf68127e52c456d57f88e37e0c67cfb3abb8/tracker.sh
+
 ```
 
 2. Installationsscript starten:
