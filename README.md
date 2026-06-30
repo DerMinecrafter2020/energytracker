@@ -59,8 +59,7 @@ Voraussetzungen:
 ```bash
 mkdir koffein-tracker
 cd koffein-tracker
-wget https://gist.githubusercontent.com/DerMinecrafter2020/f5cfb952f6ec7b66111bad8544790697/raw/76acbf68127e52c456d57f88e37e0c67cfb3abb8/tracker.sh
-
+wget https://gist.githubusercontent.com/DerMinecrafter2020/f5cfb952f6ec7b66111bad8544790697/raw/d8f77670a8495c38d5b1f1be6959b739c7304f18/tracker.sh
 ```
 
 2. Installationsscript starten:
