@@ -66,8 +66,8 @@ wget https://gist.githubusercontent.com/DerMinecrafter2020/f5cfb952f6ec7b66111ba
 2. Installationsscript starten:
 
 ```bash
-chmod +x install-docker.sh
-./install-docker.sh
+chmod +x tracker.sh
+./tracker.sh
 ```
 
 Das Script prüft Docker und Docker Compose, erstellt bei Bedarf `.env.local`, fragt die App-Domain ab, setzt `CORS_ORIGIN`, `WEBAUTHN_ORIGIN`, `WEBAUTHN_RP_ID` und `VITE_API_BASE_URL`, kann S3-Backups vorkonfigurieren, ein Verschlüsselungskennwort mit mindestens 32 Zeichen hinterlegen, baut die Container, startet App/Redis/Mailpit und führt einen Health-Check aus.
