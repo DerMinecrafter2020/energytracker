@@ -2,7 +2,7 @@
 
 Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persönlichen Warnungen. Die App bringt Benutzerverwaltung, Admin-Panel, Redis-Persistenz, 2FA, Erinnerungen, Discord-Integration und einen KI-Assistenten mit synchronisiertem Chatverlauf mit.
 
-![Version](https://img.shields.io/badge/version-3.0.3-blue)
+![Version](https://img.shields.io/badge/version-3.0.4-blue)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
@@ -57,7 +57,7 @@ Voraussetzungen:
 1. Repository klonen:
 
 ```bash
-git clone <repo-url> koffein-tracker
+git clone DerMinecrafter2020/energytracker koffein-tracker
 cd koffein-tracker
 ```
 
@@ -68,7 +68,15 @@ chmod +x install-docker.sh
 ./install-docker.sh
 ```
 
-Das Script prüft Docker und Docker Compose, erstellt bei Bedarf `.env.local`, baut die Container, startet App/Redis/Mailpit und führt einen Health-Check aus.
+Das Script prüft Docker und Docker Compose, erstellt bei Bedarf `.env.local`, fragt die App-Domain ab, setzt `CORS_ORIGIN`, `WEBAUTHN_ORIGIN`, `WEBAUTHN_RP_ID` und `VITE_API_BASE_URL`, kann S3-Backups vorkonfigurieren, ein Verschlüsselungskennwort mit mindestens 32 Zeichen hinterlegen, baut die Container, startet App/Redis/Mailpit und führt einen Health-Check aus.
+
+Update einer bestehenden Installation:
+
+```bash
+./install-docker.sh --update
+```
+
+Der Update-Modus behält `.env.local` bei, führt wenn möglich `git pull --ff-only` aus, aktualisiert Docker Images, baut das App-Image neu und startet die Container neu.
 
 ### Manuelle Installation
 
@@ -381,7 +389,8 @@ Geschützte Endpunkte erwarten `Authorization: Bearer <token>`. Admin-Endpunkte 
 | `npm run build` | baut das Frontend für Produktion |
 | `npm run preview` | Vorschau des Production Builds |
 | `npm run migrate:legacy:mysql` | Legacy-Migration für alte Daten |
-| `./install-docker.sh` | erstellt `.env.local`, baut und startet Docker Compose |
+| `./install-docker.sh` | interaktive Docker-Installation mit Domain-, S3- und Verschlüsselungskennwort-Konfiguration |
+| `./install-docker.sh --update` | aktualisiert Code/Images und startet Docker Compose neu |
 
 Hinweis: `npm run build` führt vorher `npm run version:auto` aus und erhöht die Version in `package.json` und `package-lock.json`.
 
