@@ -1,9 +1,8 @@
 import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
+import { API_BASE } from './apiBase';
 
 const AUTH_KEY = 'et-session';
 const TOKEN_KEY = 'token';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 const postJson = async (path, body, fallback) => {
   const resp = await fetch(`${API_BASE}${path}`, {

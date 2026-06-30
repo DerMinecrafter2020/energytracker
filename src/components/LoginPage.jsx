@@ -8,8 +8,8 @@ import {
 
 } from '../services/auth';
 import { fetchPublicSettings } from '../services/adminApi';
+import { API_BASE } from '../services/apiBase';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const alertStyles = {
   success: 'bg-green-500/10 border-green-500/30 text-green-300',
   warning: 'bg-orange-500/10 border-orange-500/30 text-orange-300',
@@ -357,7 +357,6 @@ const LoginPage = ({ onLogin, onShowRegister, initialMessage = '' }) => {
 };
 
 export default LoginPage;
-
 
 
 

@@ -1,6 +1,6 @@
 import { logout } from './auth';
+import { API_BASE } from './apiBase';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 const handleAuthExpired = () => {

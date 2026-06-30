@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Zap, Mail, Lock, Eye, EyeOff, User, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+import { API_BASE } from '../services/apiBase';
 
 const RegisterPage = ({ onBack }) => {
     const [form, setForm]       = useState({ name: '', email: '', password: '', confirm: '' });
@@ -192,7 +191,6 @@ const RegisterPage = ({ onBack }) => {
 };
 
 export default RegisterPage;
-
 
 
 

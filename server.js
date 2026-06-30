@@ -279,6 +279,9 @@ const cleanupAuthChallenges = () => {
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(helmet({
+  crossOriginOpenerPolicy: false,
+  originAgentCluster: false,
+  strictTransportSecurity: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -288,6 +291,7 @@ app.use(helmet({
       connectSrc: ["'self'", ALLOWED_ORIGIN, 'https:'],
       fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
       frameAncestors: ["'none'"],
+      upgradeInsecureRequests: null,
     },
   },
 }));

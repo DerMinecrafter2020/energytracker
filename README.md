@@ -2,7 +2,7 @@
 
 Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persönlichen Warnungen. Die App bringt Benutzerverwaltung, Admin-Panel, Redis-Persistenz, 2FA, Erinnerungen, Discord-Integration und einen KI-Assistenten mit synchronisiertem Chatverlauf mit.
 
-![Version](https://img.shields.io/badge/version-3.0.8-blue)
+![Version](https://img.shields.io/badge/version-3.1.0-blue)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
@@ -33,6 +33,7 @@ Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persönlichen War
 - Export auf der Startseite: CSV-Download und PDF-Versand per E-Mail
 - OpenRouter-KI-Konfiguration und optional Brave Search API
 - Redis-Health-Check im Admin-Panel
+- Zugriff per Domain, localhost oder IP-Adresse ohne fest eingebrannten localhost-API-Pfad
 - Themes: Standard Dark, Light, OLED, Neon, Forest
 - Docker-Compose-Setup mit Redis und Mailpit
 
