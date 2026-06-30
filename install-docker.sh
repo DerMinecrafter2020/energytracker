@@ -5,6 +5,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
 ENV_FILE="${ENV_FILE:-.env.local}"
+ENV_EXAMPLE_URL="${ENV_EXAMPLE_URL:-https://raw.githubusercontent.com/DerMinecrafter2020/energytracker/refs/heads/main/.env.example}"
 APP_URL="${APP_URL:-}"
 MODE="${1:-}"
 
@@ -36,6 +37,7 @@ Aufruf:
 
 Optionale Umgebungsvariablen:
   ENV_FILE=.env.local
+  ENV_EXAMPLE_URL=https://raw.githubusercontent.com/DerMinecrafter2020/energytracker/refs/heads/main/.env.example
   APP_URL=https://deine-domain.de
 EOF
 }
@@ -66,10 +68,74 @@ if ! docker info >/dev/null 2>&1; then
   fail "Docker läuft nicht oder dein Benutzer hat keinen Zugriff auf den Docker-Daemon."
 fi
 
+write_default_env_file() {
+  cat > "$ENV_FILE" <<'EOF'
+# ===== APPLICATION =====
+DB_TYPE=redis
+NODE_ENV=production
+PORT=3001
+CORS_ORIGIN=http://localhost:3001
+
+# ===== REDIS =====
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# ===== AUTH / SECURITY =====
+SESSION_SECRET=bitte-ändern-langer-zufälliger-wert
+SESSION_TTL_MS=604800000
+PASSWORD_SALT=et-caffeine-salt-2024
+# Optionaler Fallback. Das Installscript kann ein Verschlüsselungskennwort direkt setzen.
+SECRET_ENCRYPTION_KEY=
+
+# Demo-Zugänge sind serverseitig und werden nicht ins Frontend gebaut.
+ADMIN_EMAIL=admin@energytracker.de
+ADMIN_PASSWORD=Admin@2024!
+USER_EMAIL=user@energytracker.de
+USER_PASSWORD=User@2024!
+
+# ===== WEBAUTHN / PASSKEYS =====
+WEBAUTHN_RP_NAME=Koffein-Tracker
+WEBAUTHN_ORIGIN=http://localhost:3001
+WEBAUTHN_RP_ID=localhost
+
+# ===== FRONTEND (Vite) =====
+VITE_API_BASE_URL=http://localhost:3001
+VITE_ADMIN_EMAIL=admin@energytracker.de
+VITE_USER_EMAIL=user@energytracker.de
+
+# ===== OPTIONAL: S3 BACKUPS =====
+S3_BUCKET=
+S3_REGION=eu-central-1
+S3_ENDPOINT=
+S3_PREFIX=koffein-tracker/backups
+S3_FORCE_PATH_STYLE=false
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+EOF
+}
+
+download_env_example() {
+  local target="$1"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 3 --connect-timeout 10 "$ENV_EXAMPLE_URL" -o "$target"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -O "$target" "$ENV_EXAMPLE_URL"
+  else
+    return 1
+  fi
+}
+
 ensure_env_file() {
   if [ ! -f "$ENV_FILE" ]; then
-    info "Erstelle $ENV_FILE aus .env.example"
-    cp .env.example "$ENV_FILE"
+    if [ -f .env.example ]; then
+      info "Erstelle $ENV_FILE aus .env.example"
+      cp .env.example "$ENV_FILE"
+    elif download_env_example "$ENV_FILE"; then
+      success "$ENV_FILE aus GitHub-Vorlage erstellt"
+    else
+      warn ".env.example wurde nicht gefunden und konnte nicht von GitHub geladen werden. Erstelle $ENV_FILE mit Standardwerten."
+      write_default_env_file
+    fi
     success "$ENV_FILE erstellt"
   else
     success "$ENV_FILE ist vorhanden"
