@@ -1,8 +1,8 @@
 # Koffein-Tracker
 
-Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen Warnungen. Die App bringt Benutzerverwaltung, Admin-Panel, Redis-Persistenz, 2FA, Erinnerungen, Discord-Integration und einen KI-Assistenten mit synchronisiertem Chatverlauf mit.
+Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persönlichen Warnungen. Die App bringt Benutzerverwaltung, Admin-Panel, Redis-Persistenz, 2FA, Erinnerungen, Discord-Integration und einen KI-Assistenten mit synchronisiertem Chatverlauf mit.
 
-![Version](https://img.shields.io/badge/version-3.0.1-blue)
+![Version](https://img.shields.io/badge/version-3.0.3-blue)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
@@ -11,21 +11,21 @@ Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen War
 
 ## Funktionen
 
-- Tagesuebersicht mit Fortschrittsbalken, Warnungen und Tageslimit
-- Drink-Logs mit Name, Menge, Koffein, Icon, Datum, Bearbeiten und Loeschen
-- KI-Assistent fuer Fragen, Tagesanalyse und Drink-Aktionen
-- Modusabhaengige Startseite: KI-Chat mit Kontextspalte oder manuelle Eingabe mit KI-Widgets
-- Taeglicher Hydration-Spruch oben an der Datumsleiste, per KI erzeugt und pro Tag gespeichert
-- KI-Tagescoach mit Risikolevel und naechsten sinnvollen Aktionen
-- Persoenliche Rekorde fuer Streaks, Top-Getraenke und staerkste Tage
+- Tagesübersicht mit Fortschrittsbalken, Warnungen und Tageslimit
+- Drink-Logs mit Name, Menge, Koffein, Icon, Datum, Bearbeiten und Löschen
+- KI-Assistent für Fragen, Tagesanalyse und Drink-Aktionen
+- Modusabhängige Startseite: KI-Chat mit Kontextspalte oder manuelle Eingabe mit KI-Widgets
+- Täglicher Hydration-Spruch oben an der Datumsleiste, per KI erzeugt und pro Tag gespeichert
+- KI-Tagescoach mit Risikolevel und nächsten sinnvollen Aktionen
+- Persönliche Rekorde für Streaks, Top-Getränke und stärkste Tage
 - Erweiterte Musteranalyse mit Risiko-Fokus
 - Unbegrenzter KI-Chatverlauf ohne 40-Nachrichten-Limit
-- Synchronisierter KI-Chat zwischen mehreren Geraeten pro Benutzer
+- Synchronisierter KI-Chat zwischen mehreren Geräten pro Benutzer
 - Benutzerkonten mit Registrierung, E-Mail-Verifikation und Passwort-Reset
-- Admin-Panel fuer Benutzer, Rollen, manuelle Verifizierung, Loeschen und Impersonation
+- Admin-Panel für Benutzer, Rollen, manuelle Verifizierung, Löschen und Impersonation
 - Demo-Login optional aktivierbar/deaktivierbar
 - Profil- und Sicherheitseinstellungen
-- Bearer-Token-Sessions, Security-Header und Rate-Limits fuer API/Auth
+- Bearer-Token-Sessions, Security-Header und Rate-Limits für API/Auth
 - 2FA per TOTP und Passkey/YubiKey/WebAuthn
 - Erinnerungen per E-Mail und optional Discord
 - Discord-Webhook-Test und geplante KI-Discord-Nachrichten
@@ -40,7 +40,7 @@ Eine React/Express-Web-App zum Tracken von Koffein, Drinks und persoenlichen War
 
 - Frontend: React 19, Vite 8, Tailwind CSS, Lucide Icons
 - Backend: Node.js 20+, Express 5
-- Persistenz: Redis ueber `ioredis`
+- Persistenz: Redis über `ioredis`
 - Auth/Security: lokale Benutzer, PBKDF2-Hashing, TOTP, WebAuthn/Passkeys
 - Mail: Nodemailer, SMTP-Konfiguration im Admin-Panel
 - KI: OpenRouter-kompatible Chat Completions API
@@ -68,7 +68,7 @@ chmod +x install-docker.sh
 ./install-docker.sh
 ```
 
-Das Script prueft Docker und Docker Compose, erstellt bei Bedarf `.env.local`, baut die Container, startet App/Redis/Mailpit und fuehrt einen Health-Check aus.
+Das Script prüft Docker und Docker Compose, erstellt bei Bedarf `.env.local`, baut die Container, startet App/Redis/Mailpit und führt einen Health-Check aus.
 
 ### Manuelle Installation
 
@@ -78,15 +78,15 @@ Das Script prueft Docker und Docker Compose, erstellt bei Bedarf `.env.local`, b
 cp .env.example .env.local
 ```
 
-2. Werte in `.env.local` fuer Produktion anpassen:
+2. Werte in `.env.local` für Produktion anpassen:
 
 ```env
 NODE_ENV=production
 PORT=3001
 CORS_ORIGIN=http://localhost:3001
 
-SESSION_SECRET=bitte-aendern-langer-zufaelliger-wert
-PASSWORD_SALT=bitte-aendern
+SESSION_SECRET=bitte-ändern-langer-zufälliger-wert
+PASSWORD_SALT=bitte-ändern
 SECRET_ENCRYPTION_KEY=
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=ein-sicheres-passwort
@@ -104,7 +104,7 @@ VITE_ADMIN_EMAIL=admin@example.com
 VITE_USER_EMAIL=user@example.com
 ```
 
-Wichtig: Nur `VITE_*` Variablen werden in das Frontend eingebaut. Secrets wie `SESSION_SECRET`, Demo-Passwoerter und `PASSWORD_SALT` muessen serverseitig ohne `VITE_` gesetzt werden.
+Wichtig: Nur `VITE_*` Variablen werden in das Frontend eingebaut. Secrets wie `SESSION_SECRET`, Demo-Passwörter und `PASSWORD_SALT` müssen serverseitig ohne `VITE_` gesetzt werden.
 
 3. Container starten:
 
@@ -112,7 +112,7 @@ Wichtig: Nur `VITE_*` Variablen werden in das Frontend eingebaut. Secrets wie `S
 docker compose --env-file .env.local up -d --build
 ```
 
-4. App oeffnen:
+4. App öffnen:
 
 ```text
 http://localhost:3001
@@ -122,7 +122,7 @@ Docker Compose startet:
 
 - `app` auf Port `3001`
 - `redis` mit persistentem Volume `redis-data`
-- `mailpit` auf `http://localhost:8025` fuer lokale Mailtests
+- `mailpit` auf `http://localhost:8025` für lokale Mailtests
 
 ## Lokale Entwicklung
 
@@ -153,7 +153,7 @@ NODE_ENV=development
 PORT=3001
 CORS_ORIGIN=http://localhost:5173
 
-SESSION_SECRET=bitte-aendern-langer-zufaelliger-wert
+SESSION_SECRET=bitte-ändern-langer-zufälliger-wert
 PASSWORD_SALT=et-caffeine-salt-2024
 SECRET_ENCRYPTION_KEY=
 
@@ -193,7 +193,7 @@ Solange Demo-Zugang aktiviert ist, stehen Standarddaten bereit:
 | Admin | `admin@energytracker.de` | `Admin@2024!` |
 | Benutzer | `user@energytracker.de` | `User@2024!` |
 
-Die Demo-Zugangsdaten koennen per ENV angepasst werden:
+Die Demo-Zugangsdaten können per ENV angepasst werden:
 
 ```env
 ADMIN_EMAIL=admin@example.com
@@ -204,9 +204,9 @@ VITE_ADMIN_EMAIL=admin@example.com
 VITE_USER_EMAIL=user@example.com
 ```
 
-Fuer produktive Installationen:
+Für produktive Installationen:
 
-- `SESSION_SECRET`, Demo-Passwoerter und `PASSWORD_SALT` aendern
+- `SESSION_SECRET`, Demo-Passwörter und `PASSWORD_SALT` ändern
 - Demo-Zugang im Admin-Panel deaktivieren
 - SMTP konfigurieren, wenn Registrierung, Verifikation oder Passwort-Reset genutzt werden sollen
 - Erste echte Admin-Benutzer im Admin-Panel anlegen
@@ -217,27 +217,27 @@ Fuer produktive Installationen:
 |---|---|
 | `PORT` | Express-Port, Standard `3001` |
 | `CORS_ORIGIN` | erlaubte Frontend-Origin |
-| `SESSION_SECRET` | Signatur-Secret fuer Login-Sessions |
+| `SESSION_SECRET` | Signatur-Secret für Login-Sessions |
 | `SESSION_TTL_MS` | Lebensdauer eines Session-Tokens in Millisekunden |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | serverseitige Demo-Admin-Zugangsdaten |
 | `USER_EMAIL` / `USER_PASSWORD` | serverseitige Demo-Benutzer-Zugangsdaten |
-| `PASSWORD_SALT` | Salt fuer Passwort-Hashing |
-| `SECRET_ENCRYPTION_KEY` | optionaler Server-Fallback fuer verschluesselt gespeicherte Zugangsdaten; bevorzugt im Admin-Panel setzen |
-| `REDIS_URL` | vollstaendige Redis-URL, z.B. `redis://127.0.0.1:6379` |
+| `PASSWORD_SALT` | Salt für Passwort-Hashing |
+| `SECRET_ENCRYPTION_KEY` | optionaler Server-Fallback für verschlüsselt gespeicherte Zugangsdaten; bevorzugt im Admin-Panel setzen |
+| `REDIS_URL` | vollständige Redis-URL, z.B. `redis://127.0.0.1:6379` |
 | `REDIS_HOST` / `REDIS_PORT` | Redis-Host und Port, falls keine `REDIS_URL` gesetzt ist |
-| `S3_BUCKET` | optionaler Bucket fuer Cloud-Backups, alternativ im Admin-Panel setzbar |
+| `S3_BUCKET` | optionaler Bucket für Cloud-Backups, alternativ im Admin-Panel setzbar |
 | `S3_REGION` | S3-Region, Standard `eu-central-1`, alternativ im Admin-Panel setzbar |
-| `S3_ENDPOINT` | optionaler Endpoint fuer S3-kompatible Anbieter, alternativ im Admin-Panel setzbar |
-| `S3_PREFIX` | Ordner/Praefix fuer Backups, Standard `koffein-tracker/backups`, alternativ im Admin-Panel setzbar |
-| `S3_FORCE_PATH_STYLE` | `true` fuer viele S3-kompatible Anbieter, alternativ im Admin-Panel setzbar |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Zugangsdaten fuer S3-Backup und Restore, alternativ im Admin-Panel setzbar |
-| `WEBAUTHN_RP_NAME` | Anzeigename fuer Passkeys/TOTP-Issuer |
-| `WEBAUTHN_ORIGIN` | Origin fuer WebAuthn, z.B. `https://deine-domain.de` |
-| `WEBAUTHN_RP_ID` | Domain fuer WebAuthn, z.B. `deine-domain.de` |
-| `VITE_API_BASE_URL` | API-URL fuer das Frontend |
+| `S3_ENDPOINT` | optionaler Endpoint für S3-kompatible Anbieter, alternativ im Admin-Panel setzbar |
+| `S3_PREFIX` | Ordner/Präfix für Backups, Standard `koffein-tracker/backups`, alternativ im Admin-Panel setzbar |
+| `S3_FORCE_PATH_STYLE` | `true` für viele S3-kompatible Anbieter, alternativ im Admin-Panel setzbar |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | Zugangsdaten für S3-Backup und Restore, alternativ im Admin-Panel setzbar |
+| `WEBAUTHN_RP_NAME` | Anzeigename für Passkeys/TOTP-Issuer |
+| `WEBAUTHN_ORIGIN` | Origin für WebAuthn, z.B. `https://deine-domain.de` |
+| `WEBAUTHN_RP_ID` | Domain für WebAuthn, z.B. `deine-domain.de` |
+| `VITE_API_BASE_URL` | API-URL für das Frontend |
 | `VITE_ADMIN_EMAIL` / `VITE_USER_EMAIL` | optionale Demo-E-Mail-Hinweise im Login |
 
-SMTP, Registrierung, Demo-Zugang, Discord-Webhook, KI-Keys und S3-Zugangsdaten koennen im Admin-Panel gespeichert werden.
+SMTP, Registrierung, Demo-Zugang, Discord-Webhook, KI-Keys und S3-Zugangsdaten können im Admin-Panel gespeichert werden.
 
 ## S3 Backup und Restore
 
@@ -248,15 +248,15 @@ Ein Admin kann unter **Einstellungen -> Redis Datenpersistenz** lokale `.db` Bac
 - nur Logs
 - nur API-Keys und Integrations-Zugangsdaten
 
-Unter **S3 Backup und Restore** koennen die `S3_*` Werte direkt im Admin-Panel gespeichert werden. Danach kann ein Admin:
+Unter **S3 Backup und Restore** können die `S3_*` Werte direkt im Admin-Panel gespeichert werden. Danach kann ein Admin:
 
 - ein vollständiges oder bereichsbezogenes `.db` Backup in den S3-Bucket hochladen
 - vorhandene S3-Backups anzeigen
 - ein Backup auf einer neuen Instanz wiederherstellen
 
-Für AWS S3 reicht normalerweise Bucket, Region, Access Key und Secret Key. Für MinIO, Hetzner, Wasabi oder andere kompatible Anbieter zusätzlich den Endpoint setzen und meistens Path-Style aktivieren. Der Endpoint kann als Service-Endpoint (`https://s3.example.com`) oder als Bucket-Endpoint (`https://mein-bucket.s3.example.com`) hinterlegt werden; die App erkennt den Bucket im Host und fuegt ihn nicht doppelt ein.
+Für AWS S3 reicht normalerweise Bucket, Region, Access Key und Secret Key. Für MinIO, Hetzner, Wasabi oder andere kompatible Anbieter zusätzlich den Endpoint setzen und meistens Path-Style aktivieren. Der Endpoint kann als Service-Endpoint (`https://s3.example.com`) oder als Bucket-Endpoint (`https://mein-bucket.s3.example.com`) hinterlegt werden; die App erkennt den Bucket im Host und fügt ihn nicht doppelt ein.
 
-S3 Access Key und Secret Key werden in Redis und in neuen `.db` Exporten verschluesselt gespeichert. Lege unter **Einstellungen -> Verschlüsselungskennwort** ein Kennwort mit mindestens 32 Zeichen fest. Dieses Kennwort wird nach dem Speichern nicht erneut angezeigt, deshalb sicher notieren. `SECRET_ENCRYPTION_KEY` kann weiterhin als Server-Fallback genutzt werden.
+S3 Access Key und Secret Key werden in Redis und in neuen `.db` Exporten verschlüsselt gespeichert. Lege unter **Einstellungen -> Verschlüsselungskennwort** ein Kennwort mit mindestens 32 Zeichen fest. Dieses Kennwort wird nach dem Speichern nicht erneut angezeigt, deshalb sicher notieren. `SECRET_ENCRYPTION_KEY` kann weiterhin als Server-Fallback genutzt werden.
 
 ## KI-Assistent
 
@@ -266,26 +266,26 @@ Funktionen:
 
 - Chat auf Deutsch
 - Tagesanalyse
-- Drinks per KI hinzufuegen, bearbeiten und loeschen
+- Drinks per KI hinzufügen, bearbeiten und löschen
 - geplante Discord-Nachrichten
-- optional Brave Search API fuer bessere Drink-Recherche
+- optional Brave Search API für bessere Drink-Recherche
 - Chatverlauf wird in Redis pro Benutzer gespeichert
-- mehrere Geraete synchronisieren den Chat automatisch
+- mehrere Geräte synchronisieren den Chat automatisch
 - kein 40-Nachrichten-Limit mehr
 
 ## Admin-Panel
 
-Admins koennen:
+Admins können:
 
 - alle Logs der letzten 30 Tage ansehen, filtern, sortieren und als CSV exportieren
-- Logs bearbeiten oder loeschen
-- Benutzer erstellen, verifizieren, loeschen und Rollen aendern
-- als Benutzer wechseln und wieder ins Admin-Panel zurueckkehren
+- Logs bearbeiten oder löschen
+- Benutzer erstellen, verifizieren, löschen und Rollen ändern
+- als Benutzer wechseln und wieder ins Admin-Panel zurückkehren
 - SMTP speichern und testen
 - Registrierung und Demo-Zugang umschalten
 - Discord-Webhook testen
 - OpenRouter- und Brave-Keys speichern
-- Redis-Persistenz pruefen
+- Redis-Persistenz prüfen
 
 ## Sicherheit
 
@@ -295,11 +295,11 @@ Unter Einstellungen kann jeder Benutzer:
 - TOTP/Authenticator-App aktivieren oder deaktivieren
 - Passkeys/YubiKey/WebAuthn registrieren oder entfernen
 - Warn- und Discord-Benachrichtigungen konfigurieren
-- Theme auswaehlen
+- Theme auswählen
 
 ## Erinnerungen und Benachrichtigungen
 
-Benutzer koennen taegliche Reminder konfigurieren:
+Benutzer können tägliche Reminder konfigurieren:
 
 - Uhrzeit
 - E-Mail-Versand
@@ -307,8 +307,8 @@ Benutzer koennen taegliche Reminder konfigurieren:
 
 Weitere Warnungen:
 
-- Tageslimit ueberschritten
-- spaetes Koffein
+- Tageslimit überschritten
+- spätes Koffein
 - schnelle Folge mehrerer Drinks
 
 ## API-Endpunkte
@@ -334,7 +334,7 @@ Auszug der wichtigsten API-Bereiche:
 - `GET/POST /api/admin/ai`
 - `GET /api/admin/redis/health`
 
-Geschuetzte Endpunkte erwarten `Authorization: Bearer <token>`. Admin-Endpunkte erfordern zusaetzlich eine Admin-Rolle.
+Geschützte Endpunkte erwarten `Authorization: Bearer <token>`. Admin-Endpunkte erfordern zusätzlich eine Admin-Rolle.
 
 ## Projektstruktur
 
@@ -349,7 +349,7 @@ Geschuetzte Endpunkte erwarten `Authorization: Bearer <token>`. Admin-Endpunkte 
 │   ├── main.jsx               # React Entry Point
 │   ├── components/
 │   │   ├── AIAssistant.jsx    # KI-Chat und synchronisierte History
-│   │   ├── AdminPanel.jsx     # Admin-Oberflaeche
+│   │   ├── AdminPanel.jsx     # Admin-Oberfläche
 │   │   ├── LoginPage.jsx      # Login, Reset, 2FA
 │   │   ├── RegisterPage.jsx   # Registrierung
 │   │   ├── SettingsPanel.jsx  # Profil, Theme, 2FA, Passkeys
@@ -376,14 +376,14 @@ Geschuetzte Endpunkte erwarten `Authorization: Bearer <token>`. Admin-Endpunkte 
 
 | Script | Beschreibung |
 |---|---|
-| `npm run dev` | startet Vite fuer lokale Entwicklung |
+| `npm run dev` | startet Vite für lokale Entwicklung |
 | `npm run server` | startet Express API |
-| `npm run build` | baut das Frontend fuer Produktion |
+| `npm run build` | baut das Frontend für Produktion |
 | `npm run preview` | Vorschau des Production Builds |
-| `npm run migrate:legacy:mysql` | Legacy-Migration fuer alte Daten |
+| `npm run migrate:legacy:mysql` | Legacy-Migration für alte Daten |
 | `./install-docker.sh` | erstellt `.env.local`, baut und startet Docker Compose |
 
-Hinweis: `npm run build` fuehrt vorher `npm run version:auto` aus und erhoeht die Version in `package.json` und `package-lock.json`.
+Hinweis: `npm run build` führt vorher `npm run version:auto` aus und erhöht die Version in `package.json` und `package-lock.json`.
 
 ## Tests
 
@@ -411,7 +411,7 @@ Empfohlener Produktionsbetrieb:
 5. SMTP im Admin-Panel konfigurieren
 6. Demo-Zugang deaktivieren
 
-Beispiel fuer Reverse Proxy:
+Beispiel für Reverse Proxy:
 
 ```nginx
 server {
@@ -430,7 +430,7 @@ server {
 
 ## Koffein-Hinweis
 
-Die App dient zur Orientierung und ersetzt keine medizinische Beratung. Das haeufig genannte Tageslimit fuer gesunde Erwachsene liegt bei ca. 400 mg Koffein, individuelle Grenzen koennen aber abweichen.
+Die App dient zur Orientierung und ersetzt keine medizinische Beratung. Das häufig genannte Tageslimit für gesunde Erwachsene liegt bei ca. 400 mg Koffein, individuelle Grenzen können aber abweichen.
 
 ## Lizenz
 

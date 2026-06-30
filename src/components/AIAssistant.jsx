@@ -531,7 +531,7 @@ const AIAssistant = ({
     }
   };
 
-  const selectedDateLabel = formatDateLabel(selectedDate) || selectedDate || 'dem gewaehlten Tag';
+  const selectedDateLabel = formatDateLabel(selectedDate) || selectedDate || 'dem gewählten Tag';
   const quickPrompts = [
     `Analysiere ${selectedDateLabel} und sag mir, was ich verbessern kann.`,
     `Zeig mir die IDs der Einträge für ${selectedDateLabel}.`,

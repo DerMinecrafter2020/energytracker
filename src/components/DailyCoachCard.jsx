@@ -26,7 +26,7 @@ const DailyCoachCard = ({ coach }) => {
         </div>
         <div className="min-w-0">
           <h2 className="text-base font-bold text-white">Tagescoach</h2>
-          <p className="text-xs text-slate-500">KI-Fokus fuer den ausgewaehlten Tag</p>
+          <p className="text-xs text-slate-500">KI-Fokus für den ausgewählten Tag</p>
         </div>
       </div>
 

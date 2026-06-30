@@ -36,7 +36,7 @@ const PersonalRecords = ({ records }) => {
           <Award className="w-5 h-5 text-amber-300" />
         </div>
         <div>
-          <h2 className="text-base font-bold text-white">Persoenliche Rekorde</h2>
+          <h2 className="text-base font-bold text-white">Persönliche Rekorde</h2>
           <p className="text-xs text-slate-500">Letzte 90 Tage</p>
         </div>
       </div>
@@ -51,9 +51,9 @@ const PersonalRecords = ({ records }) => {
         />
         <RecordTile
           icon={Coffee}
-          label="Top-Getraenk"
+          label="Top-Getränk"
           value={favorite?.name || 'Noch offen'}
-          detail={favorite ? `${favorite.count}x, ${formatMg(favorite.totalCaffeine)}` : 'Mehr tracken fuer Muster'}
+          detail={favorite ? `${favorite.count}x, ${formatMg(favorite.totalCaffeine)}` : 'Mehr tracken für Muster'}
           color="amber"
         />
         <RecordTile
@@ -65,7 +65,7 @@ const PersonalRecords = ({ records }) => {
         />
         <RecordTile
           icon={Award}
-          label="Meiste Eintraege"
+          label="Meiste Einträge"
           value={`${maxLogged?.count || 0}`}
           detail={maxLogged?.date || 'Noch keine Daten'}
           color="blue"

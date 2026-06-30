@@ -306,7 +306,7 @@ const authLimiter = rateLimit({
   limit: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Zu viele Anfragen. Bitte spaeter erneut versuchen.' },
+  message: { error: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
 });
 
 app.use('/api', apiLimiter);
@@ -403,7 +403,7 @@ const keyFromSecret = (secret) => crypto.createHash('sha256').update(cleanEnvVal
 const secretStorageKey = keyFromSecret(process.env.SECRET_KEY_STORAGE_KEY || process.env.SESSION_SECRET || process.env.PASSWORD_SALT);
 
 if (!process.env.SECRET_ENCRYPTION_KEY && !process.env.DATA_ENCRYPTION_KEY && !process.env.SESSION_SECRET) {
-  console.warn('[Security] SECRET_ENCRYPTION_KEY und SESSION_SECRET fehlen. Nutze PASSWORD_SALT als schwachen Fallback fuer verschluesselte gespeicherte Secrets.');
+  console.warn('[Security] SECRET_ENCRYPTION_KEY und SESSION_SECRET fehlen. Nutze PASSWORD_SALT als schwachen Fallback für verschlüsselte gespeicherte Secrets.');
 }
 
 const isEncryptedSecret = (value) => String(value || '').startsWith(ENCRYPTED_SECRET_PREFIX);
@@ -431,7 +431,7 @@ const decryptSecretWithKey = (value, key) => {
       decipher.final(),
     ]).toString('utf8');
   } catch (err) {
-    console.error('[Security] Gespeichertes Secret konnte nicht entschluesselt werden:', err.message);
+    console.error('[Security] Gespeichertes Secret konnte nicht entschlüsselt werden:', err.message);
     return '';
   }
 };
@@ -897,10 +897,10 @@ const s3FetchErrorMessage = (err, url) => {
   const code = cause?.code || err?.code;
   const host = cause?.hostname || cause?.host || url.hostname;
   if (code === 'ERR_TLS_CERT_ALTNAME_INVALID') {
-    return `S3 TLS-Zertifikat passt nicht zum Host ${host}. Prüfe den Endpoint und ob Path-Style fuer deinen Anbieter korrekt gesetzt ist.`;
+    return `S3 TLS-Zertifikat passt nicht zum Host ${host}. Prüfe den Endpoint und ob Path-Style für deinen Anbieter korrekt gesetzt ist.`;
   }
   if (['EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT'].includes(code)) {
-    return `S3 Verbindung fehlgeschlagen (${code}) fuer ${host}. Bitte Endpoint, DNS und Netzwerkverbindung pruefen.`;
+    return `S3 Verbindung fehlgeschlagen (${code}) für ${host}. Bitte Endpoint, DNS und Netzwerkverbindung prüfen.`;
   }
   return `S3 Verbindung fehlgeschlagen: ${err?.message || 'Unbekannter Fehler'}`;
 };
@@ -964,7 +964,7 @@ const loadDbState = async () => {
     // Avoid command retry noise when Redis is currently unreachable.
     const pingResult = await redis.ping().catch(() => null);
     if (pingResult !== 'PONG') {
-      console.warn('[DB] Redis aktuell nicht erreichbar. Starte mit leerem In-Memory-Stand und versuche spaeter erneut.');
+      console.warn('[DB] Redis aktuell nicht erreichbar. Starte mit leerem In-Memory-Stand und versuche später erneut.');
       return;
     }
 
@@ -1008,7 +1008,7 @@ const loadDbState = async () => {
     const shouldEncryptS3Secrets = hasPlainS3Secrets(loadedState.s3_settings);
     dbState = loadedState;
     if (shouldEncryptS3Secrets) {
-      console.log('[Security] Migriere gespeicherte S3-Zugangsdaten in verschluesselte Ablage.');
+      console.log('[Security] Migriere gespeicherte S3-Zugangsdaten in verschlüsselte Ablage.');
       await persistDbState();
     }
   } catch (err) {
@@ -1553,12 +1553,12 @@ const fetchDrinkWebContext = async (description) => {
 
 const formatDrinkWebContext = (hits) => {
   if (!Array.isArray(hits) || hits.length === 0) {
-    return 'Keine verifizierten Online-Treffer gefunden. Nutze konservative Standardschaetzungen.';
+    return 'Keine verifizierten Online-Treffer gefunden. Nutze konservative Standardschätzungen.';
   }
 
   return hits.map((hit, idx) => {
     const brand = hit.brand ? `, Marke: ${hit.brand}` : '';
-    const size = hit.sizeMl ? `, Groesse: ${hit.sizeMl}ml` : '';
+    const size = hit.sizeMl ? `, Größe: ${hit.sizeMl}ml` : '';
     const caffeine = hit.caffeinePer100ml !== null && hit.caffeinePer100ml !== undefined
       ? `, Koffein/100ml: ${hit.caffeinePer100ml}mg`
       : ', Koffein/100ml: unbekannt';
@@ -1897,7 +1897,7 @@ const sanitizeSecurityOverview = (user) => {
     totpEnabled: !!user.totp_enabled,
     passkeys: user.passkeys.map((k) => ({
       id: k.id,
-      name: k.name || 'Sicherheitsschluessel',
+      name: k.name || 'Sicherheitsschlüssel',
       createdAt: k.createdAt,
       lastUsedAt: k.lastUsedAt || null,
       transports: Array.isArray(k.transports) ? k.transports : [],
@@ -2059,7 +2059,7 @@ const getRangeFromQuery = (query, defaultDays = 30) => {
   const startDate = parseDateKey(start);
   const endDate = parseDateKey(end);
   if (!startDate || !endDate || startDate > endDate) {
-    const err = new Error('start und end muessen gueltige Datumswerte im Format YYYY-MM-DD sein.');
+    const err = new Error('start und end müssen gültige Datumswerte im Format YYYY-MM-DD sein.');
     err.status = 400;
     throw err;
   }
@@ -2208,7 +2208,7 @@ const buildAchievements = ({ logs, dailyLimit }) => {
     },
     {
       id: 'no-late-week',
-      title: 'Keine spaeten Drinks',
+      title: 'Keine späten Drinks',
       description: 'Diese Woche kein Koffein nach 18:00 Uhr.',
       progress: lateWeek ? 0 : 1,
       target: 1,
@@ -2299,7 +2299,7 @@ const getUserInsights = ({ userId, email }) => {
 const csvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 const buildLogsCsv = (logs) => {
-  const header = ['ID', 'Name', 'Koffein (mg)', 'Groesse (ml)', 'Datum', 'E-Mail', 'Erstellt'];
+  const header = ['ID', 'Name', 'Koffein (mg)', 'Größe (ml)', 'Datum', 'E-Mail', 'Erstellt'];
   const rows = logs.map((log) => [
     log.id,
     log.name,
@@ -2320,11 +2320,15 @@ const getExportSummary = (logs, start, end) => ({
   totalSize: logs.reduce((sum, log) => sum + (Number(log.size) || 0), 0),
 });
 
-const pdfSafeText = (value) => String(value ?? '')
-  .normalize('NFKD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/[^\x20-\x7E]/g, '?')
-  .replace(/[\\()]/g, (char) => `\\${char}`);
+const pdfTextHex = (value) => {
+  const littleEndian = Buffer.from(`\uFEFF${String(value ?? '')}`, 'utf16le');
+  for (let index = 0; index < littleEndian.length; index += 2) {
+    const first = littleEndian[index];
+    littleEndian[index] = littleEndian[index + 1];
+    littleEndian[index + 1] = first;
+  }
+  return `<${littleEndian.toString('hex').toUpperCase()}>`;
+};
 
 const wrapPdfLine = (value, maxLength = 96) => {
   const words = String(value ?? '').split(/\s+/).filter(Boolean);
@@ -2348,16 +2352,16 @@ const buildLogsPdfBuffer = ({ logs, summary }) => {
     'Koffein Export',
     `${summary.start} bis ${summary.end}`,
     '',
-    `Eintraege: ${summary.logCount}`,
+    `Einträge: ${summary.logCount}`,
     `Koffein gesamt: ${summary.totalCaffeine} mg`,
-    `Getraenke gesamt: ${summary.totalSize} ml`,
+    `Getränke gesamt: ${summary.totalSize} ml`,
     '',
-    'Datum       Koffein  Groesse  Getraenk',
+    'Datum       Koffein  Größe  Getränk',
     '------------------------------------------------------------',
   ];
 
   if (logs.length === 0) {
-    lines.push('Keine Eintraege im gewaehlten Zeitraum.');
+    lines.push('Keine Einträge im gewählten Zeitraum.');
   } else {
     logs.forEach((log) => {
       const row = `${String(log.date || '').padEnd(10)} ${String(Number(log.caffeine) || 0).padStart(6)}mg ${String(Number(log.size) || 0).padStart(6)}ml  ${log.name || 'Unbekannt'}`;
@@ -2380,8 +2384,8 @@ const buildLogsPdfBuffer = ({ logs, summary }) => {
 
   pageLines.forEach((page, index) => {
     const escapedLines = [
-      `(${pdfSafeText(`Koffein-Tracker Export - Seite ${index + 1}/${pageLines.length}`)}) Tj T*`,
-      ...page.map((line) => `(${pdfSafeText(line)}) Tj T*`),
+      `${pdfTextHex(`Koffein-Tracker Export - Seite ${index + 1}/${pageLines.length}`)} Tj T*`,
+      ...page.map((line) => `${pdfTextHex(line)} Tj T*`),
     ].join('\n');
     const content = `BT\n/F1 10 Tf\n50 790 Td\n14 TL\n${escapedLines}\nET`;
     const contentId = addObject(`<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`);
@@ -2430,10 +2434,10 @@ const sendExportPdfEmail = async ({ to, logs, summary }) => {
       icon: '📄',
       headerText: 'Dein Koffein-Export',
       contentHtml: `
-        <p style="text-align: center; margin-top: 0;">Dein Export fuer den Zeitraum <strong>${summary.start}</strong> bis <strong>${summary.end}</strong> haengt als PDF an.</p>
-        <p style="text-align: center; margin: 0;">${summary.logCount} Eintraege, ${summary.totalCaffeine} mg Koffein, ${summary.totalSize} ml Getraenke.</p>
+        <p style="text-align: center; margin-top: 0;">Dein Export für den Zeitraum <strong>${summary.start}</strong> bis <strong>${summary.end}</strong> hängt als PDF an.</p>
+        <p style="text-align: center; margin: 0;">${summary.logCount} Einträge, ${summary.totalCaffeine} mg Koffein, ${summary.totalSize} ml Getränke.</p>
       `,
-      footerText: 'Diese E-Mail wurde ueber die Exportfunktion deiner Startseite verschickt.',
+      footerText: 'Diese E-Mail wurde über die Exportfunktion deiner Startseite verschickt.',
     }),
     attachments: [{
       filename,
@@ -2522,7 +2526,15 @@ const getAdminActivity = () => {
   };
 };
 
-const buildModernEmail = ({ icon, headerText, contentHtml, footerText }) => `
+const buildModernEmail = ({ icon, headerText, contentHtml, footerText }) => `<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${headerText || 'Koffein-Tracker'}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #02040A;">
   <div style="font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #02040A; color: #f1f5f9; padding: 40px 20px; text-align: center;">
     <div style="max-width: 500px; margin: 0 auto; background-color: #0d1117; border: 1px solid #1f2937; border-radius: 24px; padding: 40px 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
       <div style="width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #3b82f6, #60a5fa, #fbbf24); margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(96,165,250,0.4);">
@@ -2538,16 +2550,18 @@ const buildModernEmail = ({ icon, headerText, contentHtml, footerText }) => `
       ${footerText || ''}
     </p>
   </div>
+</body>
+</html>
 `;
 
 const HYDRATION_FALLBACK_QUOTES = [
-  'Ein Glas Wasser macht den Kopf klarer als der naechste Reflex-Kaffee.',
-  'Heute kurz trinken, bevor der Akku auf Reserve laeuft.',
+  'Ein Glas Wasser macht den Kopf klarer als der nächste Reflex-Kaffee.',
+  'Heute kurz trinken, bevor der Akku auf Reserve läuft.',
   'Hydration zuerst, Koffein danach mit besserem Gewissen.',
-  'Kleine Wasserpause, grosser Unterschied fuer den Tag.',
+  'Kleine Wasserpause, großer Unterschied für den Tag.',
   'Dein Tagesziel startet mit einem Schluck, nicht mit Perfektion.',
-  'Wasser ist der stille Co-Pilot fuer Fokus und Energie.',
-  'Erst auffuellen, dann beschleunigen.',
+  'Wasser ist der stille Co-Pilot für Fokus und Energie.',
+  'Erst auffüllen, dann beschleunigen.',
 ];
 
 const parseJsonObject = (value) => {
@@ -2585,11 +2599,11 @@ const getDailyHydrationQuote = async (date = getTodayKey()) => {
     const result = await callOpenRouter([
       {
         role: 'system',
-        content: 'Du schreibst kurze, alltagstaugliche deutsche Motivationssaetze fuer eine Koffein-Tracker-App. Keine Emojis, keine Hashtags, maximal 16 Woerter.',
+        content: 'Du schreibst kurze, alltagstaugliche deutsche Motivationssätze für eine Koffein-Tracker-App. Keine Emojis, keine Hashtags, maximal 16 Wörter.',
       },
       {
         role: 'user',
-        content: `Erstelle fuer ${safeDate} einen neuen Tagesziel-Spruch zum Thema Hydration im Blick behalten. Nur den Satz ausgeben.`,
+        content: `Erstelle für ${safeDate} einen neuen Tagesziel-Spruch zum Thema Hydration im Blick behalten. Nur den Satz ausgeben.`,
       },
     ]);
     quote = sanitizeHydrationQuote(result.content, safeDate);
@@ -2647,7 +2661,7 @@ const getDailyCoach = async ({ userId, email, date = getTodayKey() }) => {
     const result = await callOpenRouter([
       {
         role: 'system',
-        content: 'Du bist der kurze Tagescoach einer Koffein-Tracker-App. Antworte ausschliesslich als JSON mit risk low|medium|high, headline, advice und actions Array mit 3 kurzen deutschen Strings. Keine Markdown-Erklaerung.',
+        content: 'Du bist der kurze Tagescoach einer Koffein-Tracker-App. Antworte ausschließlich als JSON mit risk low|medium|high, headline, advice und actions Array mit 3 kurzen deutschen Strings. Keine Markdown-Erklärung.',
       },
       {
         role: 'user',

@@ -14,7 +14,7 @@ const login = async (email, password) => {
     body: JSON.stringify({ email, password }),
   });
 
-  assert.strictEqual(res.status, 200, `Login fuer ${email} fehlgeschlagen: ${res.status}`);
+  assert.strictEqual(res.status, 200, `Login für ${email} fehlgeschlagen: ${res.status}`);
   const body = await res.json();
   assert.ok(body.user?.token, 'Login muss ein Session-Token liefern');
   return body.user.token;
@@ -249,7 +249,7 @@ test('Admin kann globale Eingabeart zwischen KI und manuell umschalten', async (
   }
 });
 
-test('Public Settings liefern Demo-Zugangsdaten fuer Demo-Buttons', async () => {
+test('Public Settings liefern Demo-Zugangsdaten für Demo-Buttons', async () => {
   const res = await fetch(`${BASE_URL}/settings/public`);
   assert.strictEqual(res.status, 200, `Expected 200 OK, got ${res.status}`);
   const body = await res.json();
@@ -366,7 +366,7 @@ test('Version 3 liefert Tagescoach, Rekorde und erweiterte Muster', async () => 
   assert.ok(String(insights.focus || '').length > 0);
 });
 
-test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angemeldete Benutzer', async () => {
+test('Discord Webhook wird gespeichert und AI Scheduling funktioniert für angemeldete Benutzer', async () => {
   const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
   const userToken = await login(USER_EMAIL, USER_PASSWORD);
   const exportRes = await fetch(`${BASE_URL}/admin/database/export`, {
@@ -420,7 +420,7 @@ test('Discord Webhook wird gespeichert und AI Scheduling funktioniert fuer angem
   }
 });
 
-test('Log-API ist pro Benutzer geschuetzt und bleibt editierbar', async () => {
+test('Log-API ist pro Benutzer geschützt und bleibt editierbar', async () => {
   const unauthenticatedCreate = await fetch(`${BASE_URL}/logs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -486,7 +486,7 @@ test('Log-API ist pro Benutzer geschuetzt und bleibt editierbar', async () => {
   }
 });
 
-test('Benutzer koennen fremde Logs weder abfragen noch loeschen', async () => {
+test('Benutzer können fremde Logs weder abfragen noch löschen', async () => {
   const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
   const userToken = await login(USER_EMAIL, USER_PASSWORD);
   const testDate = '2026-06-14';

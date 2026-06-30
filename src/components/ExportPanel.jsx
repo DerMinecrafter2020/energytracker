@@ -16,7 +16,7 @@ const defaultStart = () => {
 const csvValue = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 const buildCsv = (items) => {
-  const header = ['ID', 'Name', 'Koffein (mg)', 'Groesse (ml)', 'Datum', 'Erstellt'];
+  const header = ['ID', 'Name', 'Koffein (mg)', 'Größe (ml)', 'Datum', 'Erstellt'];
   const rows = items.map((item) => [item.id, item.name, item.caffeine, item.size, item.date, item.createdAt].map(csvValue).join(','));
   return [header.map(csvValue).join(','), ...rows].join('\n');
 };

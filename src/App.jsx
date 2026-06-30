@@ -543,7 +543,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
         onShowSettings={() => setShowSettings(true)}
       />
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 pb-20 sm:pb-24">
+      <main className="max-w-screen-2xl mx-auto px-3 sm:px-5 lg:px-6 pb-20 sm:pb-24">
         {latestVersion && latestVersion !== currentVersion && (
           <div className="glass-card border border-blue-500/30 bg-blue-500/10
             px-4 py-3 rounded-2xl mb-6 animate-fade-in">
@@ -610,11 +610,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
               </div>
             </div>
 
-            <section className={`grid gap-4 sm:gap-5 items-start ${
-              isManualMode
-                ? 'xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]'
-                : 'xl:grid-cols-[minmax(0,1fr)_390px]'
-            }`}>
+            <section className={`${isManualMode ? 'space-y-4 sm:space-y-5' : 'grid gap-4 sm:gap-5 items-start xl:grid-cols-[minmax(0,1fr)_minmax(360px,430px)]'}`}>
               <div className="min-w-0">
                 {isManualMode ? (
                   <ManualDrinkEntry
@@ -645,14 +641,14 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
                 </div>
 
                 {isManualMode ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4">
                     {aiContextWidgets}
                   </div>
                 ) : aiContextWidgets}
               </aside>
             </section>
 
-            <section className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] items-start">
+            <section className={isManualMode ? 'space-y-4 sm:space-y-5' : 'grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)] items-start'}>
               <CalendarWidget
                 selectedDate={selectedDate}
                 logs={logs}
@@ -664,7 +660,7 @@ function TrackerApp({ session, onLogout, onShowAdminPanel, initialScrollY, onPer
                 isLoading={isOperationLoading}
               />
 
-              <div className={isManualMode ? 'grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5' : 'space-y-4 sm:space-y-5'}>
+              <div className={isManualMode ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5' : 'space-y-4 sm:space-y-5'}>
                 <DrinkHistory
                   selectedDate={selectedDate}
                   logs={logs}

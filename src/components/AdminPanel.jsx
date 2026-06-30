@@ -61,7 +61,7 @@ const backupScopes = [
 ];
 
 const buildAdminCsv = (items) => {
-  const header = ['ID', 'Name', 'Koffein (mg)', 'Groesse (ml)', 'Datum', 'E-Mail', 'Erstellt'];
+  const header = ['ID', 'Name', 'Koffein (mg)', 'Größe (ml)', 'Datum', 'E-Mail', 'Erstellt'];
   const rows = items.map((item) => [
     item.id,
     item.name,
@@ -118,7 +118,7 @@ const renderAdminPrintableHtml = ({ items, summary }) => `
       </div>
       <table>
         <thead>
-          <tr><th>Datum</th><th>Benutzer</th><th>Name</th><th>Groesse</th><th>Koffein</th></tr>
+          <tr><th>Datum</th><th>Benutzer</th><th>Name</th><th>Größe</th><th>Koffein</th></tr>
         </thead>
         <tbody>
           ${items.map((item) => `
@@ -1593,7 +1593,7 @@ const AdminPanel = ({ session, onLogout, onShowUserPanel, onImpersonate, initial
               <StatCard icon={Activity} label="Aktiv 7 Tage" value={adminActivity.totals.activeUsers7Days || 0} color="green" />
               <StatCard icon={Calendar} label="Logs heute" value={adminActivity.totals.logsToday || 0} color="purple" />
               <StatCard icon={Zap} label="Koffein heute" value={`${adminActivity.totals.caffeineToday || 0} mg`} color="amber" />
-              <StatCard icon={AlertTriangle} label="Ueber Limit" value={adminActivity.totals.usersOverLimit || 0} color="red" />
+              <StatCard icon={AlertTriangle} label="Über Limit" value={adminActivity.totals.usersOverLimit || 0} color="red" />
             </div>
 
             <div className="glass-card rounded-2xl p-6 space-y-4">
