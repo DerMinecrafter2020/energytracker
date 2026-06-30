@@ -266,7 +266,7 @@ test('Public Settings liefern Demo-Zugangsdaten fuer Demo-Buttons', async () => 
 
 test('Startseiten Export mailt PDF und Tagesziel-Spruch ist abrufbar', async () => {
   const adminToken = await login(ADMIN_EMAIL, ADMIN_PASSWORD);
-  const userToken = await login(USER_EMAIL, USER_PASSWORD);
+  let userToken = await login(USER_EMAIL, USER_PASSWORD);
   const exportRes = await fetch(`${BASE_URL}/admin/database/export`, {
     headers: authHeaders(adminToken),
   });
@@ -291,14 +291,30 @@ test('Startseiten Export mailt PDF und Tagesziel-Spruch ist abrufbar', async () 
     });
     assert.strictEqual(smtpRes.status, 200, `Expected 200 OK, got ${smtpRes.status}`);
 
+    const updatedEmail = 'pdf-export-user@example.test';
+    const profileRes = await fetch(`${BASE_URL}/user/profile`, {
+      method: 'POST',
+      headers: authHeaders(userToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        currentPassword: USER_PASSWORD,
+        newName: 'PDF Export User',
+        newEmail: updatedEmail,
+      }),
+    });
+    assert.strictEqual(profileRes.status, 200, `Expected 200 OK, got ${profileRes.status}`);
+    const profileBody = await profileRes.json();
+    assert.strictEqual(profileBody.email, updatedEmail);
+    userToken = profileBody.token;
+
     const mailRes = await fetch(`${BASE_URL}/export/logs/email-pdf`, {
       method: 'POST',
       headers: authHeaders(userToken, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ start: '2026-06-01', end: '2026-06-30' }),
+      body: JSON.stringify({ start: '2026-06-01', end: '2026-06-30', email: 'falsch@example.test' }),
     });
     assert.strictEqual(mailRes.status, 200, `Expected 200 OK, got ${mailRes.status}`);
     const mailBody = await mailRes.json();
     assert.strictEqual(mailBody.success, true);
+    assert.strictEqual(mailBody.to, updatedEmail);
     assert.match(mailBody.filename, /\.pdf$/);
     assert.ok(Number(mailBody.size || 0) > 100, 'PDF-Anhang muss Inhalt haben');
 

@@ -2351,13 +2351,19 @@ const sendExportPdfEmail = async ({ to, logs, summary }) => {
     err.status = 400;
     throw err;
   }
+  const recipient = String(to || '').toLowerCase().trim();
+  if (!recipient) {
+    const err = new Error('Für diesen Benutzer ist keine E-Mail-Adresse hinterlegt.');
+    err.status = 400;
+    throw err;
+  }
 
   const filename = `koffein-export-${summary.start}-bis-${summary.end}.pdf`;
   const pdf = buildLogsPdfBuffer({ logs, summary });
   const transporter = createTransporter(cfg);
   await transporter.sendMail({
     from: `"${cfg.fromName}" <${cfg.fromEmail || 'admin@fra03.de'}>`,
-    to,
+    to: recipient,
     subject: `Koffein-Tracker Export ${summary.start} bis ${summary.end}`,
     html: buildModernEmail({
       icon: '📄',
@@ -4599,13 +4605,15 @@ app.get('/api/export/logs', requireAuth, async (req, res) => {
 app.post('/api/export/logs/email-pdf', requireAuth, async (req, res) => {
   try {
     const { userId, email } = authIdentity(req);
+    const profileUser = getUserByIdentity({ userId, email }) || req.user;
+    const recipientEmail = String(profileUser?.email || email || '').toLowerCase().trim();
     const { start, end } = getRangeFromQuery(req.body || {}, 30);
     const logs = getLogsForUser({ userId, email, start, end });
     const summary = getExportSummary(logs, start, end);
-    const result = await sendExportPdfEmail({ to: email, logs, summary });
+    const result = await sendExportPdfEmail({ to: recipientEmail, logs, summary });
     res.json({
       success: true,
-      to: email,
+      to: recipientEmail,
       filename: result.filename,
       size: result.size,
       summary,
